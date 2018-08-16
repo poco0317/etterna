@@ -2934,8 +2934,8 @@ void Player::SetJudgment( int iRow, int iTrack, const TapNote &tn, TapNoteScore 
 		if (tns != TNS_Miss)
 			msg.SetParam("Offset", tn.result.fTapNoteOffset * 1000);  // don't send out ms offsets for misses, multiply by 1000 for convenience - Mina
 
-		if (m_pPlayerStageStats != nullptr) {
-			if (tns == TNS_Miss)
+		if (m_pPlayerStageStats != nullptr && tns != TNS_CheckpointHit) {
+			if (tns == TNS_Miss || tns == TNS_CheckpointMiss)
 				curwifescore -= 8;
 			else
 				curwifescore += wife2(tn.result.fTapNoteOffset, m_fTimingWindowScale);
@@ -3044,8 +3044,8 @@ void Player::SetHoldJudgment( TapNote &tn, int iTrack, int iRow)
 			msg.SetParam("Val", m_pPlayerStageStats->m_iHoldNoteScores[tn.HoldResult.hns] + 1);
 
 			// Ms scoring implemenation - Mina
-			if (tn.HoldResult.hns == HNS_LetGo || tn.HoldResult.hns == HNS_Missed)
-				curwifescore -= 6.f;
+			if ((tn.HoldResult.hns == HNS_LetGo || tn.HoldResult.hns == HNS_Missed) && GAMESTATE->m_pCurGame->m_szName != "pump")
+				curwifescore -= 6.f; 
 
 			msg.SetParam("WifePercent", 100 * curwifescore / maxwifescore);
 			msg.SetParam("CurWifeScore", curwifescore);
