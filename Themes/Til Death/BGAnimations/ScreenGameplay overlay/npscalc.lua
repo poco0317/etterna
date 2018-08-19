@@ -6,11 +6,11 @@
 local enabled = {
 	NPSDisplay = {
 		PlayerNumber_P1 = GAMESTATE:IsPlayerEnabled(PLAYER_1) and playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).NPSDisplay,
-		PlayerNumber_P2 = GAMESTATE:IsPlayerEnabled(PLAYER_2) and playerConfig:get_data(pn_to_profile_slot(PLAYER_2)).NPSDisplay
+		--PlayerNumber_P2 = GAMESTATE:IsPlayerEnabled(PLAYER_2) and playerConfig:get_data(pn_to_profile_slot(PLAYER_2)).NPSDisplay
 	},
 	NPSGraph = {
 		PlayerNumber_P1 = GAMESTATE:IsPlayerEnabled(PLAYER_1) and playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).NPSGraph,
-		PlayerNumber_P2 = GAMESTATE:IsPlayerEnabled(PLAYER_2) and playerConfig:get_data(pn_to_profile_slot(PLAYER_2)).NPSGraph
+		--PlayerNumber_P2 = GAMESTATE:IsPlayerEnabled(PLAYER_2) and playerConfig:get_data(pn_to_profile_slot(PLAYER_2)).NPSGraph
 	}
 }
 
@@ -189,10 +189,10 @@ local graphPos = {  -- Position of the NPS graph
 		X = 0 + mpOffset,
 		Y = SCREEN_BOTTOM-160
 	},
-	PlayerNumber_P2 = {
+	--[[PlayerNumber_P2 = {
 		X = SCREEN_WIDTH-graphWidth,
 		Y = 50
-	}
+	}]]
 }
 
 local textPos = { -- Position of the NPS text
@@ -200,10 +200,10 @@ local textPos = { -- Position of the NPS text
 		X = 5 + mpOffset,
 		Y = SCREEN_BOTTOM-170
 	},
-	PlayerNumber_P2 = {
+	--[[PlayerNumber_P2 = {
 		X = SCREEN_WIDTH-graphWidth,
 		Y = 34
-	}
+	}]]
 }
 
 local maxVerts = 100 -- Higher numbers allows for more detailed graph that spans for a longer duration. But may lead to performance issues
@@ -235,12 +235,12 @@ local npsWindow = {
 -- (let's just call this notes for simplicity)
 local noteTable = {
 	PlayerNumber_P1 = {},
-	PlayerNumber_P2 = {},
+	--PlayerNumber_P2 = {},
 }
 
 local lastJudgment = {
 	PlayerNumber_P1 = 'TapNoteScore_None',
-	PlayerNumber_P2 = 'TapNoteScore_None'
+	--PlayerNumber_P2 = 'TapNoteScore_None'
 }
 
 -- Total sum of notes inside the moving average window for each player.
@@ -249,12 +249,12 @@ local lastJudgment = {
 -- iterating through the entire noteTable to get the sum. 
 local noteSum = {
 	PlayerNumber_P1 = 0,
-	PlayerNumber_P2 = 0, 
+	--PlayerNumber_P2 = 0, 
 }
 
 local peakNPS = {
 	PlayerNumber_P1 = 0,
-	PlayerNumber_P2 = 0, 
+	--PlayerNumber_P2 = 0, 
 }
 
 
