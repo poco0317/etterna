@@ -84,6 +84,25 @@ local defaultConfig = {
 		Grade_Tier17	= "#000000", -- ITG PLS
 		Grade_Failed	= "#cdcdcd", -- F
 		Grade_None		= "#666666", -- no play
+		Tier01	= "#66ccff", -- AAAA
+		Tier02	= "#eebb00", -- AAA
+		Tier03	= "#66cc66", -- AA
+		Tier04	= "#da5757", -- A
+		Tier05	= "#5b78bb", -- B
+		Tier06	= "#c97bff", -- C
+		Tier07	= "#8c6239", -- D
+		Tier08	= "#000000", -- ITG PLS
+		Tier09	= "#000000", -- ITG PLS
+		Tier10	= "#000000", -- ITG PLS
+		Tier11	= "#000000", -- ITG PLS
+		Tier12	= "#000000", -- ITG PLS
+		Tier13	= "#000000", -- ITG PLS
+		Tier14	= "#000000", -- ITG PLS
+		Tier15	= "#000000", -- ITG PLS
+		Tier16	= "#000000", -- ITG PLS
+		Tier17	= "#000000", -- ITG PLS
+		Failed	= "#cdcdcd", -- F
+		None		= "#666666", -- no play
 	},
 
 	judgment = { -- Colors of each Judgment types
