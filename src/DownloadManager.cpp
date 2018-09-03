@@ -1040,8 +1040,12 @@ float overratedness(string chartkey) {
 void DownloadManager::MakeAThing(string chartkey) {
 	athing.clear();
 	HighScore hs;
+	unordered_set<string> userswithscores;
 
 	for (auto& ohs : DLMAN->chartLeaderboards[chartkey]) {
+		if (topscoresonly && userswithscores.count(ohs.username) == 1)
+			continue;
+
 		hs.SetDateTime(ohs.datetime);
 		hs.SetMaxCombo(ohs.maxcombo);
 		hs.SetName(ohs.username);
@@ -1068,7 +1072,9 @@ void DownloadManager::MakeAThing(string chartkey) {
 		hs.scoreid = ohs.scoreid;
 		hs.avatar = ohs.avatar;
 		athing.push_back(hs);
+		userswithscores.emplace(ohs.username);
 	}
+	userswithscores.clear();
 	
 }
 
@@ -1141,8 +1147,9 @@ void DownloadManager::RequestChartLeaderBoard(string chartkey)
 				// it seems prudent to maintain the eo functionality in this way and screen out multiple scores from the same user 
 				// even more prudent would be to put this last where it belongs, we don't want to screen out scores for players who wouldn't
 				// have had them registered in the first place -mina
-				if (userswithscores.count(tmp.username) == 1)
-					continue;
+				// Retrieve all scores in all cases; moved this to the lua-related methods. Default behavior acts the same. -poco
+				//if (userswithscores.count(tmp.username) == 1)
+				//	continue;
 
 				userswithscores.emplace(tmp.username);
 				vec.emplace_back(tmp);
@@ -1805,6 +1812,14 @@ public:
 		lua_pushboolean(L, p->currentrateonly);
 		return 1;
 	}
+	static int ToggleTopScoresOnlyFilter(T* p, lua_State* L) {
+		p->topscoresonly = !p->topscoresonly;
+		return 0;
+	}
+	static int GetTopScoresOnlyFilter(T* p, lua_State* L) {
+		lua_pushboolean(L, p->topscoresonly);
+		return 1;
+	}
 
 	LunaDownloadManager()
 	{
@@ -1828,6 +1843,8 @@ public:
 		ADD_METHOD(RequestChartLeaderBoard);
 		ADD_METHOD(ToggleRateFilter);
 		ADD_METHOD(GetCurrentRateFilter);
+		ADD_METHOD(ToggleTopScoresOnlyFilter);
+		ADD_METHOD(GetTopScoresOnlyFilter);
 		ADD_METHOD(Logout);
 	}
 };
