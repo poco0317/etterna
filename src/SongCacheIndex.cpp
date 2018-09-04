@@ -414,17 +414,22 @@ bool SongCacheIndex::CacheSong(Song& song, string dir)
 			NUM_BackgroundLayer,
 			BACKGROUND_LAYER_Invalid
 		}; */
+		LOG->Trace("working on song %s", song.m_sSongFileName);
 		FOREACH_BackgroundLayer(b)
 		{
+			LOG->Trace("in song, layer %d", b);
 			string bgchanges = "";
 			if (song.GetBackgroundChanges(b).empty())
 			{
-				insertSong.bind(index++);
+				LOG->Trace("background skipped %s", song.m_sSongFileName);
+				insertSong.bind(index++, NULL);
 				continue;	// skip
 			}
 			for (auto &bgc : song.GetBackgroundChanges(b))
 			{
+				LOG->Trace("background change %s", bgc.ToString());
 				bgchanges.append(bgc.ToString() + ",");
+				LOG->Trace("background change2 %s", bgc.ToString() + ",");
 			}
 
 			/* If there's an animation plan at all, add a dummy "-nosongbg-" tag to
@@ -436,6 +441,8 @@ bool SongCacheIndex::CacheSong(Song& song, string dir)
 				bgchanges.append("99999=-nosongbg-=1.000=0=0=0");
 			}
 			insertSong.bind(index++, bgchanges);
+			LOG->Trace("bgchanges is %s", bgchanges);
+
 		}
 
 		if (song.GetForegroundChanges().size())
@@ -866,6 +873,9 @@ inline pair<RString, int> SongCacheIndex::SongFromStatement(Song* song, SQLite::
 
 	string animations = static_cast<const char *>(query.getColumn(index++));
 	string animationstwo = static_cast<const char *>(query.getColumn(index++));
+
+	//LOG->Trace("animations %s", animations);
+	//LOG->Trace("animations2 %s", animationstwo);
 
 	vector<RString> aFGChangeExpressions;
 	split(static_cast<const char *>(query.getColumn(index++)), ",", aFGChangeExpressions);

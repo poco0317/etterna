@@ -350,13 +350,17 @@ void SMLoader::ProcessBGChanges( Song &out, const RString &sValueName, const RSt
 	else
 	{
 		vector<RString> aBGChangeExpressions;
+		LOG->Trace("eheuehueh %s", sPath);
 		split( sParam, ",", aBGChangeExpressions );
-		
+		LOG->Trace("yeeter %d", aBGChangeExpressions.size());
 		for( unsigned b=0; b<aBGChangeExpressions.size(); b++ )
 		{
 			BackgroundChange change;
-			if( LoadFromBGChangesString( change, aBGChangeExpressions[b] ) )
-				out.AddBackgroundChange( iLayer, change );
+			if (LoadFromBGChangesString(change, aBGChangeExpressions[b]))
+			{
+				LOG->Trace("this: %s", aBGChangeExpressions[b]);
+				out.AddBackgroundChange(iLayer, change);
+			}
 		}
 	}
 }
