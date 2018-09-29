@@ -1,6 +1,7 @@
 --[[ Screen Filter ]]
 
-
+local keymode = getCurrentKeyMode()
+local allowedCustomization = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 local padding = 20 -- 10px on each side
 local arrowWidth = 64 -- until noteskin metrics are implemented...
 
@@ -14,12 +15,12 @@ local filterAlphas = {
 --moving notefield shenanigans
 local rPressed = false
 local tPressed = false
-local noteFieldWidth = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).GameplaySizes.NotefieldWidth
-local notefieldX = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).GameplayXYCoordinates.NotefieldX
+local noteFieldWidth = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).GameplaySizes[keymode].NotefieldWidth
+local notefieldX = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).GameplayXYCoordinates[keymode].NotefieldX
 local filter
 
 local function input(event)
-	if getAutoplay() ~= 0 then
+	if getAutoplay() ~= 0 then -- not touching this currently, its fully bound with the notefield ones and doesnt have a message
 		if event.DeviceInput.button == "DeviceButton_r" then
 			rPressed = not (event.type == "InputEventType_Release")
 		end
@@ -50,7 +51,7 @@ end
 
 local t = Def.ActorFrame{
 	OnCommand=function()
-		if(playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay) then
+		if(allowedCustomization) then
 			SCREENMAN:GetTopScreen():AddInputCallback(input)
 		end
 	end
