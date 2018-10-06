@@ -846,6 +846,25 @@ class LunaSteps : public Luna<Steps>
 			lua_pushstring(L, "");
 		return 1;
 	}
+	static int GetNonEmptyNoteData(T* p, lua_State* L)
+	{
+		NoteData nd = p->GetNoteData();
+		lua_newtable(L);
+		vector<int> keys;
+		FOREACH_NONEMPTY_ROW_ALL_TRACKS(nd, currow)
+		{
+			vector<int> rownotes;
+			//rownotes.reserve(nd.GetNumTracks());
+			keys.push_back(currow);
+
+			for (int track = 0; track < nd.GetNumTracks(); track++) {
+				TapNote tn = nd.GetTapNote(track, currow);
+				LuaHelpers::Push(L, tn.type);
+				lua_rawseti(L, -2, track+1);
+			}
+		}
+		return 1;
+	}
 
 	LunaSteps()
 	{
@@ -875,6 +894,7 @@ class LunaSteps : public Luna<Steps>
 		ADD_METHOD(PredictMeter);
 		ADD_METHOD(GetDisplayBPMType);
 		ADD_METHOD(GetRelevantSkillsetsByMSDRank);
+		ADD_METHOD(GetNonEmptyNoteData);
 	}
 };
 
