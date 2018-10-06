@@ -686,6 +686,11 @@ Steps::SetCachedRadarValues(const RadarValues& rv)
 	m_CachedRadarValues = rv;
 	m_bAreCachedRadarValuesJustLoaded = true;
 }
+struct NoteInfoExtended
+{
+	int tnt;
+	int track;
+};
 
 // lua start
 #include "LuaBinding.h"
