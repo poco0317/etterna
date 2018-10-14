@@ -7,7 +7,7 @@ class Style;
 class Steps;
 class PlayerOptions;
 struct lua_State;
-
+fdsa
 #include "RageTypes.h"
 #include "GameConstantsAndTypes.h"
 #include "SongOptions.h"
