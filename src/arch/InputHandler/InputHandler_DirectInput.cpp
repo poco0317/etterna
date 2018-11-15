@@ -594,6 +594,8 @@ InputHandler_DInput::UpdateBuffered(
 							mouseInput = MOUSE_RIGHT;
 						else if (in.ofs == DIMOFS_BUTTON2)
 							mouseInput = MOUSE_MIDDLE;
+						else if (in.ofs == DIMOFS_BUTTON3)
+							mouseInput = MOUSE_CUSTOM;
 						else
 							LOG->MapLog("unknown input",
 										"Mouse '%s' is returning an unknown "

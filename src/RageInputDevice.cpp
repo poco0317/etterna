@@ -135,6 +135,7 @@ InitNames()
 	g_mapNamesToString[MOUSE_LEFT] = "left mouse button";
 	g_mapNamesToString[MOUSE_RIGHT] = "right mouse button";
 	g_mapNamesToString[MOUSE_MIDDLE] = "middle mouse button";
+	g_mapNamesToString[MOUSE_CUSTOM] = "extra mouse button";
 	g_mapNamesToString[MOUSE_WHEELUP] = "mousewheel up";
 	g_mapNamesToString[MOUSE_WHEELDOWN] = "mousewheel down";
 

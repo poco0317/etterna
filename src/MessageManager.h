@@ -78,6 +78,7 @@ enum MessageID
 	Message_LeftClick,
 	Message_RightClick,
 	Message_MiddleClick,
+	Message_CustomClick,
 	Message_MouseWheelUp,
 	Message_MouseWheelDown,
 	NUM_MessageID, // leave this at the end

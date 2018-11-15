@@ -83,6 +83,7 @@ static const char* MessageIDNames[] = {
 	"LeftClick",
 	"RightClick",
 	"MiddleClick",
+	"CustomClick",
 	"MouseWheelUp",
 	"MouseWheelDown",
 };
