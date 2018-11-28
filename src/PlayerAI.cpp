@@ -6,6 +6,8 @@
 #include "PlayerState.h"
 #include "RageUtil.h"
 #include "RadarValues.h"
+#include "Steps.h"
+#include "NoteData.h"
 
 #define AI_PATH "Data/AI.ini"
 
@@ -50,6 +52,7 @@ struct TapScoreDistribution
 
 static TapScoreDistribution g_Distributions[NUM_SKILL_LEVELS];
 
+NoteData* PlayerAI::pCurNoteData = nullptr;
 HighScore* PlayerAI::pScoreData = nullptr;
 TimingData* PlayerAI::pReplayTiming = nullptr;
 map<int, vector<TapReplayResult>> PlayerAI::m_ReplayTapMap;
@@ -153,6 +156,35 @@ PlayerAI::GetTapNoteScoreForReplay(const PlayerState* pPlayerState,
 	return TNS_None;
 }
 
+static float t1;
+static float t2;
+static float t3;
+
+void
+PlayerAI::dothing()
+{
+	if (pScoreData == nullptr || pReplayTiming == nullptr || pCurNoteData == nullptr || pScoreData->GetCopyOfSetOnlineReplayTimestampVector().empty())
+		return;
+
+	float earliestTapFromTimestamps =
+	  pScoreData->GetCopyOfSetOnlineReplayTimestampVector()[0];
+
+	float earliestTapFromTimingData =
+	  pReplayTiming->WhereUAtBro(pCurNoteData->BuildAndGetNerv()[0]);
+
+	float difference = (earliestTapFromTimingData - earliestTapFromTimestamps);
+
+	vector<float> timestamps = pScoreData->GetCopyOfSetOnlineReplayTimestampVector();
+	vector<int> noterows;
+	for (float t : timestamps)
+	{
+		t -= difference;
+		int row = BeatToNoteRow(pReplayTiming->GetBeatFromElapsedTime(t));
+		noterows.emplace_back(row);
+	}
+
+}
+
 void
 PlayerAI::SetScoreData(HighScore* pHighScore)
 {
@@ -161,8 +193,7 @@ PlayerAI::SetScoreData(HighScore* pHighScore)
 	m_ReplayTapMap.clear();
 	m_ReplayHoldMap.clear();
 
-	if (!successful)
-	{
+	if (!successful) {
 		return;
 	}
 
@@ -172,9 +203,22 @@ PlayerAI::SetScoreData(HighScore* pHighScore)
 	auto replayTrackVector = pHighScore->GetCopyOfTrackVector();
 	auto replayHoldVector = pHighScore->GetCopyOfHoldReplayDataVector();
 
+	// These are noterows where tracks are found to be equal.
+	// The reason this happens is one of many in a list I don't want to give
+	// (ok its mines please dont hurt anyone)
+	vector<size_t> potentialProblemIndices;
+
 	// Generate TapReplayResults to put into a vector referenced by the song row
 	// in a map
 	for (size_t i = 0; i < replayNoteRowVector.size(); i++) {
+
+		// We will store a list of indices to go over later if this is an online
+		// score The reason for doing it like this is to prevent the need for
+		// way more nested loops than we can handle.
+		if (i > 0 && replayNoteRowVector[i] == replayNoteRowVector[i - 1]) {
+			potentialProblemIndices.push_back(i);
+		}
+
 		TapReplayResult trr;
 		trr.row = replayNoteRowVector[i];
 		trr.offset = replayOffsetVector[i];
@@ -200,6 +244,55 @@ PlayerAI::SetScoreData(HighScore* pHighScore)
 		}
 	}
 
+
+	/*
+	// If this is an online score, we have to do some filtering
+	// for the rows, due to some rough injustices.
+	// I'm sorry if you try to interpret this -poco
+	if (pCurNoteData != nullptr && !potentialProblemIndices.empty() &&
+		!pHighScore->GetCopyOfSetOnlineReplayTimestampVector().empty()) {
+		// Go over ever potential problem noterow...
+		for (size_t i : potentialProblemIndices) {
+			vector<size_t> upForRemoval;
+
+			// Go over every "tap" on the row, looking for the mistake.
+			for (size_t j = 0;
+				 j < m_ReplayTapMap[replayNoteRowVector[i]].size();
+				 j++) {
+				TapReplayResult& trr =
+				  m_ReplayTapMap[replayNoteRowVector[i]][j];
+				// Fix or remove the mistake.
+				if (fabs(trr.offset) >= .170f && fabs(trr.offset) <= .190f) {
+					// If this happens to be a mine in the notedata, cool. Fix
+					// it.
+					bool success = false;
+					for (int k = 0;
+						 !success && k < pCurNoteData->GetNumTracks();
+						 k++) {
+						if (pCurNoteData->FindTapNote(k, j)->second.type ==
+							TapNoteType_Mine) {
+							trr.type = TapNoteType_Mine;
+							trr.offset = -2.f;
+							trr.track = k;
+							success = true;
+						} else {
+							continue;
+						}
+					}
+					if (trr.type != TapNoteType_Mine)
+						// I don't know what happened, remove it
+						upForRemoval.push_back(j);
+				}
+			}
+			for (size_t j : upForRemoval) {
+				m_ReplayTapMap[replayNoteRowVector[i]].erase(
+				  m_ReplayTapMap[replayNoteRowVector[i]].begin() + j);
+			}
+			upForRemoval.clear();
+		}
+	}
+	*/
+
 	// Generate vectors made of pregenerated HoldReplayResults referenced by the
 	// song row in a map
 	for (size_t i = 0; i < replayHoldVector.size(); i++) {
@@ -210,6 +303,57 @@ PlayerAI::SetScoreData(HighScore* pHighScore)
 		} else {
 			vector<HoldReplayResult> hrrVector = { replayHoldVector[i] };
 			m_ReplayHoldMap[replayHoldVector[i].row] = hrrVector;
+		}
+	}
+}
+
+void
+PlayerAI::RemoveDuplicateTracksOnRows(NoteData* nd)
+{
+	pCurNoteData = nd;
+	return;
+
+	if (pScoreData != nullptr && !pScoreData->GetCopyOfSetOnlineReplayTimestampVector().empty())
+	{
+		for (auto& row : m_ReplayTapMap)
+		{
+			vector<TapReplayResult> brokenTRRs;
+			vector<size_t> upForRemoval;
+
+			for (TapReplayResult& trr : row.second)
+			{
+				if (fabs(trr.offset) >= .18f)
+				{
+					brokenTRRs.push_back(trr);
+				}
+			}
+			bool success = false;
+			int lowestWorkedTrack = -1;
+			for (TapReplayResult& trr : brokenTRRs)
+			{
+				for (int i = 0; !success && i < nd->GetNumTracks(); i++)
+				{
+					if (nd->FindTapNote(i, trr.row)->second.type == TapNoteType_Mine && i > lowestWorkedTrack)
+					{
+						trr.type = TapNoteType_Mine;
+						trr.offset = 0.f;
+						trr.track = i;
+						success = true;
+						lowestWorkedTrack = i;
+					}
+				}
+			}
+			for (size_t i = 0; i < brokenTRRs.size(); i++)
+			{
+				if (brokenTRRs[i].type != TapNoteType_Mine)
+				{
+					upForRemoval.push_back(i);
+				}
+			}
+			for (size_t i : upForRemoval)
+			{
+				row.second.erase(row.second.begin() + i);
+			}
 		}
 	}
 }
@@ -227,12 +371,10 @@ PlayerAI::SetUpExactTapMap(TimingData* timing)
 	pReplayTiming = timing;
 
 	// For every row in the replay data...
-	for (auto& row : m_ReplayTapMap)
-	{
+	for (auto& row : m_ReplayTapMap) {
 		// Get the current time and go over all taps on this row...
 		float rowTime = timing->WhereUAtBro(row.first);
-		for (TapReplayResult& trr : row.second)
-		{
+		for (TapReplayResult& trr : row.second) {
 			// Find the time adjusted for offset
 			// Then the beat according to that time
 			// Then the noterow according to that beat
@@ -242,19 +384,14 @@ PlayerAI::SetUpExactTapMap(TimingData* timing)
 			trr.offsetAdjustedRow = tapRow;
 
 			// And put that into the exacttapmap :)
-			if (m_ReplayExactTapMap.count(tapRow) != 0)
-			{
+			if (m_ReplayExactTapMap.count(tapRow) != 0) {
 				m_ReplayExactTapMap[tapRow].push_back(trr);
-			}
-			else
-			{
+			} else {
 				vector<TapReplayResult> trrVector = { trr };
 				m_ReplayExactTapMap[tapRow] = trrVector;
 			}
 		}
-		
 	}
-
 }
 
 void
@@ -280,7 +417,8 @@ PlayerAI::RemoveTapFromVectors(int row, int col)
 			auto& trr = m_ReplayExactTapMap[row][i];
 			if (trr.track == col) {
 				// delete
-				m_ReplayExactTapMap[row].erase(m_ReplayExactTapMap[row].begin() + i);
+				m_ReplayExactTapMap[row].erase(
+				  m_ReplayExactTapMap[row].begin() + i);
 				if (m_ReplayExactTapMap[row].empty())
 					m_ReplayExactTapMap.erase(row);
 			}
@@ -293,10 +431,8 @@ PlayerAI::GetAdjustedRowFromUnadjustedCoordinates(int row, int col)
 {
 	int output = -1;
 
-	if (m_ReplayTapMap.count(row) != 0)
-	{
-		for (TapReplayResult& trr : m_ReplayTapMap[row])
-		{
+	if (m_ReplayTapMap.count(row) != 0) {
+		for (TapReplayResult& trr : m_ReplayTapMap[row]) {
 			if (trr.track == col)
 				output = trr.offsetAdjustedRow;
 		}
@@ -333,7 +469,6 @@ PlayerAI::TapExistsAtThisRow(int noteRow)
 	} else {
 		return m_ReplayTapMap.count(noteRow) != 0;
 	}
-
 }
 
 bool
@@ -465,12 +600,11 @@ PlayerAI::GetTapNoteOffsetForReplay(TapNote* pTN, int noteRow, int col)
 
 		// This is only reached if we have column data.
 		noteRow = GetAdjustedRowFromUnadjustedCoordinates(noteRow, col);
-		if (m_ReplayExactTapMap.count(noteRow) != 0)
-		{
-			for (int i = 0; i < (int)m_ReplayExactTapMap[noteRow]
-									.size(); i++) // go over all elements in the row
+		if (m_ReplayExactTapMap.count(noteRow) != 0) {
+			for (int i = 0; i < (int)m_ReplayExactTapMap[noteRow].size();
+				 i++) // go over all elements in the row
 			{
-				auto trr = m_ReplayExactTapMap[noteRow][i];
+				TapReplayResult trr = m_ReplayExactTapMap[noteRow][i];
 				if (trr.track ==
 					col) // if the column expected is the actual note, use it
 				{
@@ -481,7 +615,7 @@ PlayerAI::GetTapNoteOffsetForReplay(TapNote* pTN, int noteRow, int col)
 							continue;
 					}
 					m_ReplayExactTapMap[noteRow].erase(
-						m_ReplayExactTapMap[noteRow].begin() + i);
+					  m_ReplayExactTapMap[noteRow].begin() + i);
 					if (m_ReplayExactTapMap[noteRow].empty())
 						m_ReplayExactTapMap.erase(noteRow);
 					return -trr.offset;
@@ -494,7 +628,8 @@ PlayerAI::GetTapNoteOffsetForReplay(TapNote* pTN, int noteRow, int col)
 }
 
 void
-PlayerAI::CalculateRadarValuesForReplay(RadarValues& rv, RadarValues& possibleRV)
+PlayerAI::CalculateRadarValuesForReplay(RadarValues& rv,
+										RadarValues& possibleRV)
 {
 	// We will do this thoroughly just in case someone decides to use the other
 	// categories we don't currently use
@@ -509,40 +644,34 @@ PlayerAI::CalculateRadarValuesForReplay(RadarValues& rv, RadarValues& possibleRV
 	int minesMissed = possibleRV[RadarCategory_Mines];
 
 	// For every row recorded...
-	for (auto& row : m_ReplayTapMap)
-	{
+	for (auto& row : m_ReplayTapMap) {
 		int tapsOnThisRow = 0;
 		// For every tap on these rows...
-		for (TapReplayResult& trr : row.second)
-		{
-			if (trr.type == TapNoteType_Fake)
-			{
+		for (TapReplayResult& trr : row.second) {
+			if (trr.type == TapNoteType_Fake) {
 				fakes--;
 				continue;
 			}
-			if (trr.type == TapNoteType_Mine)
-			{
+			if (trr.type == TapNoteType_Mine) {
 				minesMissed--;
 				continue;
 			}
-			if (trr.type == TapNoteType_Lift)
-			{
+			if (trr.type == TapNoteType_Lift) {
 				liftsHit++;
 				continue;
 			}
 			tapsOnThisRow++;
-			// We handle Empties as well because that's what old replays are loaded as.
-			if (trr.type == TapNoteType_Tap || trr.type == TapNoteType_HoldHead || trr.type == TapNoteType_Empty)
-			{
+			// We handle Empties as well because that's what old replays are
+			// loaded as.
+			if (trr.type == TapNoteType_Tap ||
+				trr.type == TapNoteType_HoldHead ||
+				trr.type == TapNoteType_Empty) {
 				totalNotesHit++;
 				tapsHit++;
-				if (tapsOnThisRow == 2)
-				{
+				if (tapsOnThisRow == 2) {
 					// This is technically incorrect.
 					jumpsHit++;
-				}
-				else if (tapsOnThisRow >= 3)
-				{
+				} else if (tapsOnThisRow >= 3) {
 					handsHit++;
 				}
 				continue;
@@ -551,18 +680,13 @@ PlayerAI::CalculateRadarValuesForReplay(RadarValues& rv, RadarValues& possibleRV
 	}
 
 	// For every hold recorded...
-	for (auto& row : m_ReplayHoldMap)
-	{
+	for (auto& row : m_ReplayHoldMap) {
 		// For every hold on this row...
-		for (HoldReplayResult& hrr : row.second)
-		{
-			if (hrr.subType == TapNoteSubType_Hold)
-			{
+		for (HoldReplayResult& hrr : row.second) {
+			if (hrr.subType == TapNoteSubType_Hold) {
 				holdsHeld--;
 				continue;
-			}
-			else if (hrr.subType == TapNoteSubType_Roll)
-			{
+			} else if (hrr.subType == TapNoteSubType_Roll) {
 				rollsHeld--;
 				continue;
 			}

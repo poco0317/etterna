@@ -1,4 +1,4 @@
-﻿/* PlayerAI - Chooses which notes the AI steps on. */
+/* PlayerAI - Chooses which notes the AI steps on. */
 
 #ifndef PlayerAI_H
 #define PlayerAI_H
@@ -18,6 +18,9 @@ class PlayerAI
 
 	// Pointer to real timing data for a replay
 	static TimingData* pReplayTiming;
+
+	// Pointer to real note data for a replay
+	static NoteData* pCurNoteData;
 
 	// Pulled from pScoreData on initialization
 
@@ -65,6 +68,9 @@ class PlayerAI
 	static void RemoveTapFromVectors(int row, int col);
 	// Go through the replay data to fill out the radar values for the eval screen
 	static void CalculateRadarValuesForReplay(RadarValues& rv, RadarValues& possibleRV);
+	// Unbreak some logical stuff with online replays using given notedata.
+	static void RemoveDuplicateTracksOnRows(NoteData* nd);
+	static void dothing();
 };
 
 #endif

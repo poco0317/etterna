@@ -1722,6 +1722,13 @@ class LunaScreenSelectMusic : public Luna<ScreenSelectMusic>
 			}
 			GAMESTATE->SetProcessedTimingData(nullptr);
 			hs->SetNoteRowVector(ihatemylife);
+			// old replays (1) dont have tracks
+			// not setting this value breaks a lot of logic -poco
+			if (hs->GetTrackVector().empty()) {
+				hs->SetReplayType(1);
+			} else {
+				hs->SetReplayType(2);
+			}
 		}
 
 		PlayerAI::SetScoreData(hs);

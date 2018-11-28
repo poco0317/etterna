@@ -764,6 +764,13 @@ Player::Load()
 
 	// If we are in a replay, attempt to load the real tapper stuff
 	if (GamePreferences::m_AutoPlay == PC_REPLAY) {
+		PlayerAI::RemoveDuplicateTracksOnRows(&m_NoteData);
+
+		PlayerAI::SetUpExactTapMap(m_Timing);
+
+		PlayerAI::dothing();
+
+		PlayerAI::SetScoreData(PlayerAI::pScoreData);
 		PlayerAI::SetUpExactTapMap(m_Timing);
 	}
 
@@ -941,7 +948,8 @@ Player::Update(float fDeltaTime)
 			vector<TapReplayResult> trrVector =
 			  PlayerAI::GetTapsAtOrBeforeRow(iSongRow);
 			for (TapReplayResult trr : trrVector) {
-				Step(trr.track, trr.row, now, false, false);
+				//Step(trr.track, trr.row, now, false, false);
+				Step(trr.track, -1, now, false, false);
 			}
 		}
 	}
@@ -3231,7 +3239,7 @@ Player::SetJudgment(int iRow,
 					float fTapNoteOffset)
 {
 	if (tns < 0 || tns > NUM_TapNoteScore)
-		tns = TNS_Miss;	// dont know why or how this crashes -mina
+		tns = TNS_Miss; // dont know why or how this crashes -mina
 	if (tns == TNS_Miss)
 		AddNoteToReplayData(
 		  GAMESTATE->CountNotesSeparately() ? iTrack : -1, &tn, iRow);
