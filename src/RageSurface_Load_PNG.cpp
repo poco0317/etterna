@@ -1,4 +1,4 @@
-﻿#include "global.h"
+#include "global.h"
 #include "RageFile.h"
 #include "RageLog.h"
 #include "RageSurface.h"
@@ -6,6 +6,8 @@
 #include "RageUtil.h"
 
 #if defined(_MSC_VER)
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../extern/stb-master/stb_image.h"
 #include "../extern/libpng/include/png.h"
 #if defined(_BINARY_PNG)
 #pragma comment(lib, "libpng.lib")
