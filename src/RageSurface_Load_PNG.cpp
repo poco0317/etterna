@@ -311,10 +311,17 @@ RageSurface_Load_PNG(const RString& sPath,
 		RGBX,
 		RGBA
 	} type;
-	// ret = CreateSurface(x,	// crashes because ??? using the one at line 131
-	// instead, though i suppose stbi_load is getting the data and we need to
-	// feed that to it instead of nullptr? -mina
-	ret = CreateSurfaceFrom(x,
+
+	// i guess this is what makes black boxes go away? transparency mask? -mina
+	if (bHeaderOnly) {
+		ret = CreateSurfaceFrom(x, y, 32, 0, 0, 0, 0, nullptr, x * 4);
+	} else {
+		// ret = CreateSurface(x,	// crashes because ??? using the one at line
+		// 131
+		// instead, though i suppose stbi_load is getting the data and we need
+		// to feed that to it instead of nullptr? -mina
+		ret =
+		  CreateSurfaceFrom(x,
 							y,
 							32,
 							Swap32BE(0xFF000000),
@@ -322,7 +329,9 @@ RageSurface_Load_PNG(const RString& sPath,
 							Swap32BE(0x0000FF00),
 							Swap32BE(type == RGBA ? 0x000000FF : 0x00000000),
 							doot,
-							x * 4);	// wtf is pitch??
+							x * 4); // wtf is pitch??
+	}
+
 	if (ret == nullptr) {
 		error = errorbuf;
 		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT; // XXX
