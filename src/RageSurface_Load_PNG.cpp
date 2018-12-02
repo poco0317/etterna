@@ -283,7 +283,46 @@ RageSurface_Load_PNG(const RString& sPath,
 	}
 
 	char errorbuf[1024];
-	ret = RageSurface_Load_PNG(&f, sPath, errorbuf, bHeaderOnly);
+
+	// because i dont know what im doing -mina
+	// Basic usage (see HDR discussion below for HDR usage):
+	//    int x,y,n;
+	//    unsigned char *data = stbi_load(filename, &x, &y, &n, 0);
+	//    // ... process data if not NULL ...
+	//    // ... x = width, y = height, n = # 8-bit components per pixel ...
+	//    // ... replace '0' with '1'..'4' to force that many components per
+	//    pixel
+	//    // ... but 'n' will always be the number that it would have been if
+	//    you said 0 stbi_image_free(data)
+	int x, y, n;
+	// auto* doot = stbi_load(sPath, &x, &y, &n, 0); //crashes
+	// because i think this needs full paths? -mina
+	auto* doot =
+	  stbi_load(f.GetPath(),
+				&x,
+				&y,
+				&n,
+				4); // 0 crashes, 1 looks like warhol, 2/3 looks like sqrt(warhol), i guess 4 looks right? -mina
+
+	// copy pasta from RageSurface_Load_PNG -mina
+	enum	// what is this stuff anyway
+	{
+		PALETTE,
+		RGBX,
+		RGBA
+	} type;
+	// ret = CreateSurface(x,	// crashes because ??? using the one at line 131
+	// instead, though i suppose stbi_load is getting the data and we need to
+	// feed that to it instead of nullptr? -mina
+	ret = CreateSurfaceFrom(x,
+							y,
+							32,
+							Swap32BE(0xFF000000),
+							Swap32BE(0x00FF0000),
+							Swap32BE(0x0000FF00),
+							Swap32BE(type == RGBA ? 0x000000FF : 0x00000000),
+							doot,
+							x * 4);	// wtf is pitch??
 	if (ret == nullptr) {
 		error = errorbuf;
 		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT; // XXX
