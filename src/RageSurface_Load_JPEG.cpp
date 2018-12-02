@@ -1,9 +1,9 @@
-﻿#include "global.h"
+#include "global.h"
 #include "RageFile.h"
 #include "RageSurface.h"
 #include "RageSurface_Load_JPEG.h"
 #include "RageUtil.h"
-
+#include "../../extern/stb-master/stb_image.h"
 #include <csetjmp>
 
 extern "C" {
@@ -204,9 +204,9 @@ RageSurface_Load_JPEG(RageFile* f,
 
 RageSurfaceUtils::OpenResult
 RageSurface_Load_JPEG(const RString& sPath,
-					  RageSurface*& ret,
-					  bool bHeaderOnly,
-					  RString& error)
+					 RageSurface*& ret,
+					 bool bHeaderOnly,
+					 RString& error)
 {
 	RageFile f;
 	if (!f.Open(sPath)) {
@@ -215,7 +215,25 @@ RageSurface_Load_JPEG(const RString& sPath,
 	}
 
 	char errorbuf[1024];
-	ret = RageSurface_Load_JPEG(&f, sPath, errorbuf);
+
+	int x, y, n;
+	auto* doot = stbi_load(f.GetPath(), &x, &y, &n, 4); 
+
+	if (bHeaderOnly) {
+		ret = CreateSurfaceFrom(x, y, 32, 0, 0, 0, 0, nullptr, x * 4);
+	} else {
+		ret = CreateSurfaceFrom(
+		  x,
+		  y,
+		  32,
+		  Swap32BE(0xFF000000),
+		  Swap32BE(0x00FF0000),
+		  Swap32BE(0x0000FF00),
+		  Swap32BE(0x00000000), // jpegs dont have alpha channels
+		  doot,
+		  x * 4);
+	}
+
 	if (ret == nullptr) {
 		error = errorbuf;
 		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT; // XXX
