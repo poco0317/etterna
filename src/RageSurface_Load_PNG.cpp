@@ -305,14 +305,24 @@ RageSurface_Load_PNG(const RString& sPath,
 				4); // 0 crashes, 1 looks like warhol, 2/3 looks like sqrt(warhol), i guess 4 looks right? -mina
 
 	// copy pasta from RageSurface_Load_PNG -mina
-	enum	// what is this stuff anyway
+	// ok so black boxes are stuff with the channels and transparency layer and
+	// stuff, see stb_image.h comment at 125 so we need to set the type based on
+	// 'n' so the thing loads alpha channels properly -mina
+	enum
 	{
 		PALETTE,
 		RGBX,
 		RGBA
 	} type;
 
-	// i guess this is what makes black boxes go away? transparency mask? -mina
+	if (n == 3)
+		type = RGBX;
+	else if (n == 4)
+		type = RGBA;
+	else
+		type = PALETTE; // n < 3 is palette garbage maybe? just guessing -mina
+
+	// dunno what this is for /shrug -mina
 	if (bHeaderOnly) {
 		ret = CreateSurfaceFrom(x, y, 32, 0, 0, 0, 0, nullptr, x * 4);
 	} else {
@@ -320,16 +330,18 @@ RageSurface_Load_PNG(const RString& sPath,
 		// 131
 		// instead, though i suppose stbi_load is getting the data and we need
 		// to feed that to it instead of nullptr? -mina
-		ret =
-		  CreateSurfaceFrom(x,
-							y,
-							32,
-							Swap32BE(0xFF000000),
-							Swap32BE(0x00FF0000),
-							Swap32BE(0x0000FF00),
-							Swap32BE(type == RGBA ? 0x000000FF : 0x00000000),
-							doot,
-							x * 4); // wtf is pitch??
+		ret = CreateSurfaceFrom(
+		  x,
+		  y,
+		  32,
+		  Swap32BE(0xFF000000),
+		  Swap32BE(0x00FF0000),
+		  Swap32BE(0x0000FF00),
+		  Swap32BE(type == RGBA ? 0x000000FF
+								: 0x00000000), // im guessing this has to do
+											   // with comment at 148? -mina
+		  doot,
+		  x * 4); // wtf is pitch??
 	}
 
 	if (ret == nullptr) {
