@@ -282,32 +282,8 @@ RageSurface_Load_PNG(const RString& sPath,
 		return RageSurfaceUtils::OPEN_FATAL_ERROR;
 	}
 
-	char errorbuf[1024];
-
-	// because i dont know what im doing -mina
-	// Basic usage (see HDR discussion below for HDR usage):
-	//    int x,y,n;
-	//    unsigned char *data = stbi_load(filename, &x, &y, &n, 0);
-	//    // ... process data if not NULL ...
-	//    // ... x = width, y = height, n = # 8-bit components per pixel ...
-	//    // ... replace '0' with '1'..'4' to force that many components per
-	//    pixel
-	//    // ... but 'n' will always be the number that it would have been if
-	//    you said 0 stbi_image_free(data)
 	int x, y, n;
-	// auto* doot = stbi_load(sPath, &x, &y, &n, 0); //crashes
-	// because i think this needs full paths? -mina
-	auto* doot =
-	  stbi_load(f.GetPath(),
-				&x,
-				&y,
-				&n,
-				4); // 0 crashes, 1 looks like warhol, 2/3 looks like sqrt(warhol), i guess 4 looks right? -mina
-
-	// copy pasta from RageSurface_Load_PNG -mina
-	// ok so black boxes are stuff with the channels and transparency layer and
-	// stuff, see stb_image.h comment at 125 so we need to set the type based on
-	// 'n' so the thing loads alpha channels properly -mina
+	auto* doot = stbi_load(f.GetPath(), &x, &y, &n, 4);
 	enum
 	{
 		PALETTE,
@@ -320,16 +296,11 @@ RageSurface_Load_PNG(const RString& sPath,
 	else if (n == 4)
 		type = RGBA;
 	else
-		type = PALETTE; // n < 3 is palette garbage maybe? just guessing -mina
+		type = PALETTE;
 
-	// dunno what this is for /shrug -mina
 	if (bHeaderOnly) {
 		ret = CreateSurfaceFrom(x, y, 32, 0, 0, 0, 0, nullptr, x * 4);
 	} else {
-		// ret = CreateSurface(x,	// crashes because ??? using the one at line
-		// 131
-		// instead, though i suppose stbi_load is getting the data and we need
-		// to feed that to it instead of nullptr? -mina
 		ret = CreateSurfaceFrom(
 		  x,
 		  y,
@@ -338,17 +309,16 @@ RageSurface_Load_PNG(const RString& sPath,
 		  Swap32BE(0x00FF0000),
 		  Swap32BE(0x0000FF00),
 		  Swap32BE(type == RGBA ? 0x000000FF
-								: 0x00000000), // im guessing this has to do
-											   // with comment at 148? -mina
+								: 0x00000000),
 		  doot,
-		  x * 4); // wtf is pitch??
+		  x * 4);
 	}
 
 	if (ret == nullptr) {
-		error = errorbuf;
+		stbi_image_free(doot);
 		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT; // XXX
 	}
-
+	ret->stb_loadpoint = true;
 	return RageSurfaceUtils::OPEN_OK;
 }
 
