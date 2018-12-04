@@ -1,4 +1,4 @@
-﻿#include "global.h"
+#include "global.h"
 #include "ActorUtil.h"
 #include "RageFile.h"
 #include "RageLog.h"
@@ -22,11 +22,11 @@ TryOpenFile(RString sPath,
 	if (!format.CompareNoCase("png"))
 		result = RageSurface_Load_PNG(sPath, ret, bHeaderOnly, error);
 	else if (!format.CompareNoCase("gif"))
-		result = RageSurface_Load_GIF(sPath, ret, bHeaderOnly, error);
+		result = RageSurface_Load_PNG(sPath, ret, bHeaderOnly, error);
 	else if (!format.CompareNoCase("jpg") || !format.CompareNoCase("jpeg"))
-		result = RageSurface_Load_JPEG(sPath, ret, bHeaderOnly, error);
+		result = RageSurface_Load_PNG(sPath, ret, bHeaderOnly, error);
 	else if (!format.CompareNoCase("bmp"))
-		result = RageSurface_Load_BMP(sPath, ret, bHeaderOnly, error);
+		result = RageSurface_Load_PNG(sPath, ret, bHeaderOnly, error);
 	else {
 		error = "Unsupported format";
 		bKeepTrying = true;
