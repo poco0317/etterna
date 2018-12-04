@@ -83,10 +83,6 @@ AutoScreenMessage(SM_DoNextScreen);
 AutoScreenMessage(SM_StartHereWeGo);
 AutoScreenMessage(SM_StopHereWeGo);
 
-AutoScreenMessage(SM_BattleTrickLevel1);
-AutoScreenMessage(SM_BattleTrickLevel2);
-AutoScreenMessage(SM_BattleTrickLevel3);
-
 static Preference<bool> g_bCenter1Player("Center1Player", true);
 static Preference<bool> g_bShowLyrics("ShowLyrics", false);
 static Preference<float> g_fNetStartOffset("NetworkStartOffset", -3.0);
