@@ -11,6 +11,7 @@ local cd
 local calcinfo
 
 local function UpdatePreviewPos(self)
+	if not self:IsVisible() then return end
 	if noteField and yeet and SCREENMAN:GetTopScreen():GetName() == "ScreenSelectMusic" or 
 	noteField and yeet and SCREENMAN:GetTopScreen():GetName() == "ScreenNetSelectMusic" then
 		local pos = SCREENMAN:GetTopScreen():GetPreviewNoteFieldMusicPosition() / musicratio
@@ -57,7 +58,6 @@ local t = Def.ActorFrame {
 	Name = "ChartPreview",
 	InitCommand=function(self)
 		self:visible(false)
-        self:SetUpdateFunction(UpdatePreviewPos)
 		calcinfo = self:GetChild("notChordDensityGraph"):visible(false):draworder(1000) -- actor for calcinfo
 		cd = self:GetChild("ChordDensityGraph"):visible(false):draworder(1000)
 		memehamstermax = self
@@ -84,9 +84,17 @@ local t = Def.ActorFrame {
 	end,
 	hELPidontDNOKNOWMessageCommand=function(self)
 		SCREENMAN:GetTopScreen():DeletePreviewNoteField(self)
+		self:SetUpdateFunction(nil)
+	end,
+	ChartPreviewOffMessageCommand=function(self)
+		self:SetUpdateFunction(nil)
+	end,
+	ChartPreviewOnMessageCommand=function(self)
+		self:SetUpdateFunction(UpdatePreviewPos)
 	end,
 	NoteFieldVisibleMessageCommand = function(self)
-        self:visible(true)
+		self:visible(true)
+		self:SetUpdateFunction(UpdatePreviewPos)
 		cd:visible(true):y(20)				-- need to control this manually -mina
 		cd:GetChild("cdbg"):diffusealpha(0)	-- we want to use our position background for draw order stuff -mina
 		cd:queuecommand("GraphUpdate")		-- first graph will be empty if we dont force this on initial creation
