@@ -37,6 +37,9 @@ DestroyGraphicsWindow();
 void
 GetDisplayResolutions(DisplayResolutions& out);
 
+BOOL
+MvWindow(int a, int b);
+
 VideoModeParams*
 GetParams();
 HDC

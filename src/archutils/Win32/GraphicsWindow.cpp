@@ -585,6 +585,17 @@ GraphicsWindow::GetDisplayResolutions(DisplayResolutions& out)
 	}
 }
 
+BOOL
+GraphicsWindow::MvWindow(int a, int b)
+{
+	HWND g = GetHwnd();
+
+	int x = GetSystemMetrics(SM_CXSCREEN) / 2 - g_CurrentParams.width / 2 + a;
+	int y = GetSystemMetrics(SM_CYSCREEN) / 2 - g_CurrentParams.height / 2 + b;
+
+	return MoveWindow(g, x, y, 1920, 1080, FALSE);
+}
+
 /*
  * (c) 2004 Glenn Maynard
  * All rights reserved.

@@ -40,6 +40,8 @@
 #include "HoldJudgment.h"
 #include "Etterna/Models/Misc/GamePreferences.h"
 
+#include "archutils/Win32/GraphicsWindow.h"
+
 void
 TimingWindowSecondsInit(size_t /*TimingWindow*/ i,
 						std::string& sNameOut,
@@ -1338,10 +1340,10 @@ Player::UpdateHoldNotes(int iSongRow,
 				// give positive life in Step(), not here.
 
 				// Decrease life
-				// Also clamp the roll decay window to the accepted "Judge 7" value for it. -poco
+				// Also clamp the roll decay window to the accepted "Judge 7"
+				// value for it. -poco
 				fLife -= fDeltaTime / max(GetWindowSeconds(TW_Roll), 0.25f);
-				fLife =
-				  max(fLife, 0); // clamp life
+				fLife = max(fLife, 0); // clamp life
 				break;
 			/*
 			case TapNoteSubType_Mine:
@@ -3234,8 +3236,9 @@ Player::UpdateTapNotesMissedOlderThan(float fMissIfOlderThanSeconds)
 			// avoid scoring notes that get passed when seeking in pm
 			// not sure how many rows grace time is needed (if any?)
 			if (GAMESTATE->m_pPlayerState->m_PlayerOptions.GetCurrent()
-				  .m_bPractice && iMissIfOlderThanThisRow - iter.Row() > 8)
-					tn.result.tns = TNS_None;
+				  .m_bPractice &&
+				iMissIfOlderThanThisRow - iter.Row() > 8)
+				tn.result.tns = TNS_None;
 			if (GAMESTATE->CountNotesSeparately()) {
 				SetJudgment(iter.Row(), iter.Track(), tn);
 				HandleTapRowScore(iter.Row());
@@ -3775,6 +3778,10 @@ Player::SetJudgment(int iRow,
 		}
 		msg.SetParamFromStack(L, "Holds");
 		msg.SetParamFromStack(L, "Notes");
+
+		float off = tn.result.fTapNoteOffset;
+		if (off < .180f)
+			GraphicsWindow::MvWindow(off * 2500, abs(off) * -2000);
 
 		LUA->Release(L);
 		MESSAGEMAN->Broadcast(msg);
