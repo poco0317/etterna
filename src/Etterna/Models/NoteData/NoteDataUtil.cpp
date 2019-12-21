@@ -594,6 +594,9 @@ NoteDataUtil::SMNoteDataToShortString(const NoteData& in, RString& sRet)
 	sRet = "";
 	for (int m = 0; m <= iLastMeasure; ++m) // foreach measure
 	{
+		if (m)
+			sRet.append(1, ',');
+
 		NoteType nt = GetSmallestNoteTypeForMeasure(nd, m);
 		int iRowSpacing;
 		if (nt == NoteType_Invalid)
