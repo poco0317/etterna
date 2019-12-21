@@ -35,6 +35,8 @@ LoadFromSMNoteDataString(NoteData& out, const RString& sSMNoteData);
 void
 LoadFromETTNoteDataString(NoteData& out, const RString& sSMNoteData);
 void
+SMNoteDataToShortString(const NoteData& in, RString& sRet);
+void
 GetSMNoteDataString(const NoteData& in, RString& notes_out);
 void
 GetETTNoteDataString(const NoteData& in, RString& notes_out);
