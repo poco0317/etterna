@@ -35,8 +35,8 @@
 /* register DisplayBPM with StringConversion */
 #include "Etterna/Models/Misc/EnumHelper.h"
 
-// For hashing wife chart keys - Mina
-#include "Etterna/Singletons/CryptManager.h"
+// For hashing chart keys
+#include "Etterna/Globals/picosha2.h"
 
 static const char* DisplayBPMNames[] = {
 	"Actual",
@@ -427,11 +427,10 @@ RString
 Steps::GenerateChartKey(NoteData& nd, TimingData* td)
 {
 	RString noteDataString = "";
-	RString bpms = "";
-
 	NoteDataUtil::SMNoteDataToShortString(nd, noteDataString);
-
-	return BinaryToHex(CryptManager::GetSHA256ForString(noteDataString));
+	std::string hash = "";
+	picosha2::hash256_hex_string(noteDataString, hash);
+	return RString(hash);
 }
 
 void
