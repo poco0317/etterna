@@ -24,6 +24,8 @@ enum CalcPatternMod
 	Roll,
 	HS,
 	Jump,
+	MSD,
+	PtLoss,
 	ModCount,
 	None
 };
@@ -72,6 +74,8 @@ class Hand
 	std::vector<float> v_itvNPSdiff,
 	  v_itvMSdiff; // Calculated difficulty for each interval
 	std::vector<float> debug; // debug info placement
+	std::vector<float> finalMSDvals;
+	std::vector<float> pointslost;
   private:
 	const bool SmoothDifficulty =
 	  true; // Do we moving average the difficulty intervals?

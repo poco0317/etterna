@@ -10,11 +10,15 @@ local plotX, plotY = oldWidth+3 + plotWidth/2, -20 + plotHeight/2
 local dotDims, plotMargin = 2, 4
 local highest = 0
 local lowest = 0
+local lowerGraphMax = 0
+local upperGraphMax = 0
+local lowerGraphMin = 0
+local upperGraphMin = 0
 local baralpha = 0.2
 local bgalpha = 0.9
 local textzoom = 0.35
 local enabled = false
-local modvaluescaler = 200
+local modvaluescaler = 150
 local song
 local steps
 local finalSecond
@@ -37,8 +41,16 @@ local function scale(x, lower, upper, scaledMin, scaledMax) -- uhh
     return perc * (scaledMax - scaledMin) + scaledMin
 end
 
-local function fitY2(y) -- scale ssr to fit thing
-    local num = scale(y, lowest, highest, 0, 1)
+local function fitY1(y) -- scale for upper graph
+    local num = scale(y, upperGraphMin, upperGraphMax, 0, 1)
+    local out = -1 * num * plotHeight
+    return out
+end
+
+local function fitY2(y, lb, ub) -- scale for lower graph
+    if lb == nil then lb = lowest end
+    if ub == nil then ub = highest end
+    local num = scale(y, lb, ub, 0, 1)
     local out = -1 * num * plotHeight + plotHeight/2
     return out
 end
@@ -49,6 +61,7 @@ local function convertPercentToIndex(x)
     if output > 1 then output = 1 end
 
     local ind = notShit.round(output * #ssrs[1])
+    if ind < 1 then ind = 1 end
     return ind
 end
 
@@ -58,6 +71,7 @@ local function convertPercentToIndexForMods(x)
     if output > 1 then output = 1 end
 
     local ind = notShit.round(output * #graphVecs[1][1])
+    if ind < 1 then ind = 1 end
     return ind
 end
 
@@ -76,7 +90,7 @@ end
 
 -- for SSR graph generator, modify these constants
 local ssrLowerBoundWife = 0.90 -- left end of the graph
-local ssrUpperBoundWife = 1.0 -- right end of the graph
+local ssrUpperBoundWife = 0.97 -- right end of the graph
 local ssrResolution = 1 -- higher number = higher resolution graph (and lag)
 
 local function produceThisManySSRs(steps, rate)
@@ -135,6 +149,8 @@ local function updateCoolStuff()
         local roll = steps:DootSpooks(3)
         local hsds = steps:DootSpooks(4)
         local jumpds = steps:DootSpooks(5)
+        local msd = steps:DootSpooks(6)
+        local pts = steps:DootSpooks(7)
         graphVecs[1] = {}
         graphVecs[1][1] = ohj[1]
         graphVecs[1][2] = ohj[2]
@@ -148,14 +164,40 @@ local function updateCoolStuff()
         graphVecs[1][10] = jumpds[2]
 
         graphVecs[2] = {}
-        graphVecs[2][1] = ssrs[1]
-        graphVecs[2][2] = ssrs[2]
-        graphVecs[2][3] = ssrs[3]
-        graphVecs[2][4] = ssrs[4]
-        graphVecs[2][5] = ssrs[5]
-        graphVecs[2][6] = ssrs[6]
-        graphVecs[2][7] = ssrs[7]
-        graphVecs[2][8] = ssrs[8]
+        graphVecs[2][1] = msd[1]
+        graphVecs[2][2] = msd[2]
+        graphVecs[2][3] = pts[1]
+        graphVecs[2][4] = pts[2]
+        --graphVecs[2][1] = ssrs[1]
+        --graphVecs[2][2] = ssrs[2]
+        --graphVecs[2][3] = ssrs[3]
+        --graphVecs[2][4] = ssrs[4]
+        --graphVecs[2][5] = ssrs[5]
+        --graphVecs[2][6] = ssrs[6]
+        --graphVecs[2][7] = ssrs[7]
+        --graphVecs[2][8] = ssrs[8]
+        --graphVecs[2][9] = ssrs[9]
+
+        -- hardcode these numbers for constant upper graph bounds
+        upperGraphMin = 0
+        upperGraphMax = 1.1
+        --[[-- uncomment to have adaptive upper graph
+        for _, line in ipairs(graphVecs[1]) do
+            for ind, val in pairs(line) do
+                if val < upperGraphMin then upperGraphMin = val end
+                if val > upperGraphMax then upperGraphMax = val end
+            end
+        end]]
+
+        -- same as immediately above
+        lowerGraphMin = 1000
+        lowerGraphMax = -1000
+        for _, line in ipairs(graphVecs[2]) do
+            for ind, val in pairs(line) do
+                if val < lowerGraphMin then lowerGraphMin = val end
+                if val > lowerGraphMax then lowerGraphMax = val end
+            end
+        end
     else
         graphVecs = {}
     end
@@ -310,10 +352,14 @@ o[#o + 1] = Def.Quad {
             local jack = ssrs[6][index]
             local chjk = ssrs[7][index]
             local tech = ssrs[8][index]
+
+            local index = convertPercentToIndexForMods(perc)
+            local msd = graphVecs[2][1][index]
             if ovrl == nil then
                 txt:settext("")
             else
-                txt:settextf("Percent: %5.4f\nOverall: %.2f\nStream: %.2f\nJumpstream: %.2f\nHandstream: %.2f\nStamina: %.2f\nJackspeed: %.2f\nChordjack: %.2f\nTechnical: %.2f", (ssrLowerBoundWife + (ssrUpperBoundWife-ssrLowerBoundWife)*perc)*100, ovrl, strm, js, hs, stam, jack, chjk, tech)
+                txt:settextf("MSD: %5.4f", msd)
+                --txt:settextf("Percent: %5.4f\nOverall: %.2f\nStream: %.2f\nJumpstream: %.2f\nHandstream: %.2f\nStamina: %.2f\nJackspeed: %.2f\nChordjack: %.2f\nTechnical: %.2f", (ssrLowerBoundWife + (ssrUpperBoundWife-ssrLowerBoundWife)*perc)*100, ovrl, strm, js, hs, stam, jack, chjk, tech)
             end
 		else
 			bar:visible(false)
@@ -416,8 +462,9 @@ local function topGraphLine(lineNum, colorToUse)
                     end
                 end
                 for i = 1, #graphVecs[1][lineNum] do
-                    local x = fitX(i, finalSecond)
-                    local y = fitY(graphVecs[1][lineNum][i])
+                    local x = fitX(i, #graphVecs[1][lineNum]) -- vector length based positioning
+                    --local x = fitX(i, finalSecond / getCurRateValue()) -- song length based positioning
+                    local y = fitY1(graphVecs[1][lineNum][i])
                     y = y + plotHeight / 2
                     setOffsetVerts(verts, x, y, colorToUse) 
                 end
@@ -448,7 +495,34 @@ for i = 1,10 do
     o[#o+1] = topGraphLine(i, modColors[i])
 end
 
+local function bottomGraphLineMSD(lineNum, colorToUse)
+    return Def.ActorMultiVertex {
+        InitCommand = function(self)
+            self:y(plotHeight+5)
+        end,
+        DoTheThingCommand = function(self)
+            if song and enabled then
+                self:SetVertices({})
+                self:SetDrawState {Mode = "DrawMode_Quads", First = 1, Num = 0}
 
+                self:visible(true)
+                local verts = {}
+
+                for i = 1, #graphVecs[2][lineNum] do
+                    local x = fitX(i, #graphVecs[2][lineNum]) -- vector length based positioning
+                    --local x = fitX(i, finalSecond / getCurRateValue()) -- song length based positioning
+                    local y = fitY2(graphVecs[2][lineNum][i], lowerGraphMin, lowerGraphMax)
+                    setOffsetVerts(verts, x, y, color("1,0.3,1"))
+                end
+                
+                self:SetVertices(verts)
+                self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = #verts}
+            else
+                self:visible(false)
+            end
+        end
+    }
+end
 
 local function bottomGraphLine(lineNum, colorToUse)
     return Def.ActorMultiVertex {
@@ -464,9 +538,9 @@ local function bottomGraphLine(lineNum, colorToUse)
                 local verts = {}
 
                 for i = 1, #graphVecs[2][lineNum] do
-                    local x = fitX(i, #graphVecs[2][lineNum])
+                    local x = fitX(i, #graphVecs[2][lineNum]) -- vector length based positioning
+                    --local x = fitX(i, finalSecond / getCurRateValue()) -- song length based positioning
                     local y = fitY2(graphVecs[2][lineNum][i])
-
                     setOffsetVerts(verts, x, y, colorToUse)
                 end
                 
@@ -489,9 +563,11 @@ local skillsetColors = {
     color("#b0cec2")    -- tech
 }
 
-for i = 1,8 do
-    o[#o+1] = bottomGraphLine(i, skillsetColors[i])
+for i = 1,4 do
+    --o[#o+1] = bottomGraphLine(i, skillsetColors[i])
+    o[#o+1] = bottomGraphLineMSD(i, skillsetColors[i])
 end
+
 
 
 -- a bunch of things for stuff and things
