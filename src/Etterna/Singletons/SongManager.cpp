@@ -42,6 +42,7 @@
 #include "CryptManager.h"
 
 #include <fstream>
+#include "Etterna/Globals/zip_file.hpp"
 
 typedef RString SongDir;
 struct Group
@@ -1160,6 +1161,17 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 		}
 	}
 	LOG->Trace("Finished generating cache files for %s", sGroupName.c_str());
+
+	LOG->Trace("Zipping song directory...");
+	miniz_cpp::zip_file fi;
+	std::vector<RString> flist;
+	GetDirListingRecursive("Songs/" + sGroupName + "/", "*", flist);
+	for (auto thing : flist) {
+		thing.erase(0, 1);
+		fi.write(thing);
+	}
+	fi.save("Cache/" + sGroupName + ".zip");
+	LOG->Trace("Finished zipping to Cache.");
 }
 
 void
