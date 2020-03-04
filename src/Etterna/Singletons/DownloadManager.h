@@ -253,6 +253,7 @@ class DownloadManager
 	  const string& sk,
 	  function<void()> callback = function<void()>());
 	void UploadScore(HighScore* hs);
+	void UploadPackForRanking(const RString& group);
 
 	bool ShouldUploadScores();
 

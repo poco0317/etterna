@@ -40,6 +40,7 @@
 #include "NetworkSyncManager.h"
 #include "Etterna/Models/NoteWriters/NotesWriterSSC.h"
 #include "CryptManager.h"
+#include "DownloadManager.h"
 
 #include <fstream>
 #include "Etterna/Globals/zip_file.hpp"
@@ -1172,6 +1173,8 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 	}
 	fi.save("Cache/" + sGroupName + ".zip");
 	LOG->Trace("Finished zipping to Cache.");
+
+	DLMAN->UploadPackForRanking(sGroupName);
 }
 
 void

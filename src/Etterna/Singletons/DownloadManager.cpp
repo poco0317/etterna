@@ -48,6 +48,7 @@ static Preference<RString> packListURL(
   "https://api.etternaonline.com/v2/packs");
 static Preference<RString> serverURL("BaseAPIURL",
 									 "https://api.etternaonline.com/v2");
+static Preference<RString> rankURL("RankURL", "");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -1351,6 +1352,37 @@ DownloadManager::UploadScores()
 		LOG->Trace("Uploading top scores that were not synced.");
 	uploadSequentially(toUpload);
 	return true;
+}
+void
+DownloadManager::UploadPackForRanking(const RString& group)
+{
+	if (!LoggedIn())
+		return;
+
+	CURL* curlHandle = initCURLHandle(true);
+	string url = rankURL.Get();
+	curl_httppost* form = nullptr;
+	curl_httppost* lastPtr = nullptr;
+	curl_slist* headerlist = nullptr;
+	RString contents;
+	if (!addFileToForm(form,
+					   lastPtr,
+					   "zip",
+					   group + ".zip",
+					   "Cache/" + group + ".zip",
+					   contents))
+		return;
+	ComputerIdentity();
+	SetCURLFormPostField(
+	  curlHandle, form, lastPtr, "origin", ComputerIdentity() + ":_:Ranking");
+	SetCURLPostToURL(curlHandle, url);
+	string result;
+	SetCURLResultsString(curlHandle, &result);
+	curl_easy_setopt(curlHandle, CURLOPT_HTTPPOST, form);
+	CURLcode ret = curl_easy_perform(curlHandle);
+	curl_easy_cleanup(curlHandle);
+	LOG->Trace("Return code %d", ret);
+	LOG->Trace("Result %s", result.c_str());
 }
 void
 DownloadManager::EndSessionIfExists()
