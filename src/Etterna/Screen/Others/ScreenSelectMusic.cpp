@@ -455,6 +455,13 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 			AfterMusicChange();
 			SCREENMAN->SystemMessage("Current pack reloaded");
 			return true;
+		} else if (holding_shift && bHoldingCtrl && c == 'O' &&
+				   m_MusicWheel.IsSettled()) {
+			SONGMAN->GenerateCachefilesForGroup(
+			  GetMusicWheel()->GetSelectedSection());
+			AfterMusicChange();
+			SCREENMAN->SystemMessage("Did cache stuff");
+			return true;
 		} else if (bHoldingCtrl && c == 'F' && m_MusicWheel.IsSettled() &&
 				   input.type == IET_FIRST_PRESS) {
 			// Favorite the currently selected song. -Not Kyz
@@ -1032,7 +1039,8 @@ ScreenSelectMusic::HandleScreenMessage(const ScreenMessage SM)
 		}
 
 		// restart preview music after finishing or cancelling playlist creation
-		// this is just copypasta'd and should be made a function? or we have something better? idk
+		// this is just copypasta'd and should be made a function? or we have
+		// something better? idk
 		GameSoundManager::PlayMusicParams PlayParams;
 		PlayParams.sFile = HandleLuaMusicFile(m_sSampleMusicToPlay);
 		PlayParams.pTiming = m_pSampleMusicTimingData;
