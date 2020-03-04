@@ -25,6 +25,7 @@
 #include "Etterna/Models/Songs/Song.h"
 #include "Etterna/Models/Songs/SongCacheIndex.h"
 #include "SongManager.h"
+#include "Etterna/Models/NoteData/NoteData.h"
 #include "Etterna/Models/Songs/SongUtil.h"
 #include "Etterna/Globals/SpecialFiles.h"
 #include "Etterna/Actor/Base/Sprite.h"
@@ -37,6 +38,10 @@
 #include "arch/LoadingWindow/LoadingWindow.h"
 #include "ScreenManager.h"
 #include "NetworkSyncManager.h"
+#include "Etterna/Models/NoteWriters/NotesWriterSSC.h"
+#include "CryptManager.h"
+
+#include <fstream>
 
 typedef RString SongDir;
 struct Group
@@ -1084,6 +1089,77 @@ SongManager::ForceReloadSongGroup(const RString& sGroupName) const
 		s->ReloadFromSongDir();
 		SONGMAN->ReconcileChartKeysForReloadedSong(s, oldChartkeys);
 	}
+}
+
+void
+SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
+{
+	LOG->Trace("Generating cache files for %s", sGroupName.c_str());
+	auto songs = GetSongs(sGroupName);
+	for (auto s : songs) {
+		auto sdir = s->GetSongDir();
+		// the starting '/' implies absolute path which breaks it
+		sdir.erase(0, 1);
+
+		// Save ssc/sm5 cache file
+		{
+			RString tmpOutPutPath = "Cache/tmp.ssc";
+			RString sscCacheFilePath = sdir + "songdata.cache";
+
+			NotesWriterSSC::Write(tmpOutPutPath, *s, s->GetAllSteps(), true);
+
+			RageFile f;
+			if (!f.Open(tmpOutPutPath)) {
+				RageException::Throw("SongManager failed to open \"%s\": %s",
+									 tmpOutPutPath.c_str(),
+									 f.GetError().c_str());
+			}
+			string p = f.GetPath();
+			f.Close();
+			std::ofstream dst(sscCacheFilePath, std::ios::binary);
+			std::ifstream src(p, std::ios::binary);
+			dst << src.rdbuf();
+			dst.close();
+		}
+
+		FOREACH_CONST(Steps*, s->GetAllSteps(), is)
+		{
+			Steps* steps = (*is);
+			TimingData* td = steps->GetTimingData();
+			NoteData nd;
+			steps->GetNoteData(nd);
+			LOG->Trace("Writing cache file for chart %s (%s)",
+					   s->GetDisplayMainTitle().c_str(),
+					   steps->GetChartKey().c_str());
+
+			nd.LogNonEmptyRows();
+			auto& nerv = nd.GetNonEmptyRowVector();
+			auto& etaner = td->BuildAndGetEtaner(nerv);
+			auto& serializednd = nd.SerializeNoteData(etaner);
+
+			string path = sdir + steps->GetChartKey() + ".cache";
+			ofstream FILE(path, ios::binary);
+			if (!FILE) {
+				LOG->Warn("Failed to cache song %s (%s)",
+						  s->GetDisplayMainTitle().c_str(),
+						  steps->GetChartKey().c_str());
+				continue;
+			}
+
+			for (auto n : serializednd) {
+				auto ap =
+				  to_string(n.notes) + " " + to_string(n.rowTime) + "\n";
+				FILE.write(ap.c_str(), ap.size());
+			}
+			FILE.close();
+
+			td->UnsetEtaner();
+			nd.UnsetNerv();
+			nd.UnsetSerializedNoteData();
+			steps->Compress();
+		}
+	}
+	LOG->Trace("Finished generating cache files for %s", sGroupName.c_str());
 }
 
 void

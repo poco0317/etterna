@@ -91,6 +91,8 @@ class SongManager
 	 * @return the songs that belong in the group. */
 	const vector<Song*>& GetSongs(const RString& sGroupName) const;
 	void ForceReloadSongGroup(const RString& sGroupName) const;
+	void GenerateCachefilesForGroup(const RString& sGroupName) const;
+
 	/**
 	 * @brief Retrieve all of the songs in the game.
 	 * @return all of the songs. */
