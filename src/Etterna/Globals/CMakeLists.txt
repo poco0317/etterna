@@ -12,7 +12,8 @@ list(APPEND GLOBAL_FILES_HPP
 	"SpecialFiles.h"
 	"StdString.h" # TODO: Remove the need for this file, transition to std::string.
 	"StepMania.h" # TODO: Refactor into separate main project.
-	"picosha2.h")
+	"picosha2.h"
+	"zip_file.hpp")
 
 if(NOT APPLE)
 	list(APPEND GLOBAL_FILES_SRC "Main.cpp")
