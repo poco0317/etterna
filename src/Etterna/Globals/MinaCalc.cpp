@@ -87,6 +87,12 @@ AggregateScores(const vector<float>& skillsets, float rating, float resolution)
 	return rating + 2.f * resolution;
 }
 
+float
+normalizer(float x, float y, float z1, float z2)
+{
+	return x - x * CalcClamp(-(x / y) * z1 * z2 + z1 * z2 + z2, 0.f, z2);
+}
+
 unsigned int
 column_count(unsigned int note)
 {
@@ -194,12 +200,19 @@ Calc::CalcMain(const vector<NoteInfo>& NoteInfo,
 		stam = Chisel(
 		  tech - 0.1f, 2.56f, score_goal, true, false, false, false, false);
 
-	js *= 0.95f;
-	hs *= 0.95f;
-	stam *= 0.9f;
+	js = normalizer(js, stream, 7.25f, 0.25f);
+	hs = normalizer(hs, stream, 6.5f, 0.3f);
+	hs = normalizer(hs, js, 11.5f, 0.15f);
+
+	float stambase = max(max(stream, tech * 0.96f), max(js, hs));
+	if (stambase == stream)
+		stambase *= 0.975f;
+
+	stam = normalizer(stam, stambase, 7.75f, 0.2f);
 
 	float chordjack = jack * 0.75f;
-	tech *= 0.95f;
+	float technorm = max(max(stream, js), hs);
+	tech = normalizer(tech, technorm, 8.f, .15f) * 0.97f;
 
 	DifficultyRating difficulty =
 	  DifficultyRating{ 0.0,
@@ -228,7 +241,8 @@ Calc::CalcMain(const vector<NoteInfo>& NoteInfo,
 	difficulty.technical *=
 	  allhandsdownscaler * manyjumpsdownscaler * lotquaddownscaler * 1.01f;
 
-	chordjack *= CalcClamp(qprop + hprop + jprop + 0.2f, 0.5f, 1.f) * 1.025f;
+	chordjack = normalizer(chordjack, difficulty.handstream, 5.5f, 0.3f) *
+				CalcClamp(qprop + hprop + jprop + 0.2f, 0.5f, 1.f) * 1.025f;
 
 	bool downscale_chordjack_at_end = false;
 	if (chordjack > difficulty.jack)
@@ -294,7 +308,7 @@ Calc::CalcMain(const vector<NoteInfo>& NoteInfo,
 		difficulty = DifficultyRating{ 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 	}
 
-	difficulty.jack *= 0.925f;
+	difficulty.jack *= 1.0075f;
 
 	if (highest == difficulty.technical) {
 		difficulty.technical -= CalcClamp(
@@ -611,21 +625,15 @@ Calc::OHJumpDownscaler(const vector<NoteInfo>& NoteInfo,
 		int taps = 0;
 		int jumps = 0;
 		for (int row : interval) {
-			int columns = 0;
 			if (NoteInfo[row].notes & firstNote) {
-				++columns;
+				++taps;
+				if (NoteInfo[row].notes & secondNote) {
+					++jumps;
+					++taps;
+				}
 			}
-			if (NoteInfo[row].notes & secondNote) {
-				++columns;
-			}
-			if (columns == 2) {
-				jumps++;
-				taps += 2; // this gets added twice intentionally to mimic
-						   // mina's ratings more closely
-			}
-			taps += columns;
 		}
-		output.push_back(taps != 0 ? pow(1 - (1.6f * static_cast<float>(jumps) /
+		output.push_back(taps != 0 ? pow(1 - (0.8f * static_cast<float>(jumps) /
 											  static_cast<float>(taps)),
 										 0.25f)
 								   : 1.f);
@@ -752,21 +760,14 @@ Calc::RollDownscaler(const Finger& f1,
 
 		float interval_mean = mean(hand_intervals);
 
-		// i allowed >1 values here for reasons but lets not do that for now
-		float interval_cv = cv(hand_intervals) + 0.84f;
-		output[i] = interval_cv >= 1.0f
-					  ? 1.0f
-					  : interval_cv * interval_cv;
+		for (float& note : hand_intervals)
+			if (interval_mean / note < 0.6f)
+				note = interval_mean;
 
-		// this is erroneously picking up on oh jumps, i had anticipated and solved this issue
-		// in R, but it required the note data which i don't feel like passing to this function atm
-		// instead, since we have already done the ohj detection, we'll consider strong ohj scaling
-		// to be proof positive that these are not rolls (this is not a good long term solution)
-		// this is _also_ still picking up jacks however this isn't as big a deal because jacks don't
-		// use the nps base anyway
-		// ok this this is _also_ picking up trills and that sort of is a problem
-		if (ohjs[i] < 0.94f)
-			output[i] = 1.f;
+		float interval_cv = cv(hand_intervals) + 0.85f;
+		output[i] = interval_cv >= 1.0f
+					  ? min(sqrt(sqrt(interval_cv)), 1.075f)
+					  : interval_cv * interval_cv * interval_cv;
 
 		if (logpatterns)
 			std::cout << "ro " << output[i] << std::endl;
@@ -778,7 +779,7 @@ Calc::RollDownscaler(const Finger& f1,
 	return output;
 }
 
-static const float ssrcap = 0.965f; // ssr cap for now
+static const float ssrcap = 1.f; //0.965f; // ssr cap for now
 
 // Function to generate SSR rating
 DifficultyRating
