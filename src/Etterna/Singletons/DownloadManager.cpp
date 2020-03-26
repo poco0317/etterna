@@ -265,6 +265,19 @@ addFileToForm(curl_httppost*& form,
 		return false;
 	rFile.Read(contents, rFile.GetFileSize());
 	rFile.Close();
+
+	curl_formadd(&form,
+    &lastPtr,
+    CURLFORM_COPYNAME, "cache-control:",
+    CURLFORM_COPYCONTENTS, "no-cache",
+    CURLFORM_END);
+
+curl_formadd(&form,
+    &lastPtr,
+    CURLFORM_COPYNAME, "content-type:",
+    CURLFORM_COPYCONTENTS, "multipart/form-data",
+    CURLFORM_END);
+
 	curl_formadd(&form,
 				 &lastPtr,
 				 CURLFORM_COPYNAME,
@@ -1359,30 +1372,47 @@ DownloadManager::UploadPackForRanking(const RString& group)
 	if (!LoggedIn())
 		return;
 
-	CURL* curlHandle = initCURLHandle(true);
-	string url = rankURL.Get();
-	curl_httppost* form = nullptr;
-	curl_httppost* lastPtr = nullptr;
-	curl_slist* headerlist = nullptr;
-	RString contents;
-	if (!addFileToForm(form,
-					   lastPtr,
-					   "zip",
-					   group + ".zip",
-					   "Cache/" + group + ".zip",
-					   contents))
-		return;
-	ComputerIdentity();
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "origin", ComputerIdentity() + ":_:Ranking");
-	SetCURLPostToURL(curlHandle, url);
-	string result;
-	SetCURLResultsString(curlHandle, &result);
-	curl_easy_setopt(curlHandle, CURLOPT_HTTPPOST, form);
-	CURLcode ret = curl_easy_perform(curlHandle);
-	curl_easy_cleanup(curlHandle);
-	LOG->Trace("Return code %d", ret);
-	LOG->Trace("Result %s", result.c_str());
+	CURL *curl;
+	CURLcode res;
+
+	curl_mime *form = NULL;
+	curl_mimepart *field = NULL;
+	struct curl_slist *headerlist = NULL;
+	static const char buf[] = "Expect:";
+
+	curl_global_init(CURL_GLOBAL_ALL);
+
+	curl = curl_easy_init();
+	if(curl) {
+		/* Create the form */
+		form = curl_mime_init(curl);
+
+		/* Fill in the file upload field */
+		field = curl_mime_addpart(form);
+		curl_mime_name(field, "zip");
+		curl_mime_filedata(field, FILEMAN->ResolvePath("Cache/" + group + ".zip"));
+
+		    headerlist = curl_slist_append(headerlist, buf);
+    /* what URL that receives this POST */
+		curl_easy_setopt(curl, CURLOPT_URL, rankURL.Get().c_str());
+
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
+		curl_easy_setopt(curl, CURLOPT_MIMEPOST, form);
+		curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+		//curl_easy_setopt(curl, CURLOPT_COOKIE, "XDEBUG_SESSION=XDEBUG_ECLIPSE;");
+
+
+
+		res = curl_easy_perform(curl);
+
+			/* always cleanup */
+		curl_easy_cleanup(curl);
+
+		/* then cleanup the form */
+		curl_mime_free(form);
+		/* free slist */
+		curl_slist_free_all(headerlist);
+	}
 }
 void
 DownloadManager::EndSessionIfExists()

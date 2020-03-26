@@ -1147,12 +1147,10 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 						  steps->GetChartKey().c_str());
 				continue;
 			}
-
-			for (auto n : serializednd) {
-				auto ap =
-				  to_string(n.notes) + " " + to_string(n.rowTime) + "\n";
-				FILE.write(ap.c_str(), ap.size());
-			}
+			
+			FILE.write((char*)&serializednd[0],
+                       	serializednd.size() * sizeof(NoteInfo));
+		
 			FILE.close();
 
 			td->UnsetEtaner();
