@@ -905,8 +905,8 @@ RageDisplay_Legacy::EndFrame()
 		CameraPushMatrix();
 		LoadMenuPerspective(
 		  0,
-		  GetActualVideoModeParams()->width,
-		  GetActualVideoModeParams()->height,
+		  static_cast<float>(GetActualVideoModeParams()->width),
+		  static_cast<float>(GetActualVideoModeParams()->height),
 		  static_cast<float>(GetActualVideoModeParams()->width) / 2.f,
 		  static_cast<float>(GetActualVideoModeParams()->height) / 2.f);
 		fullscreenSprite.Draw();
@@ -2776,12 +2776,16 @@ RageDisplay_Legacy::CreateRenderTarget(const RenderTargetParam& param,
 	else
 		pTarget = g_pWind->CreateRenderTarget();
 
-	pTarget->Create(param, iTextureWidthOut, iTextureHeightOut);
+	intptr_t iTexture = 0;
+	if (pTarget) {
+		pTarget->Create(param, iTextureWidthOut, iTextureHeightOut);
 
-	intptr_t iTexture = pTarget->GetTexture();
+		iTexture = pTarget->GetTexture();
 
-	ASSERT(g_mapRenderTargets.find(iTexture) == g_mapRenderTargets.end());
-	g_mapRenderTargets[iTexture] = pTarget;
+		ASSERT(g_mapRenderTargets.find(iTexture) == g_mapRenderTargets.end());
+		g_mapRenderTargets[iTexture] = pTarget;
+	}
+
 	return iTexture;
 }
 

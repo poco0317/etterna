@@ -225,8 +225,13 @@ class DownloadManager
 						done); // Sends login request if not already logging in
 	void OnLogin();
 	bool UploadScores(); // Uploads all scores not yet uploaded to current
-	bool UpdateOnlineScoreReplayData(); // attempts updates existing replaydata
-										// server (Async, 1 request per score)
+	void ForceUploadScoresForChart(
+	  const std::string& ck,
+	  bool startnow = true); // forced upload wrapper for charts
+	void ForceUploadScoresForPack(
+	  const std::string& pack,
+	  bool startnow = true); // forced upload wrapper for packs
+	void ForceUploadAllScores();
 	void RefreshPackList(const string& url);
 
 	void init();
@@ -245,15 +250,16 @@ class DownloadManager
 	bool Error() { return error == ""; }
 	bool EncodeSpaces(string& str);
 
+	void UploadScore(HighScore* hs,
+					 function<void()> callback,
+					 bool load_from_disk);
 	void UploadScoreWithReplayData(HighScore* hs);
-	void UploadScoreWithReplayDataFromDisk(
-	  const string& sk,
-	  function<void()> callback = function<void()>());
+	void UploadScoreWithReplayDataFromDisk(function<void()> callback = []() {});
 	void UpdateOnlineScoreReplayData(
 	  const string& sk,
 	  function<void()> callback = function<void()>());
-	void UploadScore(HighScore* hs);
 	void UploadPackForRanking(const RString& group);
+	void UploadScore(HighScore* hs);
 
 	bool ShouldUploadScores();
 
@@ -279,7 +285,7 @@ class DownloadManager
 	void RefreshRegisterPage();
 	bool currentrateonly = false;
 	bool topscoresonly = true;
-	bool ccoffonly = true;
+	bool ccoffonly = false;
 	void RefreshCountryCodes();
 	void RequestReplayData(const string& scorekey,
 						   int userid,
@@ -305,6 +311,8 @@ class DownloadManager
 	// most recent single score upload result -mina
 	RString mostrecentresult = "";
 	deque<pair<DownloadablePack*, bool>> DownloadQueue; // (pack,isMirror)
+	deque<HighScore*> ScoreUploadSequentialQueue;
+	unsigned int sequentialScoreUploadTotalWorkload{ 0 };
 	const int maxPacksToDownloadAtOnce = 1;
 	const float DownloadCooldownTime = 5.f;
 	float timeSinceLastDownload = 0.f;
