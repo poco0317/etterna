@@ -1174,7 +1174,7 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 					   s->GetDisplayMainTitle().c_str(),
 					   steps->GetChartKey().c_str());
 
-			nd.LogNonEmptyRows();
+			nd.LogNonEmptyRows(td);
 			auto& nerv = nd.GetNonEmptyRowVector();
 			auto& etaner = td->BuildAndGetEtaner(nerv);
 			auto& serializednd = nd.SerializeNoteData(etaner);
