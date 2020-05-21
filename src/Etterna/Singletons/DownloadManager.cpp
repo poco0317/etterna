@@ -846,8 +846,7 @@ DownloadManager::RefreshFavourites()
 bool
 DownloadManager::ShouldUploadScores()
 {
-	return LoggedIn() && automaticSync &&
-		   GamePreferences::m_AutoPlay == PC_HUMAN;
+	return false;
 }
 inline void
 SetCURLPOSTScore(CURL*& curlHandle,
@@ -939,6 +938,7 @@ DownloadManager::UploadScore(HighScore* hs,
 							 function<void()> callback,
 							 bool load_from_disk)
 {
+	return;
 	CHECKPOINT_M("Creating UploadScore request");
 	if (!LoggedIn()) {
 		LOG->Trace(
@@ -1165,8 +1165,7 @@ uploadSequentially()
 bool
 DownloadManager::UploadScores()
 {
-	if (!LoggedIn())
-		return false;
+	return false;
 
 	// First we accumulate scores that have not been uploaded and have
 	// replay data. There is no reason to upload updated calc versions to the
@@ -1224,6 +1223,7 @@ DownloadManager::UploadScores()
 void
 DownloadManager::ForceUploadScoresForChart(const std::string& ck, bool startnow)
 {
+	return;
 	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
 	auto cs = SCOREMAN->GetScoresForChart(ck);
 	if (cs) {
@@ -1258,6 +1258,7 @@ void
 DownloadManager::ForceUploadScoresForPack(const std::string& pack,
 										  bool startnow)
 {
+	return;
 	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
 	auto songs = SONGMAN->GetSongs(pack);
 	for (auto so : songs)
@@ -1275,6 +1276,7 @@ DownloadManager::ForceUploadScoresForPack(const std::string& pack,
 void
 DownloadManager::ForceUploadAllScores()
 {
+	return;
 	bool not_already_uploading = this->ScoreUploadSequentialQueue.empty();
 
 	auto songs = SONGMAN->GetSongs(GROUP_ALL);
@@ -1302,7 +1304,6 @@ DownloadManager::UploadPackForRanking(const RString& group)
 	curl_mime* form = NULL;
 	curl_mimepart* field = NULL;
 	struct curl_slist* headerlist = NULL;
-	static const char buf[] = "Expect:";
 
 	curl_global_init(CURL_GLOBAL_ALL);
 
@@ -1314,10 +1315,16 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		/* Fill in the file upload field */
 		field = curl_mime_addpart(form);
 		curl_mime_name(field, "zip");
-		curl_mime_filedata(field,
-						   FILEMAN->ResolvePath("Cache/" + group + ".zip"));
 
-		headerlist = curl_slist_append(headerlist, buf);
+		// path gets normalized so starts with a /
+		// so we have to remove that /
+		string path = FILEMAN->ResolvePath("Cache/" + group + ".zip");
+		path.erase(0, 1);
+		curl_mime_filedata(field, path.c_str());
+
+		headerlist = curl_slist_append(
+		  headerlist, ("Authorization: Bearer " + DLMAN->authToken).c_str());
+
 		/* what URL that receives this POST */
 		curl_easy_setopt(curl, CURLOPT_URL, rankURL.Get().c_str());
 
@@ -1328,6 +1335,8 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		// "XDEBUG_SESSION=XDEBUG_ECLIPSE;");
 
 		res = curl_easy_perform(curl);
+
+		LOG->Trace("\nCURL RESPONSE NUMBER %d\n", res);
 
 		/* always cleanup */
 		curl_easy_cleanup(curl);
@@ -2211,6 +2220,7 @@ DownloadManager::StartSession(string user,
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
 			LOG->Trace(("Malformed request response: " + req.result).c_str());
+			DLMAN->loggingIn = false;
 			return;
 		}
 
@@ -2221,13 +2231,8 @@ DownloadManager::StartSession(string user,
 			DLMAN->loggingIn = false;
 		}
 
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("accessToken") &&
-			d["data"]["attributes"]["accessToken"].IsString()) {
-			DLMAN->authToken =
-			  d["data"]["attributes"]["accessToken"].GetString();
+		if (d.HasMember("access_token") && d["access_token"].IsString()) {
+			DLMAN->authToken = d["access_token"].GetString();
 			DLMAN->sessionUser = user;
 			DLMAN->sessionPass = pass;
 		} else {
