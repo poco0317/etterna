@@ -254,7 +254,8 @@ class DownloadManager
 					 function<void()> callback,
 					 bool load_from_disk);
 	void UploadScoreWithReplayData(HighScore* hs);
-	void UploadScoreWithReplayDataFromDisk(function<void()> callback = []() {});
+	void UploadScoreWithReplayDataFromDisk(HighScore* hs,
+										   function<void()> callback = []() {});
 	void UpdateOnlineScoreReplayData(
 	  const string& sk,
 	  function<void()> callback = function<void()>());
