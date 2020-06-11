@@ -888,6 +888,10 @@ ArrowEffects::GetGlow(int iCol,
 float
 ArrowEffects::GetBrightness(const PlayerState* pPlayerState, float fNoteBeat)
 {
+	// no hide arrow if edit
+	if (GAMESTATE->IsEditing())
+		return 1.f;
+
 	float fSongBeat = pPlayerState->m_Position.m_fSongBeatVisible;
 	float fBeatsUntilStep = fNoteBeat - fSongBeat;
 

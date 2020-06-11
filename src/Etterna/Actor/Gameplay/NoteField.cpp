@@ -474,6 +474,18 @@ NoteField::DrawBeatBar(const float fBeat, BeatBarType type, int iMeasureIndex)
 			SCALE(iState + 1, 0.f, 4.f, 0.f, 1.f)));
 	m_sprBeatBars.SetZoomX(fWidth / m_sprBeatBars.GetUnzoomedWidth());
 	m_sprBeatBars.Draw();
+
+	// measure numbers
+	if (GAMESTATE->IsEditing() && bIsMeasure) {
+		int iMeasureNoDisplay = iMeasureIndex;
+
+		m_textMeasureNumber.SetDiffuse(RageColor(1, 1, 1, 1));
+		m_textMeasureNumber.SetGlow(RageColor(1, 1, 1, 0));
+		m_textMeasureNumber.SetHorizAlign(align_right);
+		m_textMeasureNumber.SetText(ssprintf("%d", iMeasureNoDisplay));
+		m_textMeasureNumber.SetXY(-fWidth / 2, fYPos);
+		m_textMeasureNumber.Draw();
+	}
 }
 
 void
@@ -559,6 +571,42 @@ NoteField::DrawAreaHighlight(int iStartBeat, int iEndBeat)
 	m_rectAreaHighlight.SetDiffuse(AREA_HIGHLIGHT_COLOR);
 	m_rectAreaHighlight.Draw();
 }
+
+static ThemeMetric<RageColor> BPM_COLOR("NoteField", "BPMColor");
+static ThemeMetric<RageColor> STOP_COLOR("NoteField", "StopColor");
+static ThemeMetric<RageColor> DELAY_COLOR("NoteField", "DelayColor");
+static ThemeMetric<RageColor> WARP_COLOR("NoteField", "WarpColor");
+static ThemeMetric<RageColor> TIME_SIG_COLOR("NoteField", "TimeSignatureColor");
+static ThemeMetric<RageColor> TICKCOUNT_COLOR("NoteField", "TickcountColor");
+static ThemeMetric<RageColor> COMBO_COLOR("NoteField", "ComboColor");
+static ThemeMetric<RageColor> LABEL_COLOR("NoteField", "LabelColor");
+static ThemeMetric<RageColor> SPEED_COLOR("NoteField", "SpeedColor");
+static ThemeMetric<RageColor> SCROLL_COLOR("NoteField", "ScrollColor");
+static ThemeMetric<RageColor> FAKE_COLOR("NoteField", "FakeColor");
+static ThemeMetric<bool> BPM_IS_LEFT_SIDE("NoteField", "BPMIsLeftSide");
+static ThemeMetric<bool> STOP_IS_LEFT_SIDE("NoteField", "StopIsLeftSide");
+static ThemeMetric<bool> DELAY_IS_LEFT_SIDE("NoteField", "DelayIsLeftSide");
+static ThemeMetric<bool> WARP_IS_LEFT_SIDE("NoteField", "WarpIsLeftSide");
+static ThemeMetric<bool> TIME_SIG_IS_LEFT_SIDE("NoteField",
+											   "TimeSignatureIsLeftSide");
+static ThemeMetric<bool> TICKCOUNT_IS_LEFT_SIDE("NoteField",
+												"TickcountIsLeftSide");
+static ThemeMetric<bool> COMBO_IS_LEFT_SIDE("NoteField", "ComboIsLeftSide");
+static ThemeMetric<bool> LABEL_IS_LEFT_SIDE("NoteField", "LabelIsLeftSide");
+static ThemeMetric<bool> SPEED_IS_LEFT_SIDE("NoteField", "SpeedIsLeftSide");
+static ThemeMetric<bool> SCROLL_IS_LEFT_SIDE("NoteField", "ScrollIsLeftSide");
+static ThemeMetric<bool> FAKE_IS_LEFT_SIDE("NoteField", "FakeIsLeftSide");
+static ThemeMetric<float> BPM_OFFSETX("NoteField", "BPMOffsetX");
+static ThemeMetric<float> STOP_OFFSETX("NoteField", "StopOffsetX");
+static ThemeMetric<float> DELAY_OFFSETX("NoteField", "DelayOffsetX");
+static ThemeMetric<float> WARP_OFFSETX("NoteField", "WarpOffsetX");
+static ThemeMetric<float> TIME_SIG_OFFSETX("NoteField", "TimeSignatureOffsetX");
+static ThemeMetric<float> TICKCOUNT_OFFSETX("NoteField", "TickcountOffsetX");
+static ThemeMetric<float> COMBO_OFFSETX("NoteField", "ComboOffsetX");
+static ThemeMetric<float> LABEL_OFFSETX("NoteField", "LabelOffsetX");
+static ThemeMetric<float> SPEED_OFFSETX("NoteField", "SpeedOffsetX");
+static ThemeMetric<float> SCROLL_OFFSETX("NoteField", "ScrollOffsetX");
+static ThemeMetric<float> FAKE_OFFSETX("NoteField", "FakeOffsetX");
 
 void
 NoteField::set_text_measure_number_for_draw(const float beat,
@@ -813,7 +861,7 @@ NoteField::DrawPrimitives()
 
 	unsigned i = 0;
 	// Draw beat bars
-	if (SHOW_BEAT_BARS && pTiming != NULL) {
+	if ((GAMESTATE->IsEditing() || SHOW_BEAT_BARS) && pTiming != nullptr) {
 		const vector<TimingSegment*>& tSigs = *segs[SEGMENT_TIME_SIG];
 		int iMeasureIndex = 0;
 		for (i = 0; i < tSigs.size(); i++) {
@@ -850,6 +898,148 @@ NoteField::DrawPrimitives()
 				if (bMeasureBar)
 					iMeasureIndex++;
 			}
+		}
+	}
+
+	// editor stuff
+	if (GAMESTATE->IsEditing() && pTiming != nullptr) {
+		ASSERT(GAMESTATE->m_pCurSong != nullptr);
+
+		const TimingData& timing = *pTiming;
+		const RageColor text_glow = RageColor(
+		  1, 1, 1, RageFastCos(RageTimer::GetTimeSinceStart() * 2) / 2 + 0.5f);
+
+		float horiz_align = align_right;
+		float side_sign = 1;
+#define draw_all_segments(str_exp, name, caps_name)                            \
+	horiz_align = caps_name##_IS_LEFT_SIDE ? align_right : align_left;         \
+	side_sign = caps_name##_IS_LEFT_SIDE ? -1 : 1;                             \
+	for (unsigned int i = 0; i < segs[SEGMENT_##caps_name]->size(); ++i) {     \
+		const name##Segment* seg = To##name((*segs[SEGMENT_##caps_name])[i]);  \
+		if (seg->GetRow() >= m_FieldRenderArgs.first_row &&                    \
+			seg->GetRow() <= m_FieldRenderArgs.last_row &&                     \
+			IS_ON_SCREEN(seg->GetBeat())) {                                    \
+			draw_timing_segment_text(str_exp,                                  \
+									 seg->GetBeat(),                           \
+									 side_sign,                                \
+									 caps_name##_OFFSETX,                      \
+									 horiz_align,                              \
+									 caps_name##_COLOR,                        \
+									 text_glow);                               \
+		}                                                                      \
+	}
+
+		draw_all_segments(std::to_string(seg->GetRatio()), Scroll, SCROLL);
+		draw_all_segments(std::to_string(seg->GetBPM()), BPM, BPM);
+		draw_all_segments(std::to_string(seg->GetPause()), Stop, STOP);
+		draw_all_segments(std::to_string(seg->GetPause()), Delay, DELAY);
+		draw_all_segments(std::to_string(seg->GetLength()), Warp, WARP);
+		draw_all_segments(ssprintf("%d\n--\n%d", seg->GetNum(), seg->GetDen()),
+						  TimeSignature,
+						  TIME_SIG);
+		draw_all_segments(
+		  ssprintf("%d", seg->GetTicks()), Tickcount, TICKCOUNT);
+		draw_all_segments(
+		  ssprintf("%d/%d", seg->GetCombo(), seg->GetMissCombo()),
+		  Combo,
+		  COMBO);
+		draw_all_segments(seg->GetLabel(), Label, LABEL);
+		draw_all_segments(ssprintf("%s\n%s\n%s",
+								   std::to_string(seg->GetRatio()).c_str(),
+								   (seg->GetUnit() == 1 ? "S" : "B"),
+								   std::to_string(seg->GetDelay()).c_str()),
+						  Speed,
+						  SPEED);
+		draw_all_segments(std::to_string(seg->GetLength()), Fake, FAKE);
+#undef draw_all_segments
+
+		if (!GAMESTATE->m_bIsUsingStepTiming) {
+			// BGChange text
+			EditMode mode = GAMESTATE->m_EditMode;
+			switch (mode) {
+				case EditMode_Home:
+				case EditMode_Practice:
+					break;
+				case EditMode_Full: {
+					vector<BackgroundChange>::iterator
+					  iter[NUM_BackgroundLayer];
+					FOREACH_BackgroundLayer(j) iter[j] =
+					  GAMESTATE->m_pCurSong->GetBackgroundChanges(j).begin();
+
+					for (;;) {
+						float fLowestBeat = FLT_MAX;
+						vector<BackgroundLayer> viLowestIndex;
+
+						FOREACH_BackgroundLayer(j)
+						{
+							if (iter[j] ==
+								GAMESTATE->m_pCurSong->GetBackgroundChanges(j)
+								  .end()) {
+								continue;
+							}
+							float fBeat = iter[j]->m_fStartBeat;
+							if (fBeat < fLowestBeat) {
+								fLowestBeat = fBeat;
+								viLowestIndex.clear();
+								viLowestIndex.push_back(j);
+							} else if (fBeat == fLowestBeat) {
+								viLowestIndex.push_back(j);
+							}
+						}
+
+						if (viLowestIndex.empty()) {
+							FOREACH_BackgroundLayer(j)
+							{
+								ASSERT(iter[j] == GAMESTATE->m_pCurSong
+													->GetBackgroundChanges(j)
+													.end());
+							}
+							break;
+						}
+
+						if (IS_ON_SCREEN(fLowestBeat)) {
+							vector<RString> vsBGChanges;
+							for (BackgroundLayer const& bl : viLowestIndex) {
+								ASSERT(iter[bl] != GAMESTATE->m_pCurSong
+													 ->GetBackgroundChanges(bl)
+													 .end());
+								const BackgroundChange& change = *iter[bl];
+								RString s = change.GetTextDescription();
+								if (bl != 0) {
+									s = ssprintf("%d: ", bl) + s;
+								}
+								vsBGChanges.push_back(s);
+							}
+							DrawBGChangeText(
+							  fLowestBeat, join("\n", vsBGChanges), text_glow);
+						}
+						for (BackgroundLayer const& bl : viLowestIndex) {
+							iter[bl]++;
+						}
+					}
+				} break;
+				default:
+					FAIL_M(ssprintf("Invalid edit mode: %i", mode));
+			}
+		}
+
+		// Draw marker bars
+		if (m_iBeginMarker != -1 && m_iEndMarker != -1) {
+			int iBegin = m_iBeginMarker;
+			int iEnd = m_iEndMarker;
+			CLAMP(
+			  iBegin, m_FieldRenderArgs.first_row, m_FieldRenderArgs.last_row);
+			CLAMP(
+			  iEnd, m_FieldRenderArgs.first_row, m_FieldRenderArgs.last_row);
+			DrawAreaHighlight(iBegin, iEnd);
+		} else if (m_iBeginMarker != -1) {
+			if (m_iBeginMarker >= m_FieldRenderArgs.first_row &&
+				m_iBeginMarker <= m_FieldRenderArgs.last_row)
+				DrawMarkerBar(m_iBeginMarker);
+		} else if (m_iEndMarker != -1) {
+			if (m_iEndMarker >= m_FieldRenderArgs.first_row &&
+				m_iEndMarker <= m_FieldRenderArgs.last_row)
+				DrawMarkerBar(m_iEndMarker);
 		}
 	}
 

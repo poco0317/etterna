@@ -435,8 +435,13 @@ class OptionRowHandlerListSteps : public OptionRowHandlerList
 		m_Def.m_vsChoices.clear();
 		m_aListEntries.clear();
 
-		if (GAMESTATE->GetCurrentStyle(GAMESTATE->GetMasterPlayerNumber()) &&
-			GAMESTATE->m_pCurSong) // playing a song
+		// fill in difficulty names
+		if (GAMESTATE->IsEditing()) {
+			m_Def.m_vsChoices.push_back("");
+			m_aListEntries.push_back(GameCommand());
+		} else if (GAMESTATE->GetCurrentStyle(
+					 GAMESTATE->GetMasterPlayerNumber()) &&
+				   GAMESTATE->m_pCurSong) // playing a song
 		{
 			m_Def.m_layoutType = StringToLayoutType(STEPS_ROW_LAYOUT_TYPE);
 
