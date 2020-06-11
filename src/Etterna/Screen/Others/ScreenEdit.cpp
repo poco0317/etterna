@@ -2896,7 +2896,6 @@ static LocalizedString SNAP_TO("ScreenEdit", "Snap to");
 static LocalizedString NOTES("ScreenEdit", "%s notes");
 static LocalizedString SELECTION_BEAT("ScreenEdit", "Selection beat");
 static LocalizedString DIFFICULTY("ScreenEdit", "Difficulty");
-static LocalizedString ROUTINE_PLAYER("ScreenEdit", "Routine Player");
 static LocalizedString CHART_NAME("ScreenEdit", "Chart Name");
 static LocalizedString DESCRIPTION("ScreenEdit", "Description");
 static LocalizedString CHART_STYLE("ScreenEdit", "Chart Style");
@@ -2935,8 +2934,6 @@ static ThemeMetric<RString> SELECTION_BEAT_UNFINISHED_FORMAT(
 static ThemeMetric<RString> SELECTION_BEAT_END_FORMAT("ScreenEdit",
 													  "SelectionBeatEndFormat");
 static ThemeMetric<RString> DIFFICULTY_FORMAT("ScreenEdit", "DifficultyFormat");
-static ThemeMetric<RString> ROUTINE_PLAYER_FORMAT("ScreenEdit",
-												  "RoutinePlayerFormat");
 static ThemeMetric<RString> CHART_NAME_FORMAT("ScreenEdit", "ChartNameFormat");
 static ThemeMetric<RString> DESCRIPTION_FORMAT("ScreenEdit",
 											   "DescriptionFormat");
@@ -2958,30 +2955,6 @@ static ThemeMetric<RString> NUM_HANDS_FORMAT("ScreenEdit", "NumHandsFormat");
 static ThemeMetric<RString> NUM_ROLLS_FORMAT("ScreenEdit", "NumRollsFormat");
 static ThemeMetric<RString> NUM_LIFTS_FORMAT("ScreenEdit", "NumLiftsFormat");
 static ThemeMetric<RString> NUM_FAKES_FORMAT("ScreenEdit", "NumFakesFormat");
-static ThemeMetric<RString> NUM_STEPS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumStepsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_JUMPS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumJumpsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_HOLDS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumHoldsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_MINES_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumMinesFormatTwoPlayer");
-static ThemeMetric<RString> NUM_HANDS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumHandsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_ROLLS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumRollsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_LIFTS_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumLiftsFormatTwoPlayer");
-static ThemeMetric<RString> NUM_FAKES_FORMAT_TWO_PLAYER(
-  "ScreenEdit",
-  "NumFakesFormatTwoPlayer");
 static ThemeMetric<RString> TIMING_MODE_FORMAT("ScreenEdit",
 											   "TimingModeFormat");
 static ThemeMetric<RString> BEAT_0_OFFSET_FORMAT("ScreenEdit",
@@ -3049,10 +3022,6 @@ ScreenEdit::UpdateTextInfo()
 		  ssprintf(DIFFICULTY_FORMAT.GetValue(),
 				   DIFFICULTY.GetValue().c_str(),
 				   DifficultyToString(m_pSteps->GetDifficulty()).c_str());
-		if (m_InputPlayerNumber != PLAYER_INVALID)
-			sText += ssprintf(ROUTINE_PLAYER_FORMAT.GetValue(),
-							  ROUTINE_PLAYER.GetValue().c_str(),
-							  m_InputPlayerNumber + 1);
 		// sText += ssprintf( DESCRIPTION_FORMAT.GetValue(),
 		// DESCRIPTION.GetValue().c_str(), m_pSteps->GetDescription().c_str() );
 		sText += ssprintf(CHART_NAME_FORMAT.GetValue(),
