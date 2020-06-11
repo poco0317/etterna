@@ -281,6 +281,7 @@ GameState::Reset()
 	m_SortOrder.Set(SortOrder_Invalid);
 	m_PreferredSortOrder = GetDefaultSort();
 	m_PlayMode.Set(PlayMode_Invalid);
+	m_EditMode = EditMode_Invalid;
 	m_iCurrentStageIndex = 0;
 
 	m_bGameplayLeadIn.Set(false);

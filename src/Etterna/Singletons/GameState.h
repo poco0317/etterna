@@ -183,6 +183,8 @@ class GameState
 	BroadcastOnChange<Difficulty> m_PreferredDifficulty;
 	BroadcastOnChange<SortOrder> m_SortOrder; // set by MusicWheel
 	SortOrder m_PreferredSortOrder;			  // used by MusicWheel
+	EditMode m_EditMode;
+	bool IsEditing() { return m_EditMode != EditMode_Invalid; }
 
 	int m_iNumStagesOfThisSong;
 	// Used by GameplayScreen to know if it needs to call NSMAN
