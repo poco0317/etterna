@@ -91,8 +91,8 @@ ScreenEditMenu::HandleScreenMessage(const ScreenMessage SM)
 		LOG->Trace("Delete successful; deleting steps from memory");
 
 		Song* pSong = GAMESTATE->m_pCurSong;
-		Steps* pStepsToDelete = GAMESTATE->m_pCurSteps[PLAYER_1];
-		FOREACH_PlayerNumber(pn) { GAMESTATE->m_pCurSteps[pn].Set(NULL); }
+		Steps* pStepsToDelete = GAMESTATE->m_pCurSteps;
+		FOREACH_PlayerNumber(pn) { GAMESTATE->m_pCurSteps.Set(NULL); }
 		bool bSaveSong = !pStepsToDelete->WasLoadedFromProfile();
 		pSong->DeleteSteps(pStepsToDelete);
 		SONGMAN->Invalidate(pSong);
@@ -165,14 +165,14 @@ GetCopyDescription(const Steps* pSourceSteps)
 static void
 SetCurrentStepsDescription(const RString& s)
 {
-	GAMESTATE->m_pCurSteps[0]->SetDescription(s);
+	GAMESTATE->m_pCurSteps->SetDescription(s);
 }
 
 static void
 DeleteCurrentSteps()
 {
-	GAMESTATE->m_pCurSong->DeleteSteps(GAMESTATE->m_pCurSteps[0]);
-	GAMESTATE->m_pCurSteps[0].Set(NULL);
+	GAMESTATE->m_pCurSong->DeleteSteps(GAMESTATE->m_pCurSteps);
+	GAMESTATE->m_pCurSteps.Set(NULL);
 }
 
 static LocalizedString MISSING_MUSIC_FILE(
@@ -227,7 +227,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 	GAMESTATE->m_pCurSong.Set(pSong);
 	GAMESTATE->SetCurrentStyle(GAMEMAN->GetEditorStyleForStepsType(st),
 							   PLAYER_INVALID);
-	GAMESTATE->m_pCurSteps[PLAYER_1].Set(pSteps);
+	GAMESTATE->m_pCurSteps.Set(pSteps);
 
 	// handle error cases
 	if (!pSong->HasMusic()) {
@@ -276,10 +276,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 			break;
 		case EditMenuAction_LoadAutosave:
 			if (pSong) {
-				FOREACH_PlayerNumber(pn)
-				{
-					GAMESTATE->m_pCurSteps[pn].Set(NULL);
-				}
+				FOREACH_PlayerNumber(pn) { GAMESTATE->m_pCurSteps.Set(NULL); }
 				pSong->LoadAutosaveFile();
 				SONGMAN->Invalidate(pSong);
 				SCREENMAN->SendMessageToTopScreen(SM_RefreshSelector);
@@ -297,7 +294,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 					case EditMode_Full:
 						break;
 					case EditMode_Home:
-						pSteps->SetLoadedFromProfile(ProfileSlot_Machine);
+						pSteps->SetLoadedFromProfile(ProfileSlot_Player1);
 						break;
 					case EditMode_Practice:
 						FAIL_M("Cannot create steps in EditMode_Practice");
@@ -323,7 +320,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 				SCREENMAN->PlayStartSound();
 
 				GAMESTATE->m_pCurSong.Set(pSong);
-				GAMESTATE->m_pCurSteps[PLAYER_1].Set(pSteps);
+				GAMESTATE->m_pCurSteps.Set(pSteps);
 			}
 			break;
 		default:
@@ -343,7 +340,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 				ScreenTextEntry::TextEntry(
 				  SM_BackFromEditDescription,
 				  ENTER_EDIT_DESCRIPTION,
-				  GAMESTATE->m_pCurSteps[0]->GetDescription(),
+				  GAMESTATE->m_pCurSteps->GetDescription(),
 				  MAX_STEPS_DESCRIPTION_LENGTH,
 				  SongUtil::ValidateCurrentStepsDescription,
 				  SetCurrentStepsDescription,

@@ -2487,7 +2487,7 @@ ScreenEdit::Init()
 	SubscribeToMessage("Judgment");
 
 	ASSERT(GAMESTATE->m_pCurSong != NULL);
-	ASSERT(GAMESTATE->m_pCurSteps[PLAYER_1] != NULL);
+	ASSERT(GAMESTATE->m_pCurSteps != NULL);
 
 	EDIT_MODE.Load(m_sName, "EditMode");
 	ScreenWithMenuElements::Init();
@@ -2500,17 +2500,12 @@ ScreenEdit::Init()
 	CopyToLastSave();
 
 	m_CurrentAction = MAIN_MENU_CHOICE_INVALID;
-	m_InputPlayerNumber = PLAYER_INVALID;
+	m_InputPlayerNumber = PLAYER_1;
 
-	if (GAMESTATE->GetCurrentStyle(GAMESTATE->GetMasterPlayerNumber())
-		  ->m_StyleType == StyleType_TwoPlayersSharedSides)
-		m_InputPlayerNumber = PLAYER_1;
-
-	FOREACH_PlayerNumber(p) GAMESTATE->m_bSideIsJoined[p] = false;
-	GAMESTATE->m_bSideIsJoined[PLAYER_1] = true;
+	GAMESTATE->m_bSideIsJoined = true;
 
 	m_pSong = GAMESTATE->m_pCurSong;
-	m_pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	m_pSteps = GAMESTATE->m_pCurSteps;
 
 	/*	The user will most likely switch into Step Timing after laying down
 		some initial notes. It also throws off many people at first glance.
@@ -2554,7 +2549,7 @@ ScreenEdit::Init()
 		{
 			const RString& sNoteSkin = EDITOR_NOTE_SKINS[pn].Get();
 			if (NOTESKIN->DoesNoteSkinExist(sNoteSkin))
-				PO_GROUP_ASSIGN(GAMESTATE->m_pPlayerState[pn]->m_PlayerOptions,
+				PO_GROUP_ASSIGN(GAMESTATE->m_pPlayerState->m_PlayerOptions,
 								ModsLevel_Preferred,
 								m_sNoteSkin,
 								sNoteSkin);
@@ -2573,19 +2568,18 @@ ScreenEdit::Init()
 						m_sNoteSkin,
 						EDITOR_NOTE_SKINS[PLAYER_1].Get());
 	} else {
-		PO_GROUP_ASSIGN(m_PlayerStateEdit.m_PlayerOptions,
-						ModsLevel_Stage,
-						m_sNoteSkin,
-						GAMESTATE->m_pPlayerState[PLAYER_1]
-						  ->m_PlayerOptions.GetStage()
-						  .m_sNoteSkin);
+		PO_GROUP_ASSIGN(
+		  m_PlayerStateEdit.m_PlayerOptions,
+		  ModsLevel_Stage,
+		  m_sNoteSkin,
+		  GAMESTATE->m_pPlayerState->m_PlayerOptions.GetStage().m_sNoteSkin);
 	}
 	m_PlayerStateEdit.m_PlayerOptions.FromString(ModsLevel_Stage,
 												 EDIT_MODIFIERS);
 
 	this->originalPlayerOptions.FromString(ModsLevel_Stage, EDIT_MODIFIERS);
 
-	m_pSteps->GetNoteData(m_NoteDataEdit, true);
+	m_pSteps->GetNoteData(m_NoteDataEdit);
 	m_NoteFieldEdit.SetXY(EDIT_X, EDIT_Y);
 	m_NoteFieldEdit.SetZoom(0.5f);
 	m_NoteFieldEdit.Init(&m_PlayerStateEdit, PLAYER_HEIGHT * 2, false);
@@ -2594,7 +2588,7 @@ ScreenEdit::Init()
 
 	m_NoteDataRecord.SetNumTracks(m_NoteDataEdit.GetNumTracks());
 	m_NoteFieldRecord.SetXY(RECORD_X, RECORD_Y);
-	m_NoteFieldRecord.Init(GAMESTATE->m_pPlayerState[PLAYER_1], PLAYER_HEIGHT);
+	m_NoteFieldRecord.Init(GAMESTATE->m_pPlayerState, PLAYER_HEIGHT);
 	m_NoteFieldRecord.Load(&m_NoteDataRecord, -120, 425);
 	this->AddChild(&m_NoteFieldRecord);
 
@@ -2617,18 +2611,9 @@ ScreenEdit::Init()
 		SetDirty(true);
 	}
 
-	m_Player->Init("Player",
-				   GAMESTATE->m_pPlayerState[PLAYER_1],
-				   NULL,
-				   NULL,
-				   NULL,
-				   NULL,
-				   NULL,
-				   NULL,
-				   NULL,
-				   NULL);
+	m_Player->Init("Player", GAMESTATE->m_pPlayerState, NULL, NULL, NULL);
 	m_Player->CacheAllUsedNoteSkins();
-	GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController = PC_HUMAN;
+	GAMESTATE->m_pPlayerState->m_PlayerController = PC_HUMAN;
 	m_Player->SetXY(PLAYER_X, PLAYER_Y);
 	this->AddChild(m_Player);
 
@@ -2776,7 +2761,7 @@ ScreenEdit::Update(float fDeltaTime)
 
 	if (m_EditState == STATE_EDITING) {
 		if (IsDirty() && m_next_autosave_time > -1.0f &&
-			RageTimer::GetTimeSinceStartFast() > m_next_autosave_time) {
+			RageTimer::GetTimeSinceStart() > m_next_autosave_time) {
 			PerformSave(true);
 		}
 	}
@@ -2806,9 +2791,9 @@ ScreenEdit::Update(float fDeltaTime)
 			// selection (or appropriate quantization).
 			float fStartPlayingAtBeat = NoteRowToBeat(m_iStartPlayingAt);
 			float fStopPlayingAtBeat = NoteRowToBeat(m_iStopPlayingAt);
-			if (GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat <=
+			if (GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat <=
 				  fStartPlayingAtBeat ||
-				GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat >=
+				GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat >=
 				  fStopPlayingAtBeat)
 				continue;
 
@@ -2836,7 +2821,6 @@ ScreenEdit::Update(float fDeltaTime)
 							   ? TAP_ORIGINAL_ROLL_HEAD
 							   : TAP_ORIGINAL_HOLD_HEAD;
 
-				tn.pn = m_InputPlayerNumber;
 				m_NoteDataRecord.AddHoldNote(
 				  t, BeatToNoteRow(fStartBeat), BeatToNoteRow(fEndBeat), tn);
 			}
@@ -2879,7 +2863,7 @@ ScreenEdit::Update(float fDeltaTime)
 		  m_pSteps->GetTimingData()->GetElapsedTimeFromBeat(
 			NoteRowToBeat(m_iStopPlayingAt)) +
 		  1;
-		if (GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fMusicSeconds >
+		if (GAMESTATE->m_pPlayerState->m_Position.m_fMusicSeconds >
 			fStopAtSeconds) {
 			TransitionEditState(
 			  (LOOP_ON_CHART_END ? STATE_PLAYING : STATE_EDITING));
@@ -2904,29 +2888,8 @@ ScreenEdit::Update(float fDeltaTime)
 	PlayTicks();
 }
 
-static vector<int>
-FindAllAttacksAtTime(const AttackArray& attacks, float fStartTime)
-{
-	vector<int> ret;
-	for (unsigned i = 0; i < attacks.size(); ++i) {
-		if (fabs(attacks[i].fStartSecond - fStartTime) < 0.001f) {
-			ret.push_back(i);
-		}
-	}
-	return ret;
-}
-
-static int
-FindAttackAtTime(const AttackArray& attacks, float fStartTime)
-{
-	for (unsigned i = 0; i < attacks.size(); ++i) {
-		if (fabs(attacks[i].fStartSecond - fStartTime) < 0.001f)
-			return i;
-	}
-	return -1;
-}
-
 // TODO: Fix this mess. -Colby
+// TODO2: hahahahaha
 static LocalizedString CURRENT_BEAT("ScreenEdit", "Current beat");
 static LocalizedString CURRENT_SECOND("ScreenEdit", "Current second");
 static LocalizedString SNAP_TO("ScreenEdit", "Snap to");
@@ -3115,85 +3078,35 @@ ScreenEdit::UpdateTextInfo()
 		sText += ssprintf(TAP_NOTE_TYPE_FORMAT.GetValue(),
 						  TAP_NOTE_TYPE.GetValue().c_str(),
 						  tapnoteType.c_str());
-
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		float beat = GetAppropriateTiming().GetElapsedTimeFromBeat(GetBeat());
-		sText += ssprintf("Attack here?: %s\n",
-						  FindAttackAtTime(attacks, beat) > -1 ? "YES" : "NO");
 	}
 
 	GAMESTATE->SetProcessedTimingData(m_pSteps->GetTimingData());
 	const StepsTypeCategory& cat =
 	  GAMEMAN->GetStepsTypeInfo(m_pSteps->m_StepsType).m_StepsTypeCategory;
-	if (cat == StepsTypeCategory_Couple || cat == StepsTypeCategory_Routine) {
-		pair<int, int> tmp = m_NoteDataEdit.GetNumTapNotesTwoPlayer();
-		sText += ssprintf(NUM_STEPS_FORMAT_TWO_PLAYER.GetValue(),
-						  TAP_STEPS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumJumpsTwoPlayer();
-		sText += ssprintf(NUM_JUMPS_FORMAT_TWO_PLAYER.GetValue(),
-						  JUMPS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumHandsTwoPlayer();
-		sText += ssprintf(NUM_HANDS_FORMAT_TWO_PLAYER.GetValue(),
-						  HANDS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumHoldNotesTwoPlayer();
-		sText += ssprintf(NUM_HOLDS_FORMAT_TWO_PLAYER.GetValue(),
-						  HOLDS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumMinesTwoPlayer();
-		sText += ssprintf(NUM_MINES_FORMAT_TWO_PLAYER.GetValue(),
-						  MINES.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumRollsTwoPlayer();
-		sText += ssprintf(NUM_ROLLS_FORMAT_TWO_PLAYER.GetValue(),
-						  ROLLS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumLiftsTwoPlayer();
-		sText += ssprintf(NUM_LIFTS_FORMAT_TWO_PLAYER.GetValue(),
-						  LIFTS.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-		tmp = m_NoteDataEdit.GetNumFakesTwoPlayer();
-		sText += ssprintf(NUM_FAKES_FORMAT_TWO_PLAYER.GetValue(),
-						  FAKES.GetValue().c_str(),
-						  tmp.first,
-						  tmp.second);
-	} else {
-		sText += ssprintf(NUM_STEPS_FORMAT.GetValue(),
-						  TAP_STEPS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumTapNotes());
-		sText += ssprintf(NUM_JUMPS_FORMAT.GetValue(),
-						  JUMPS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumJumps());
-		sText += ssprintf(NUM_HANDS_FORMAT.GetValue(),
-						  HANDS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumHands());
-		sText += ssprintf(NUM_HOLDS_FORMAT.GetValue(),
-						  HOLDS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumHoldNotes());
-		sText += ssprintf(NUM_MINES_FORMAT.GetValue(),
-						  MINES.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumMines());
-		sText += ssprintf(NUM_ROLLS_FORMAT.GetValue(),
-						  ROLLS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumRolls());
-		sText += ssprintf(NUM_LIFTS_FORMAT.GetValue(),
-						  LIFTS.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumLifts());
-		sText += ssprintf(NUM_FAKES_FORMAT.GetValue(),
-						  FAKES.GetValue().c_str(),
-						  m_NoteDataEdit.GetNumFakes());
-	}
+	sText += ssprintf(NUM_STEPS_FORMAT.GetValue(),
+					  TAP_STEPS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumTapNotes());
+	sText += ssprintf(NUM_JUMPS_FORMAT.GetValue(),
+					  JUMPS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumJumps());
+	sText += ssprintf(NUM_HANDS_FORMAT.GetValue(),
+					  HANDS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumHands());
+	sText += ssprintf(NUM_HOLDS_FORMAT.GetValue(),
+					  HOLDS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumHoldNotes());
+	sText += ssprintf(NUM_MINES_FORMAT.GetValue(),
+					  MINES.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumMines());
+	sText += ssprintf(NUM_ROLLS_FORMAT.GetValue(),
+					  ROLLS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumRolls());
+	sText += ssprintf(NUM_LIFTS_FORMAT.GetValue(),
+					  LIFTS.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumLifts());
+	sText += ssprintf(NUM_FAKES_FORMAT.GetValue(),
+					  FAKES.GetValue().c_str(),
+					  m_NoteDataEdit.GetNumFakes());
 	switch (EDIT_MODE.GetValue()) {
 		DEFAULT_FAIL(EDIT_MODE.GetValue());
 		case EditMode_Practice:
@@ -3326,9 +3239,7 @@ ShiftToRightSide(int& iCol, int iNumTracks)
 			->m_StyleType);
 		case StyleType_OnePlayerOneSide:
 			break;
-		case StyleType_TwoPlayersTwoSides:
 		case StyleType_OnePlayerTwoSides:
-		case StyleType_TwoPlayersSharedSides:
 			iCol += iNumTracks / 2;
 			break;
 	}
@@ -3413,7 +3324,6 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 				SetDirty(true);
 				SaveUndo();
 				TapNote tn = m_selectedTap;
-				tn.pn = m_InputPlayerNumber;
 				m_NoteDataEdit.SetTapNote(iCol, iSongIndex, tn);
 				CheckNumberOfNotesAndUndo();
 			}
@@ -3678,7 +3588,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 			  GetAppropriateTiming().GetElapsedTimeFromBeat(GetBeat());
 
 			// save current steps
-			Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+			Steps* pSteps = GAMESTATE->m_pCurSteps;
 			ASSERT(pSteps != NULL);
 			pSteps->SetNoteData(m_NoteDataEdit);
 
@@ -3714,9 +3624,9 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 			}
 
 			pSteps = *it;
-			GAMESTATE->m_pCurSteps[PLAYER_1].Set(pSteps);
+			GAMESTATE->m_pCurSteps.Set(pSteps);
 			m_pSteps = pSteps;
-			pSteps->GetNoteData(m_NoteDataEdit, true);
+			pSteps->GetNoteData(m_NoteDataEdit);
 
 			RString s =
 			  ssprintf(SWITCHED_TO.GetValue() + " %s %s '%s' (%d of %d)",
@@ -3879,11 +3789,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 			GetAppropriateTimingForUpdate().m_fBeat0OffsetInSeconds += fDelta;
 			(fDelta > 0 ? m_soundValueIncrease : m_soundValueDecrease)
 			  .Play(true);
-			if (GAMESTATE->m_bIsUsingStepTiming) {
-				GAMESTATE->m_pCurSteps[PLAYER_1]->m_Attacks.UpdateStartTimes(
-				  fDelta);
-			} else {
-				GAMESTATE->m_pCurSong->m_Attacks.UpdateStartTimes(fDelta);
+			if (!GAMESTATE->m_bIsUsingStepTiming) {
 				GAMESTATE->m_pCurSong->m_fMusicSampleStartSeconds += fDelta;
 			}
 			SetDirty(true);
@@ -4038,8 +3944,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 					  bgc)
 					{
 						if (bgc->m_fStartBeat ==
-							GAMESTATE->m_pPlayerState[PLAYER_1]
-							  ->m_Position.m_fSongBeat) {
+							GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat) {
 							bAlreadyBGChangeHere = true;
 							bgChange = *bgc;
 						}
@@ -4138,10 +4043,6 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 				SCREENMAN->PlayInvalidSound();
 			}
 			return true;
-		case EDIT_BUTTON_OPEN_STEP_ATTACK_MENU: {
-			this->DoStepAttackMenu();
-			return true;
-		}
 		case EDIT_BUTTON_ADD_STEP_MODS: {
 			float start = -1;
 			float end = -1;
@@ -4154,10 +4055,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 				const TimingData& timing = GetAppropriateTiming();
 				start = timing.GetElapsedTimeFromBeat(
 				  NoteRowToBeat(m_NoteFieldEdit.m_iBeginMarker));
-				AttackArray& attacks =
-				  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-												   : m_pSong->m_Attacks);
-				int index = FindAttackAtTime(attacks, start);
+				int index = 0;
 
 				if (index >= 0) {
 					po.FromString("");
@@ -4170,7 +4068,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 				}
 			}
 			ModsGroup<PlayerOptions>& toEdit =
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions;
+			  GAMESTATE->m_pPlayerState->m_PlayerOptions;
 			this->originalPlayerOptions.Assign(ModsLevel_Preferred,
 											   toEdit.GetPreferred());
 			g_fLastInsertAttackPositionSeconds = start;
@@ -4239,7 +4137,7 @@ ScreenEdit::InputEdit(const InputEventPlus& input, EditButton EditB)
 					  BeatToNoteRow(g_iDefaultRecordLength.Get());
 				}
 
-				if (GAMESTATE->m_pCurSteps[0]->IsAnEdit())
+				if (GAMESTATE->m_pCurSteps->IsAnEdit())
 					m_iStopPlayingAt =
 					  min(m_iStopPlayingAt,
 						  BeatToNoteRow(GetMaximumBeatForNewNote()));
@@ -4371,7 +4269,6 @@ ScreenEdit::InputRecord(const InputEventPlus& input, EditButton EditB)
 				m_NoteDataRecord.SetTapNote(iCol, iHeadRow, TAP_EMPTY);
 
 			TapNote tn = TAP_ORIGINAL_TAP;
-			tn.pn = m_InputPlayerNumber;
 			m_NoteDataRecord.SetTapNote(iCol, iRow, tn);
 			m_NoteFieldRecord.Step(iCol, TNS_W1);
 		}
@@ -4407,7 +4304,7 @@ ScreenEdit::InputRecordPaused(const InputEventPlus& input, EditButton EditB)
 			return true;
 
 		case EDIT_BUTTON_RECORD_FROM_CURSOR:
-			if (GAMESTATE->m_pCurSteps[0]->IsAnEdit()) {
+			if (GAMESTATE->m_pCurSteps->IsAnEdit()) {
 				float fMaximumBeat = GetMaximumBeatForNewNote();
 				if (NoteRowToBeat(m_iStopPlayingAt) >= fMaximumBeat) {
 					// We're already at the end.
@@ -4422,7 +4319,7 @@ ScreenEdit::InputRecordPaused(const InputEventPlus& input, EditButton EditB)
 				m_iStartPlayingAt = m_iStopPlayingAt;
 				m_iStopPlayingAt += iSize;
 
-				if (GAMESTATE->m_pCurSteps[0]->IsAnEdit())
+				if (GAMESTATE->m_pCurSteps->IsAnEdit())
 					m_iStopPlayingAt =
 					  min(m_iStopPlayingAt,
 						  BeatToNoteRow(GetMaximumBeatForNewNote()));
@@ -4454,21 +4351,13 @@ ScreenEdit::InputPlay(const InputEventPlus& input, EditButton EditB)
 	  GAMESTATE->m_pCurGame->GetPerButtonInfo(input.GameI.button)->m_gbt;
 
 	if (GamePreferences::m_AutoPlay == PC_HUMAN &&
-		GAMESTATE->m_pPlayerState[PLAYER_1]
-			->m_PlayerOptions.GetCurrent()
+		GAMESTATE->m_pPlayerState->m_PlayerOptions.GetCurrent()
 			.m_fPlayerAutoPlay == 0) {
 		const int iCol =
 		  GAMESTATE->GetCurrentStyle(GAMESTATE->GetMasterPlayerNumber())
 			->GameInputToColumn(input.GameI);
 		bool bRelease = input.type == IET_RELEASE;
 		switch (input.pn) {
-			case PLAYER_2:
-				// ignore player 2 input unless this mode requires it
-				if (GAMESTATE
-					  ->GetCurrentStyle(GAMESTATE->GetMasterPlayerNumber())
-					  ->m_StyleType != StyleType_TwoPlayersSharedSides)
-					break;
-
 			// fall through to input handling logic:
 			case PLAYER_1: {
 				switch (gbt) {
@@ -4572,10 +4461,8 @@ ScreenEdit::TransitionEditState(EditState em)
 				break;
 
 			case STATE_PLAYING:
-				AdjustSync::HandleSongEnd();
 				if (!GAMESTATE->m_bIsUsingStepTiming)
-					GAMESTATE->m_pCurSteps[PLAYER_1]->m_Timing =
-					  backupStepTiming;
+					GAMESTATE->m_pCurSteps->m_Timing = backupStepTiming;
 				if (AdjustSync::IsSyncDataChanged())
 					ScreenSaveSync::PromptSaveSync();
 				break;
@@ -4583,8 +4470,7 @@ ScreenEdit::TransitionEditState(EditState em)
 			case STATE_RECORDING:
 				SetDirty(true);
 				if (!GAMESTATE->m_bIsUsingStepTiming)
-					GAMESTATE->m_pCurSteps[PLAYER_1]->m_Timing =
-					  backupStepTiming;
+					GAMESTATE->m_pCurSteps->m_Timing = backupStepTiming;
 				SaveUndo();
 
 				// delete old TapNotes in the range
@@ -4605,14 +4491,8 @@ ScreenEdit::TransitionEditState(EditState em)
 	// Set up player options for this mode. (EDITING uses m_PlayerStateEdit,
 	// which we don't need to change.)
 	if (em != STATE_EDITING) {
-		// Stop displaying course attacks, if any.
-		GAMESTATE->m_pPlayerState[PLAYER_1]->RemoveActiveAttacks();
-		// Load the player's default PlayerOptions.
-		GAMESTATE->m_pPlayerState[PLAYER_1]
-		  ->RebuildPlayerOptionsFromActiveAttacks();
-
 		// Snap to current options.
-		GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions.SetCurrentToLevel(
+		GAMESTATE->m_pPlayerState->m_PlayerOptions.SetCurrentToLevel(
 		  ModsLevel_Stage);
 	}
 
@@ -4641,7 +4521,7 @@ ScreenEdit::TransitionEditState(EditState em)
 			 * first. Also be sure to get the right timing. */
 			float fSeconds = GetAppropriateTiming().GetElapsedTimeFromBeat(
 							   NoteRowToBeat(m_iStartPlayingAt)) -
-							 PREFSMAN->m_EditRecordModeLeadIn;
+							 5.f;
 			GAMESTATE->UpdateSongPosition(
 			  fSeconds, GetAppropriateTiming(), RageZeroTimer);
 
@@ -4650,8 +4530,8 @@ ScreenEdit::TransitionEditState(EditState em)
 			if (!GAMESTATE->m_bIsUsingStepTiming) {
 				// Substitute the song timing for the step timing during
 				// preview if we're in song mode
-				backupStepTiming = GAMESTATE->m_pCurSteps[PLAYER_1]->m_Timing;
-				GAMESTATE->m_pCurSteps[PLAYER_1]->m_Timing.Clear();
+				backupStepTiming = GAMESTATE->m_pCurSteps->m_Timing;
+				GAMESTATE->m_pCurSteps->m_Timing.Clear();
 			}
 
 			/* Reset the note skin, in case preferences have changed. */
@@ -4670,19 +4550,17 @@ ScreenEdit::TransitionEditState(EditState em)
 		case STATE_PLAYING:
 			m_Player.Load(m_NoteDataEdit);
 
-			if (GAMESTATE->m_pPlayerState[PLAYER_1]
-				  ->m_PlayerOptions.GetCurrent()
+			if (GAMESTATE->m_pPlayerState->m_PlayerOptions.GetCurrent()
 				  .m_fPlayerAutoPlay != 0)
-				GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController =
-				  PC_AUTOPLAY;
+				GAMESTATE->m_pPlayerState->m_PlayerController = PC_AUTOPLAY;
 			else
-				GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerController =
+				GAMESTATE->m_pPlayerState->m_PlayerController =
 				  GamePreferences::m_AutoPlay;
 
 			if (g_bEditorShowBGChangesPlay) {
 				/* FirstBeat affects backgrounds, so commit changes to memory
 				 * (not to disk) and recalc it. */
-				Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+				Steps* pSteps = GAMESTATE->m_pCurSteps;
 				ASSERT(pSteps != NULL);
 				pSteps->SetNoteData(m_NoteDataEdit);
 				m_pSong->ReCalculateRadarValuesAndLastSecond();
@@ -4792,7 +4670,6 @@ ScreenEdit::ScrollTo(float fDestinationBeat)
 					   ? TAP_ORIGINAL_ROLL_HEAD
 					   : TAP_ORIGINAL_HOLD_HEAD;
 
-		tn.pn = m_InputPlayerNumber;
 		m_NoteDataEdit.AddHoldNote(iCol, iStartRow, iEndRow, tn);
 	}
 
@@ -4829,8 +4706,7 @@ ScreenEdit::HandleMessage(const Message& msg)
 		PlayerNumber pn;
 		msg.GetParam("Player", pn);
 
-		if (GAMESTATE->m_pPlayerState[PLAYER_1]
-			  ->m_PlayerOptions.GetCurrent()
+		if (GAMESTATE->m_pPlayerState->m_PlayerOptions.GetCurrent()
 			  .m_bMuteOnError) {
 			RageSoundReader* pSoundReader = m_AutoKeysounds.GetPlayerSound(pn);
 			if (pSoundReader == NULL)
@@ -4917,7 +4793,7 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 		  ScreenMiniMenu::s_viLastAnswers);
 	} else if (SM == SM_BackFromDifficultyMeterChange) {
 		int i = StringToInt(ScreenTextEntry::s_sLastAnswer);
-		GAMESTATE->m_pCurSteps[PLAYER_1]->SetMeter(i);
+		GAMESTATE->m_pCurSteps->SetMeter(i);
 		SetDirty(true);
 	} else if (SM == SM_BackFromBeat0Change &&
 			   !ScreenTextEntry::s_bCancelledLast) {
@@ -4928,10 +4804,7 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 		timing.m_fBeat0OffsetInSeconds = fBeat0;
 		float delta = timing.m_fBeat0OffsetInSeconds - old;
 
-		if (GAMESTATE->m_bIsUsingStepTiming) {
-			GAMESTATE->m_pCurSteps[PLAYER_1]->m_Attacks.UpdateStartTimes(delta);
-		} else {
-			GAMESTATE->m_pCurSong->m_Attacks.UpdateStartTimes(delta);
+		if (!GAMESTATE->m_bIsUsingStepTiming) {
 			GAMESTATE->m_pCurSong->m_fMusicSampleStartSeconds += delta;
 		}
 
@@ -5146,235 +5019,18 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 
 		// stop any music that screen may have been playing
 		SOUND->StopMusic();
-	} else if (SM == SM_BackFromInsertTapAttack) {
-		int iDurationChoice = ScreenMiniMenu::s_viLastAnswers[0];
-		g_fLastInsertAttackDurationSeconds =
-		  StringToFloat(g_InsertTapAttack.rows[0].choices[iDurationChoice]);
-
-		SCREENMAN->AddNewScreenToTop(SET_MOD_SCREEN,
-									 SM_BackFromInsertTapAttackPlayerOptions);
-	} else if (SM == SM_BackFromInsertTapAttackPlayerOptions) {
-		PlayerOptions poChosen =
-		  GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions.GetPreferred();
-		RString sMods = poChosen.GetString();
-		const int row = BeatToNoteRow(GAMESTATE->m_Position.m_fSongBeat);
-
-		TapNote tn(TapNoteType_Attack,
-				   TapNoteSubType_Invalid,
-				   TapNoteSource_Original,
-				   sMods,
-				   g_fLastInsertAttackDurationSeconds,
-				   -1);
-		tn.pn = m_InputPlayerNumber;
-		SetDirty(true);
-		SaveUndo();
-		m_NoteDataEdit.SetTapNote(g_iLastInsertTapAttackTrack, row, tn);
-		CheckNumberOfNotesAndUndo();
-	} else if (SM == SM_BackFromEditingAttackStart &&
-			   !ScreenTextEntry::s_bCancelledLast) {
-		float time = StringToFloat(ScreenTextEntry::s_sLastAnswer);
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		Attack& attack = attacks[attackInProcess];
-		attack.fStartSecond = time;
-		SetDirty(true);
-	} else if (SM == SM_BackFromEditingAttackLength &&
-			   !ScreenTextEntry::s_bCancelledLast) {
-		float time = StringToFloat(ScreenTextEntry::s_sLastAnswer);
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		Attack& attack = attacks[attackInProcess];
-		attack.fSecsRemaining = time;
-		SetDirty(true);
-	} else if (SM == SM_BackFromAddingModToExistingAttack &&
-			   !ScreenTextEntry::s_bCancelledLast) {
-		RString mod = ScreenTextEntry::s_sLastAnswer;
-		Trim(mod);
-		if (mod.length() > 0) {
-			AttackArray& attacks =
-			  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-											   : m_pSong->m_Attacks);
-			Attack& attack = attacks[attackInProcess];
-			attack.sModifiers += "," + mod;
-			SetDirty(true);
-		}
-
-	} else if (SM == SM_BackFromEditingModToExistingAttack &&
-			   !ScreenTextEntry::s_bCancelledLast) {
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		Attack& attack = attacks[attackInProcess];
-		vector<RString> mods;
-		split(attack.sModifiers, ",", mods);
-		RString mod = ScreenTextEntry::s_sLastAnswer;
-		Trim(mod);
-		if (mod.length() > 0) {
-			mods[modInProcess - 2] = mod;
-		} else {
-			mods.erase(mods.begin() + (modInProcess - 2));
-		}
-		if (mods.size() > 0) {
-			attack.sModifiers = join(",", mods);
-		} else {
-			attacks.erase(attacks.begin() + attackInProcess);
-		}
-		SetDirty(true);
-	} else if (SM == SM_BackFromInsertStepAttack) {
-		unsigned option = ScreenMiniMenu::s_iLastRowCode;
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		Attack& attack = attacks[attackInProcess];
-		vector<RString> mods;
-		split(attack.sModifiers, ",", mods);
-		modInProcess = option;
-		if (option == 0) // adjusting the starting time
-		{
-			ScreenTextEntry::TextEntry(SM_BackFromEditingAttackStart,
-									   EDIT_ATTACK_START,
-									   FloatToString(attack.fStartSecond),
-									   10);
-		} else if (option == 1) // adjusting the length of the attack
-		{
-			ScreenTextEntry::TextEntry(SM_BackFromEditingAttackLength,
-									   EDIT_ATTACK_LENGTH,
-									   FloatToString(attack.fSecsRemaining),
-									   10);
-		} else if (option >= 2 + mods.size()) // adding a new mod
-		{
-			ScreenTextEntry::TextEntry(
-			  SM_BackFromAddingModToExistingAttack, ADD_NEW_MOD, "", 64);
-		} else // modifying existing mod.
-		{
-			ScreenTextEntry::TextEntry(SM_BackFromEditingModToExistingAttack,
-									   EDIT_EXISTING_MOD,
-									   mods[option - 2],
-									   64);
-		}
-	} else if (SM == SM_BackFromAddingAttackToChart &&
-			   !ScreenTextEntry::s_bCancelledLast) {
-		RString mod = ScreenTextEntry::s_sLastAnswer;
-		Trim(mod);
-		if (mod.length() > 0) {
-			AttackArray& attacks =
-			  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-											   : m_pSong->m_Attacks);
-			Attack attack;
-			attack.fStartSecond =
-			  GetAppropriateTiming().GetElapsedTimeFromBeat(GetBeat());
-			attack.fSecsRemaining = 5; // Users can change later.
-			attack.sModifiers = mod;
-			attacks.push_back(attack);
-			SetDirty(true);
-		}
-	} else if (SM == SM_BackFromAttackAtTime) {
-		int attackChoice = ScreenMiniMenu::s_iLastRowCode;
-		int attackDecision = ScreenMiniMenu::s_viLastAnswers[attackChoice];
-		const TimingData& timing = GetAppropriateTiming();
-		float startTime = timing.GetElapsedTimeFromBeat(GetBeat());
-		AttackArray& attacks =
-		  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-										   : m_pSong->m_Attacks);
-		vector<int> points = FindAllAttacksAtTime(attacks, startTime);
-		if (attackChoice == (int)points.size()) {
-			// TODO: Add attack code.
-			ScreenTextEntry::TextEntry(
-			  SM_BackFromAddingAttackToChart, ADD_NEW_ATTACK, "", 64);
-		} else {
-			attackInProcess = points[attackChoice];
-			if (attackDecision == 1) // remove
-			{
-				attacks.erase(attacks.begin() + attackInProcess);
-				SetDirty(true);
-			} else {
-				Attack& attack = attacks[attackInProcess];
-				g_IndividualAttack.rows.clear();
-
-				g_IndividualAttack.rows[0].SetOneUnthemedChoice(
-				  FloatToString(attack.fStartSecond));
-				g_IndividualAttack.rows[1].SetOneUnthemedChoice(
-				  FloatToString(attack.fSecsRemaining));
-				vector<RString> mods;
-				split(attack.sModifiers, ",", mods);
-				for (unsigned i = 0; i < mods.size(); ++i) {
-					unsigned col = i + 2;
-					g_IndividualAttack.rows[col].SetOneUnthemedChoice(
-					  mods[i].c_str());
-				}
-
-				EditMiniMenu(&g_IndividualAttack, SM_BackFromInsertStepAttack);
-			}
-		}
-	} else if (SM == SM_BackFromInsertStepAttack) {
-		int iDurationChoice = ScreenMiniMenu::s_viLastAnswers[0];
-		const TimingData& timing = GetAppropriateTiming();
-		g_fLastInsertAttackPositionSeconds =
-		  timing.GetElapsedTimeFromBeat(GetBeat());
-		g_fLastInsertAttackDurationSeconds =
-		  StringToFloat(g_InsertStepAttack.rows[0].choices[iDurationChoice]);
-		AttackArray& attacks = GAMESTATE->m_bIsUsingStepTiming
-								 ? m_pSteps->m_Attacks
-								 : m_pSong->m_Attacks;
-		int iAttack =
-		  FindAttackAtTime(attacks, g_fLastInsertAttackPositionSeconds);
-
-		if (ScreenMiniMenu::s_iLastRowCode == true) {
-			if (iAttack > 0)
-				attacks.erase(attacks.begin() + iAttack);
-		} else {
-			ModsGroup<PlayerOptions>& toEdit =
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions;
-			this->originalPlayerOptions.Assign(ModsLevel_Preferred,
-											   toEdit.GetPreferred());
-			PlayerOptions po;
-			if (iAttack >= 0)
-				po.FromString(attacks[iAttack].sModifiers);
-
-			toEdit.Assign(ModsLevel_Preferred, po);
-			SCREENMAN->AddNewScreenToTop(
-			  SET_MOD_SCREEN, SM_BackFromInsertStepAttackPlayerOptions);
-		}
-		SetDirty(true);
-	} else if (SM == SM_BackFromInsertStepAttackPlayerOptions) {
-		ModsGroup<PlayerOptions>& toRestore =
-		  GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions;
-		PlayerOptions poChosen = toRestore.GetPreferred();
-		RString mods = poChosen.GetString();
-
-		if (g_fLastInsertAttackPositionSeconds >= 0) {
-			Attack a(ATTACK_LEVEL_1,
-					 g_fLastInsertAttackPositionSeconds,
-					 g_fLastInsertAttackDurationSeconds,
-					 mods,
-					 false,
-					 false);
-			AttackArray& attacks = GAMESTATE->m_bIsUsingStepTiming
-									 ? m_pSteps->m_Attacks
-									 : m_pSong->m_Attacks;
-			int index =
-			  FindAttackAtTime(attacks, g_fLastInsertAttackPositionSeconds);
-			if (index >= 0)
-				attacks[index] = a;
-			else
-				attacks.push_back(a);
-		}
-		toRestore.Assign(ModsLevel_Preferred,
-						 this->originalPlayerOptions.GetPreferred());
 	} else if (SM == SM_DoRevertToLastSave) {
 		if (ScreenPrompt::s_LastAnswer == ANSWER_YES) {
 			SaveUndo();
 			CopyFromLastSave();
-			m_pSteps->GetNoteData(m_NoteDataEdit, true);
+			m_pSteps->GetNoteData(m_NoteDataEdit);
 			SetDirty(false);
 		}
 	} else if (SM == SM_DoRevertFromDisk) {
 		if (ScreenPrompt::s_LastAnswer == ANSWER_YES) {
 			SaveUndo();
 			RevertFromDisk();
-			m_pSteps->GetNoteData(m_NoteDataEdit, true);
+			m_pSteps->GetNoteData(m_NoteDataEdit);
 			SetDirty(false);
 		}
 	} else if (SM == SM_ConfirmClearArea) {
@@ -5424,7 +5080,7 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 	} else if (SM == SM_AutoSaveSuccessful) {
 		LOG->Trace("AutoSave successful.");
 		m_next_autosave_time =
-		  RageTimer::GetTimeSinceStartFast() + time_between_autosave;
+		  RageTimer::GetTimeSinceStart() + time_between_autosave;
 		SCREENMAN->SystemMessage(AUTOSAVE_SUCCESSFUL);
 	} else if (SM == SM_SaveFailed) // save failed; stay in the editor
 	{
@@ -5450,8 +5106,7 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 		FOREACH_CONST(Steps*, apSteps, s)
 		{
 			// If we're not on the same style, let it go.
-			if (GAMESTATE->m_pCurSteps[PLAYER_1]->m_StepsType !=
-				(*s)->m_StepsType)
+			if (GAMESTATE->m_pCurSteps->m_StepsType != (*s)->m_StepsType)
 				continue;
 			// If the notedata has content, let it go.
 			if (!(*s)->GetNoteData().IsEmpty())
@@ -5469,8 +5124,8 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 			pSong->DeleteSteps(pSteps);
 			if (m_pSteps == pSteps)
 				m_pSteps = NULL;
-			if (GAMESTATE->m_pCurSteps[PLAYER_1].Get() == pSteps)
-				GAMESTATE->m_pCurSteps[PLAYER_1].Set(NULL);
+			if (GAMESTATE->m_pCurSteps.Get() == pSteps)
+				GAMESTATE->m_pCurSteps.Set(NULL);
 		}
 
 		m_Out.StartTransitioning(SM_GoToNextScreen);
@@ -5481,7 +5136,7 @@ ScreenEdit::HandleScreenMessage(const ScreenMessage SM)
 	} else if (SM == SM_LoseFocus) {
 		// Snap the trailing beat, in case we lose focus while tweening.
 		m_fTrailingBeat =
-		  GetBeat(); // GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat;
+		  GetBeat(); // GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat;
 	}
 
 	ScreenWithMenuElements::HandleScreenMessage(SM);
@@ -5498,7 +5153,7 @@ ScreenEdit::SetDirty(bool dirty)
 	if (dirty) {
 		if (!m_dirty) {
 			m_next_autosave_time =
-			  RageTimer::GetTimeSinceStartFast() + time_between_autosave;
+			  RageTimer::GetTimeSinceStart() + time_between_autosave;
 		}
 	} else {
 		m_next_autosave_time = -1.0f;
@@ -5511,14 +5166,6 @@ ScreenEdit::PerformSave(bool autosave)
 {
 	// copy edit into current Steps
 	m_pSteps->SetNoteData(m_NoteDataEdit);
-
-	// don't forget the attacks.
-	m_pSong->m_Attacks = GAMESTATE->m_pCurSong->m_Attacks;
-	m_pSong->m_sAttackString =
-	  GAMESTATE->m_pCurSong->m_Attacks.ToVectorString();
-	m_pSteps->m_Attacks = GAMESTATE->m_pCurSteps[PLAYER_1]->m_Attacks;
-	m_pSteps->m_sAttackString =
-	  GAMESTATE->m_pCurSteps[PLAYER_1]->m_Attacks.ToVectorString();
 
 	// If one of the charts uses split timing, then it cannot be accurately
 	// saved in the .sm format.  So saving the .sm is disabled.
@@ -5534,11 +5181,17 @@ ScreenEdit::PerformSave(bool autosave)
 
 			RString sError;
 			m_pSteps->CalculateRadarValues(m_pSong->m_fMusicLengthSeconds);
+
+			LOG->Warn("hol up");
+			break;
+			/*
 			if (!NotesWriterSM::WriteEditFileToMachine(
 				  m_pSong, m_pSteps, sError)) {
 				ScreenPrompt::Prompt(SM_None, sError);
 				break;
 			}
+
+			*/
 
 			m_pSteps->SetSavedToDisk(true);
 
@@ -5596,7 +5249,7 @@ ScreenEdit::OnSnapModeChange()
 static void
 ChangeDescription(const RString& sNew)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 
 	// Don't erase edit descriptions.
 	if (sNew.empty() && pSteps->GetDifficulty() == Difficulty_Edit)
@@ -5608,21 +5261,21 @@ ChangeDescription(const RString& sNew)
 static void
 ChangeChartName(const RString& sNew)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 	pSteps->SetChartName(sNew);
 }
 
 static void
 ChangeChartStyle(const RString& sNew)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 	pSteps->SetChartStyle(sNew);
 }
 
 static void
 ChangeStepCredit(const RString& sNew)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 	pSteps->SetCredit(sNew);
 }
 
@@ -5630,13 +5283,13 @@ static void
 ChangeStepMeter(const RString& sNew)
 {
 	int diff = StringToInt(sNew);
-	GAMESTATE->m_pCurSteps[PLAYER_1]->SetMeter(max(diff, 1));
+	GAMESTATE->m_pCurSteps->SetMeter(max(diff, 1));
 }
 
 static void
 ChangeStepMusic(const RString& sNew)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 	pSteps->SetMusicFile(sNew);
 }
 
@@ -5747,7 +5400,7 @@ ChangeMinBPM(const RString& sNew)
 static void
 ChangeStepsMinBPM(const RString& sNew)
 {
-	Steps* step = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* step = GAMESTATE->m_pCurSteps;
 	step->SetMinBPM(StringToFloat(sNew));
 }
 
@@ -5760,7 +5413,7 @@ ChangeMaxBPM(const RString& sNew)
 static void
 ChangeStepsMaxBPM(const RString& sNew)
 {
-	Steps* step = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* step = GAMESTATE->m_pCurSteps;
 	step->SetMaxBPM(StringToFloat(sNew));
 }
 
@@ -5789,7 +5442,7 @@ SongPosition&
 ScreenEdit::GetAppropriatePosition() const
 {
 	if (GAMESTATE->m_bIsUsingStepTiming) {
-		return GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position;
+		return GAMESTATE->m_pPlayerState->m_Position;
 	}
 	return GAMESTATE->m_Position;
 }
@@ -5799,11 +5452,11 @@ ScreenEdit::SetBeat(float fBeat)
 {
 	if (!GAMESTATE->m_bIsUsingStepTiming) {
 		GAMESTATE->m_Position.m_fSongBeat = fBeat;
-		GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat =
+		GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat =
 		  m_pSteps->GetTimingData()->GetBeatFromElapsedTime(
 			m_pSong->m_SongTiming.GetElapsedTimeFromBeat(fBeat));
 	} else {
-		GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat = fBeat;
+		GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat = fBeat;
 		GAMESTATE->m_Position.m_fSongBeat =
 		  m_pSong->m_SongTiming.GetBeatFromElapsedTime(
 			m_pSteps->GetTimingData()->GetElapsedTimeFromBeat(fBeat));
@@ -5816,7 +5469,7 @@ ScreenEdit::GetBeat()
 	if (!GAMESTATE->m_bIsUsingStepTiming) {
 		return GAMESTATE->m_Position.m_fSongBeat;
 	}
-	return GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat;
+	return GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat;
 }
 
 inline int
@@ -5933,14 +5586,14 @@ ScreenEdit::HandleMainMenuChoice(MainMenuChoice c, const vector<int>& iAnswers)
 			TransitionEditState(STATE_PLAYING);
 		} break;
 		case play_current_beat_to_end: {
-			m_iStartPlayingAt = BeatToNoteRow(
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat);
+			m_iStartPlayingAt =
+			  BeatToNoteRow(GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat);
 			m_iStopPlayingAt = GetSongOrNotesEnd();
 			TransitionEditState(STATE_PLAYING);
 		} break;
 		case set_selection_start: {
-			const int iCurrentRow = BeatToNoteRow(
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat);
+			const int iCurrentRow =
+			  BeatToNoteRow(GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat);
 			if (m_NoteFieldEdit.m_iEndMarker != -1 &&
 				iCurrentRow >= m_NoteFieldEdit.m_iEndMarker) {
 				SCREENMAN->PlayInvalidSound();
@@ -5950,8 +5603,8 @@ ScreenEdit::HandleMainMenuChoice(MainMenuChoice c, const vector<int>& iAnswers)
 			}
 		} break;
 		case set_selection_end: {
-			const int iCurrentRow = BeatToNoteRow(
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat);
+			const int iCurrentRow =
+			  BeatToNoteRow(GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat);
 			if (m_NoteFieldEdit.m_iBeginMarker != -1 &&
 				iCurrentRow <= m_NoteFieldEdit.m_iBeginMarker) {
 				SCREENMAN->PlayInvalidSound();
@@ -5964,7 +5617,7 @@ ScreenEdit::HandleMainMenuChoice(MainMenuChoice c, const vector<int>& iAnswers)
 			/* XXX: If the difficulty is changed from EDIT, and
 			 * pSteps->WasLoadedFromProfile() is true, we should warn that the
 			 * steps will no longer be saved to the profile. */
-			Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+			Steps* pSteps = GAMESTATE->m_pCurSteps;
 
 			g_StepsInformation.rows[difficulty].choices.clear();
 			FOREACH_ENUM(Difficulty, dc)
@@ -6014,74 +5667,32 @@ ScreenEdit::HandleMainMenuChoice(MainMenuChoice c, const vector<int>& iAnswers)
 		} break;
 		case view_steps_data: {
 			float fMusicSeconds = m_pSoundMusic->GetLengthSeconds();
-			Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+			Steps* pSteps = GAMESTATE->m_pCurSteps;
 			const StepsTypeCategory& cat =
 			  GAMEMAN->GetStepsTypeInfo(pSteps->m_StepsType)
 				.m_StepsTypeCategory;
-			if (cat == StepsTypeCategory_Couple ||
-				cat == StepsTypeCategory_Routine) {
-				pair<int, int> tmp = m_NoteDataEdit.GetNumTapNotesTwoPlayer();
-				g_StepsData.rows[tap_notes].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumJumpsTwoPlayer();
-				g_StepsData.rows[jumps].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumHandsTwoPlayer();
-				g_StepsData.rows[hands].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumQuadsTwoPlayer();
-				g_StepsData.rows[quads].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumHoldNotesTwoPlayer();
-				g_StepsData.rows[holds].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumMinesTwoPlayer();
-				g_StepsData.rows[mines].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumRollsTwoPlayer();
-				g_StepsData.rows[rolls].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumLiftsTwoPlayer();
-				g_StepsData.rows[lifts].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-				tmp = m_NoteDataEdit.GetNumFakesTwoPlayer();
-				g_StepsData.rows[fakes].SetOneUnthemedChoice(
-				  ssprintf("%d / %d", tmp.first, tmp.second));
-			} else {
-				g_StepsData.rows[tap_notes].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumTapNotes()));
-				g_StepsData.rows[jumps].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumJumps()));
-				g_StepsData.rows[hands].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumHands()));
-				g_StepsData.rows[quads].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumQuads()));
-				g_StepsData.rows[holds].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumHoldNotes()));
-				g_StepsData.rows[mines].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumMines()));
-				g_StepsData.rows[rolls].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumRolls()));
-				g_StepsData.rows[lifts].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumLifts()));
-				g_StepsData.rows[fakes].SetOneUnthemedChoice(
-				  ssprintf("%d", m_NoteDataEdit.GetNumFakes()));
-			}
+			g_StepsData.rows[tap_notes].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumTapNotes()));
+			g_StepsData.rows[jumps].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumJumps()));
+			g_StepsData.rows[hands].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumHands()));
+			g_StepsData.rows[quads].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumQuads()));
+			g_StepsData.rows[holds].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumHoldNotes()));
+			g_StepsData.rows[mines].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumMines()));
+			g_StepsData.rows[rolls].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumRolls()));
+			g_StepsData.rows[lifts].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumLifts()));
+			g_StepsData.rows[fakes].SetOneUnthemedChoice(
+			  ssprintf("%d", m_NoteDataEdit.GetNumFakes()));
 			RadarValues radar;
 			radar.Zero();
 			NoteDataUtil::CalculateRadarValues(
 			  m_NoteDataEdit, fMusicSeconds, radar);
-			g_StepsData.rows[stream].SetOneUnthemedChoice(
-			  ssprintf("%.2f", radar[RadarCategory_Stream]));
-			g_StepsData.rows[voltage].SetOneUnthemedChoice(
-			  ssprintf("%.2f", radar[RadarCategory_Voltage]));
-			g_StepsData.rows[air].SetOneUnthemedChoice(
-			  ssprintf("%.2f", radar[RadarCategory_Air]));
-			g_StepsData.rows[freeze].SetOneUnthemedChoice(
-			  ssprintf("%.2f", radar[RadarCategory_Freeze]));
-			g_StepsData.rows[chaos].SetOneUnthemedChoice(
-			  ssprintf("%.2f", radar[RadarCategory_Chaos]));
-			EditMiniMenu(&g_StepsData, SM_BackFromStepsData, SM_None);
 			break;
 		}
 		case save:
@@ -6188,8 +5799,7 @@ ConvertMappingInputToMapping(RString const& mapstr,
 	vector<RString> mapping_input;
 	split(mapstr, ",", mapping_input);
 	size_t tracks_for_type =
-	  GAMEMAN->GetStepsTypeInfo(GAMESTATE->m_pCurSteps[0]->m_StepsType)
-		.iNumTracks;
+	  GAMEMAN->GetStepsTypeInfo(GAMESTATE->m_pCurSteps->m_StepsType).iNumTracks;
 	if (mapping_input.size() > tracks_for_type) {
 		error = TOO_MANY_TRACKS;
 		return false;
@@ -6296,8 +5906,7 @@ ScreenEdit::HandleAlterMenuChoice(AlterMenuChoice c,
 		case clear: {
 			int note_count = m_NoteDataEdit.GetNumTapNotesNoTiming(
 			  m_NoteFieldEdit.m_iBeginMarker, m_NoteFieldEdit.m_iEndMarker);
-			if (note_count >= PREFSMAN->m_EditClearPromptThreshold &&
-				prompt_clear) {
+			if (note_count >= 50 && prompt_clear) {
 				ScreenPrompt::Prompt(
 				  SM_ConfirmClearArea,
 				  ssprintf(CONFIRM_CLEAR.GetValue(), note_count),
@@ -6441,7 +6050,7 @@ ScreenEdit::HandleAlterMenuChoice(AlterMenuChoice c,
 					NoteDataUtil::LoadTransformedSlidingWindow(
 					  temp, m_Clipboard, m_Clipboard.GetNumTracks());
 					NoteDataUtil::RemoveStretch(
-					  m_Clipboard, GAMESTATE->m_pCurSteps[0]->m_StepsType);
+					  m_Clipboard, GAMESTATE->m_pCurSteps->m_StepsType);
 				} break;
 				case backwards:
 					NoteDataUtil::Backwards(m_Clipboard);
@@ -6475,7 +6084,7 @@ ScreenEdit::HandleAlterMenuChoice(AlterMenuChoice c,
 					break;
 				case swap_up_down:
 					NoteDataUtil::SwapUpDown(
-					  m_Clipboard, GAMESTATE->m_pCurSteps[0]->m_StepsType);
+					  m_Clipboard, GAMESTATE->m_pCurSteps->m_StepsType);
 					break;
 				case arbitrary_remap:
 					ScreenTextEntry::TextEntry(
@@ -6619,34 +6228,6 @@ ScreenEdit::HandleAlterMenuChoice(AlterMenuChoice c,
 			SetDirty(true);
 			break;
 		}
-		case convert_to_attack: {
-			float startBeat = NoteRowToBeat(m_NoteFieldEdit.m_iBeginMarker);
-			float endBeat = NoteRowToBeat(m_NoteFieldEdit.m_iEndMarker);
-			const TimingData& timing = GetAppropriateTiming();
-			float& start = g_fLastInsertAttackPositionSeconds;
-			float& length = g_fLastInsertAttackDurationSeconds;
-			start = timing.GetElapsedTimeFromBeat(startBeat);
-			length = timing.GetElapsedTimeFromBeat(endBeat) - start;
-
-			AttackArray& attacks = GAMESTATE->m_bIsUsingStepTiming
-									 ? m_pSteps->m_Attacks
-									 : m_pSong->m_Attacks;
-			int iAttack = FindAttackAtTime(attacks, start);
-
-			ModsGroup<PlayerOptions>& toEdit =
-			  GAMESTATE->m_pPlayerState[PLAYER_1]->m_PlayerOptions;
-			this->originalPlayerOptions.Assign(ModsLevel_Preferred,
-											   toEdit.GetPreferred());
-			PlayerOptions po;
-			if (iAttack >= 0)
-				po.FromString(attacks[iAttack].sModifiers);
-
-			toEdit.Assign(ModsLevel_Preferred, po);
-			SCREENMAN->AddNewScreenToTop(
-			  SET_MOD_SCREEN, SM_BackFromInsertStepAttackPlayerOptions);
-			SetDirty(true);
-			break;
-		}
 		case convert_to_fake: {
 			int startRow = m_NoteFieldEdit.m_iBeginMarker;
 			float lengthBeat = NoteRowToBeat(m_NoteFieldEdit.m_iEndMarker) -
@@ -6666,75 +6247,7 @@ ScreenEdit::HandleAlterMenuChoice(AlterMenuChoice c,
 					const TapNote& tn = nd.GetTapNote(t, r);
 					if (tn.type != TapNoteType_Empty) {
 						TapNote nTap = tn;
-						nTap.pn = (tn.pn == PLAYER_1 ? PLAYER_2 : PLAYER_1);
 						m_NoteDataEdit.SetTapNote(t, r, nTap);
-					}
-				}
-			}
-			break;
-		}
-		case routine_mirror_1_to_2:
-		case routine_mirror_2_to_1: {
-			PlayerNumber oPN =
-			  (c == routine_mirror_1_to_2 ? PLAYER_1 : PLAYER_2);
-			PlayerNumber nPN =
-			  (c == routine_mirror_1_to_2 ? PLAYER_2 : PLAYER_1);
-			int nTrack = -1;
-			NoteData& nd = this->m_NoteDataEdit;
-			NoteField& nf = this->m_NoteFieldEdit;
-			int tracks = nd.GetNumTracks();
-			FOREACH_NONEMPTY_ROW_ALL_TRACKS_RANGE(
-			  nd, r, nf.m_iBeginMarker, nf.m_iEndMarker)
-			{
-				for (int t = 0; t < tracks; t++) {
-					const TapNote& tn = nd.GetTapNote(t, r);
-					if (tn.type != TapNoteType_Empty && tn.pn == oPN) {
-						TapNote nTap = tn;
-						nTap.pn = nPN;
-						StepsType curType =
-						  GAMESTATE->m_pCurSteps[PLAYER_1]->m_StepsType;
-						// TODO: Find a better way to do this.
-						if (curType == StepsType_dance_routine) {
-							nTrack = tracks - t - 1;
-						} else if (curType == StepsType_pump_routine) {
-							switch (t) {
-								case 0:
-									nTrack = 8;
-									break;
-								case 1:
-									nTrack = 9;
-									break;
-								case 2:
-									nTrack = 7;
-									break;
-								case 3:
-									nTrack = 5;
-									break;
-								case 4:
-									nTrack = 6;
-									break;
-								case 5:
-									nTrack = 3;
-									break;
-								case 6:
-									nTrack = 4;
-									break;
-								case 7:
-									nTrack = 2;
-									break;
-								case 8:
-									nTrack = 0;
-									break;
-								case 9:
-									nTrack = 1;
-									break;
-								default:
-									FAIL_M(ssprintf(
-									  "Invalid column %d for pump-routine", t));
-									break;
-							}
-						}
-						m_NoteDataEdit.SetTapNote(nTrack, r, nTap);
 					}
 				}
 			}
@@ -6851,10 +6364,6 @@ ScreenEdit::HandleAreaMenuChoice(AreaMenuChoice c,
 			m_Clipboard.ClearAll();
 			break;
 		}
-		case modify_attacks_at_row: {
-			this->DoStepAttackMenu();
-			break;
-		}
 		case modify_keysounds_at_row: {
 			this->DoKeyboardTrackMenu();
 			break;
@@ -6891,7 +6400,7 @@ void
 ScreenEdit::HandleStepsInformationChoice(StepsInformationChoice c,
 										 const vector<int>& iAnswers)
 {
-	Steps* pSteps = GAMESTATE->m_pCurSteps[PLAYER_1];
+	Steps* pSteps = GAMESTATE->m_pCurSteps;
 	Difficulty dc = (Difficulty)iAnswers[difficulty];
 	pSteps->SetDifficulty(dc);
 	pSteps->SetDisplayBPM(static_cast<DisplayBPM>(iAnswers[step_display_bpm]));
@@ -7317,8 +6826,7 @@ ScreenEdit::HandleTimingDataInformationChoice(TimingDataInformationChoice c,
 		}
 		case paste_full_timing: {
 			if (GAMESTATE->m_bIsUsingStepTiming) {
-				GAMESTATE->m_pCurSteps[PLAYER_1]->m_Timing =
-				  clipboardFullTiming;
+				GAMESTATE->m_pCurSteps->m_Timing = clipboardFullTiming;
 			} else {
 				GAMESTATE->m_pCurSong->m_SongTiming = clipboardFullTiming;
 			}
@@ -7507,11 +7015,11 @@ void
 ScreenEdit::CopyToLastSave()
 {
 	ASSERT(GAMESTATE->m_pCurSong != NULL);
-	ASSERT(GAMESTATE->m_pCurSteps[PLAYER_1] != NULL);
+	ASSERT(GAMESTATE->m_pCurSteps != NULL);
 	m_SongLastSave = *GAMESTATE->m_pCurSong;
 	m_vStepsLastSave.clear();
 	const vector<Steps*>& vSteps = GAMESTATE->m_pCurSong->GetStepsByStepsType(
-	  GAMESTATE->m_pCurSteps[PLAYER_1]->m_StepsType);
+	  GAMESTATE->m_pCurSteps->m_StepsType);
 	FOREACH_CONST(Steps*, vSteps, it)
 	m_vStepsLastSave.push_back(**it);
 }
@@ -7524,7 +7032,7 @@ ScreenEdit::CopyFromLastSave()
 	// 2) No steps can be deleted by ScreenEdit (except possibly when we exit)
 	*GAMESTATE->m_pCurSong = m_SongLastSave;
 	const vector<Steps*>& vSteps = GAMESTATE->m_pCurSong->GetStepsByStepsType(
-	  GAMESTATE->m_pCurSteps[PLAYER_1]->m_StepsType);
+	  GAMESTATE->m_pCurSteps->m_StepsType);
 	ASSERT_M(vSteps.size() == m_vStepsLastSave.size(),
 			 ssprintf("Step sizes don't match: %d, %d",
 					  int(vSteps.size()),
@@ -7536,9 +7044,9 @@ ScreenEdit::CopyFromLastSave()
 void
 ScreenEdit::RevertFromDisk()
 {
-	ASSERT(GAMESTATE->m_pCurSteps[PLAYER_1] != NULL);
+	ASSERT(GAMESTATE->m_pCurSteps != NULL);
 	StepsID id;
-	id.FromSteps(GAMESTATE->m_pCurSteps[PLAYER_1]);
+	id.FromSteps(GAMESTATE->m_pCurSteps);
 	ASSERT(id.IsValid());
 
 	// If m_bInStepEditor is true while the song is reloaded, it screws up
@@ -7559,7 +7067,7 @@ ScreenEdit::RevertFromDisk()
 		pNewSteps->SetDifficulty(id.GetDifficulty());
 		GAMESTATE->m_pCurSong->AddSteps(pNewSteps);
 	}
-	GAMESTATE->m_pCurSteps[PLAYER_1].Set(pNewSteps);
+	GAMESTATE->m_pCurSteps.Set(pNewSteps);
 	m_pSteps = pNewSteps;
 
 	CopyToLastSave();
@@ -7609,8 +7117,7 @@ ScreenEdit::CheckNumberOfNotesAndUndo()
 	if (EDIT_MODE.GetValue() != EditMode_Home)
 		return;
 
-	const float fBeat =
-	  GAMESTATE->m_pPlayerState[PLAYER_1]->m_Position.m_fSongBeat;
+	const float fBeat = GAMESTATE->m_pPlayerState->m_Position.m_fSongBeat;
 	const TimeSignatureSegment* curTime =
 	  GAMESTATE->m_pCurSong->m_SongTiming.GetTimeSignatureSegmentAtBeat(fBeat);
 	int rowsPerMeasure = curTime->GetDen() * curTime->GetNum();
@@ -7623,7 +7130,7 @@ ScreenEdit::CheckNumberOfNotesAndUndo()
 		iNumNotesThisMeasure += m_NoteDataEdit.GetNumTapNonEmptyTracks(r);
 	}
 
-	if (GAMESTATE->m_pCurSteps[0]->IsAnEdit()) {
+	if (GAMESTATE->m_pCurSteps->IsAnEdit()) {
 		/* Check that the action didn't push notes any farther past the last
 		 * measure. This blocks Insert Beat from pushing past the end, but
 		 * allows Delete Beat to pull back the notes that are already past the
@@ -7838,31 +7345,6 @@ GetDeviceButtonsLocalized(const vector<EditButton>& veb,
 	if (!vsHold.empty())
 		s = join("/", vsHold) + " + " + s;
 	return s;
-}
-
-void
-ScreenEdit::DoStepAttackMenu()
-{
-	const TimingData& timing = GetAppropriateTiming();
-	float startTime = timing.GetElapsedTimeFromBeat(GetBeat());
-	AttackArray& attacks =
-	  (GAMESTATE->m_bIsUsingStepTiming ? m_pSteps->m_Attacks
-									   : m_pSong->m_Attacks);
-	vector<int> points = FindAllAttacksAtTime(attacks, startTime);
-
-	g_AttackAtTimeMenu.rows.clear();
-	unsigned index = 0;
-
-	FOREACH(int, points, i)
-	{
-		const Attack& attack = attacks[*i];
-		RString desc = ssprintf("%g -> %g (%d mod[s])",
-								startTime,
-								startTime + attack.fSecsRemaining,
-								attack.GetNumAttacks());
-	}
-
-	EditMiniMenu(&g_AttackAtTimeMenu, SM_BackFromAttackAtTime);
 }
 
 static LocalizedString TRACK_NUM("ScreenEdit", "Track %d");

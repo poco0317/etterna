@@ -268,9 +268,6 @@ class ScreenEdit : public ScreenWithMenuElements
 	/** @brief Display the keyboard track menu for the current row. */
 	void DoKeyboardTrackMenu();
 
-	/** @brief Display the step attack menu for the current row. */
-	void DoStepAttackMenu();
-
 	void DoHelp();
 
 	/** @brief Display the TimingData menu for editing song and step timing. */

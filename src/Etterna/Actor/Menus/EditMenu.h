@@ -210,7 +210,6 @@ class EditMenu : public ActorFrame
   private:
 	struct StepsAndDifficulty;
 
-	void StripLockedStepsAndDifficulty(vector<StepsAndDifficulty>& v);
 	void GetSongsToShowForGroup(const RString& sGroup,
 								vector<Song*>& vpSongsOut);
 	void GetGroupsToShow(vector<RString>& vsGroupsOut);
