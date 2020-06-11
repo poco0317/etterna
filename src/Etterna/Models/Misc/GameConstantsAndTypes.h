@@ -31,12 +31,9 @@ enum GameplayMode
 const RString&
 SkillsetToString(Skillset ss);
 
-const RString&
-CalcPatternModToString(CalcPatternMod);
-const RString&
-CalcDiffValueToString(CalcDiffValue);
-const RString&
-CalcDebugMiscToString(CalcDebugMisc);
+const RString& CalcPatternModToString(CalcPatternMod);
+const RString& CalcDiffValueToString(CalcDiffValue);
+const RString& CalcDebugMiscToString(CalcDebugMisc);
 
 enum NSScoreBoardColumn
 {
@@ -459,6 +456,20 @@ StyleTypeToString(StyleType s);
 StyleType
 StringToStyleType(const RString& s);
 LuaDeclareType(StyleType);
+
+enum EditMode
+{
+	EditMode_Practice,
+	EditMode_Home,
+	EditMode_Full,
+	NUM_EditMode,
+	EditMode_Invalid,
+};
+const RString&
+EditModeToString(EditMode em);
+EditMode
+StringToEditMode(const RString& s);
+LuaDeclareType(EditMode);
 
 /**
  * @brief The different types of sample music previews available.

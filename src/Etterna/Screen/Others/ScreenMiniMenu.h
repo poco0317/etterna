@@ -19,6 +19,7 @@ struct MenuRowDef
 	vector<RString> choices;
 	bool bThemeTitle{ false };
 	bool bThemeItems{ false };
+	EditMode emShowIn = EditMode_Invalid;
 
 	MenuRowDef()
 	  : sName("")
@@ -26,7 +27,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const RString& n,
 			   MenuRowUpdateEnabled pe,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -60,7 +61,7 @@ struct MenuRowDef
 	  , sName(n)
 	  , bEnabled(true)
 	  , pfnEnabled(pe)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -103,7 +104,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const RString& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -112,7 +113,7 @@ struct MenuRowDef
 	  , sName(n)
 	  , bEnabled(e)
 	  , pfnEnabled(NULL)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -128,7 +129,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const RString& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -162,7 +163,7 @@ struct MenuRowDef
 	  , sName(n)
 	  , bEnabled(e)
 	  , pfnEnabled(NULL)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -205,7 +206,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const RString& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -215,7 +216,7 @@ struct MenuRowDef
 	  , sName(n)
 	  , bEnabled(e)
 	  , pfnEnabled(NULL)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)

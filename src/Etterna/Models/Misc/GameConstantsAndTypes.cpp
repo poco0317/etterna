@@ -225,7 +225,7 @@ StringToSkillset(const RString& s)
 	return Skill_Overall;
 }
 
-  static const char* CalcPatternModNames[] = {
+static const char* CalcPatternModNames[] = {
 	"Stream",
 	"JS",
 	"JSS",
@@ -276,7 +276,10 @@ XToString(CalcPatternMod);
 LuaXType(CalcPatternMod);
 
 static const char* CalcDiffValueNames[] = {
-	"BaseNPS", "BaseMS", "BaseMSD", "MSD",
+	"BaseNPS",
+	"BaseMS",
+	"BaseMSD",
+	"MSD",
 };
 XToString(CalcDiffValue);
 LuaXType(CalcDiffValue);
@@ -408,6 +411,11 @@ static const char* StyleTypeNames[] = {
 XToString(StyleType);
 StringToX(StyleType);
 LuaXType(StyleType);
+
+static const char* EditModeNames[] = { "Practice", "Home", "Full" };
+XToString(EditMode);
+StringToX(EditMode);
+LuaXType(EditMode);
 
 static const char* SampleMusicPreviewModeNames[] = { "Normal",
 													 "StartToPreview",

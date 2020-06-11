@@ -411,8 +411,14 @@ ScreenOptionsManageProfiles::ProcessMenuStart(const InputEventPlus&)
 	{
 		g_TempMenu.rows.clear();
 #define ADD_ACTION(i)                                                          \
-	g_TempMenu.rows.push_back(MenuRowDef(                                      \
-	  i, ProfileActionToLocalizedString(i), true, false, false, 0, ""));
+	g_TempMenu.rows.push_back(MenuRowDef(i,                                    \
+										 ProfileActionToLocalizedString(i),    \
+										 true,                                 \
+										 EditMode_Home,                        \
+										 false,                                \
+										 false,                                \
+										 0,                                    \
+										 ""));
 
 		ADD_ACTION(ProfileAction_SetDefaultP1);
 		if (PROFILEMAN->FixedProfiles()) {
