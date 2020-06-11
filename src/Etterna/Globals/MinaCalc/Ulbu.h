@@ -1,5 +1,7 @@
 #pragma once
 
+#include <deque>
+
 // stepmania garbage
 #include "Etterna/Globals/global.h"
 #include "Etterna/FileTypes/XmlFile.h"
@@ -423,11 +425,19 @@ struct TheGreatBazoinkazoinkInTheSky
 			// the pass is limited to like... a couple floats and 2 ints)
 			vector<float> the_simpsons;
 			vector<float> futurama;
-			vector<float> futuramaTEWO;
+			vector<float> bort;
+			vector<float> sundae;
+			float futuramaTEWO = 0.f;
+			float barnie = 0.f;
+
+			std::deque<std::pair<int, float>> fartsmcpoopin;
 			for (int itv = 0; itv < _itv_rows.size(); ++itv) {
 				the_simpsons.clear();
 				futurama.clear();
-				futuramaTEWO.clear();
+				bort.clear();
+				sundae.clear();
+				futuramaTEWO = 0.f;
+				barnie = 0.f;
 
 				// run the row by row construction for interval info
 				for (auto& row : _itv_rows[itv]) {
@@ -435,6 +445,19 @@ struct TheGreatBazoinkazoinkInTheSky
 					row_notes = _ni[row].notes;
 					row_count = column_count(row_notes);
 					ms_any = ms_from(row_time, last_row_time);
+
+					/* DUM STUFF */
+					std::pair<int, float> euphrates = { row_count, row_time };
+					fartsmcpoopin.push_back(euphrates);
+					while (row_time - fartsmcpoopin.front().second > 0.375F) {
+						fartsmcpoopin.pop_front();
+					}
+
+					int nps_plus_fudge = 0;
+					for (auto& r : fartsmcpoopin)
+						nps_plus_fudge += r.first;
+					sundae.push_back(nps_plus_fudge);
+					/* END DUM STUFF */
 
 					ct = determine_col_type(row_notes, ids);
 
@@ -469,11 +492,17 @@ struct TheGreatBazoinkazoinkInTheSky
 					// this will keep track of timings from now on
 					_seq.advance_sequencing(ct, row_time, ms_any);
 
+					bort.push_back(_seq._as.get_highest_anchor_difficulty());
+					barnie =
+					  max(barnie, _seq._as.get_highest_anchor_difficulty());
+
 					// mhi will exclusively track pattern configurations
-					(*_mhi)(*_last_mhi, ct, row_notes);
+					(*_mhi)(*_last_mhi, ct);
 
 					// update interval aggregation
 					_mitvhi._itvhi.set_col_taps(ct);
+
+					handle_row_dependent_pattern_advancement(row_time);
 
 					/* junk in the trunk warning */
 					bool is_cj = last_row_count > 1 && row_count > 1;
@@ -587,9 +616,8 @@ struct TheGreatBazoinkazoinkInTheSky
 						++_mitvhi._meta_types[_mhi->_mt];
 					}
 
-					futuramaTEWO.push_back(_rm.get_highest_anchor_difficulty());
-
-					handle_row_dependent_pattern_advancement(row_time);
+					futuramaTEWO =
+					  max(futuramaTEWO, _rm.get_highest_anchor_difficulty());
 
 					std::swap(_last_mhi, _mhi);
 					_mhi->offhand_ohjumps = 0;
@@ -597,21 +625,35 @@ struct TheGreatBazoinkazoinkInTheSky
 				}
 
 				handle_dependent_interval_end(itv);
+				if (!the_simpsons.empty())
+					_diffs[hand][CJBase][itv] =
+					  CJBaseDifficultySequencing(the_simpsons);
+				else
+					_diffs[hand][CJBase][itv] = 1.F;
 
-				_diffs[hand][BaseMS][itv] =
-				  CJBaseDifficultySequencing(the_simpsons);
+				if (!bort.empty())
+					_diffs[hand][JackBase][itv] = (mean(bort) + barnie) / 2.F;
+				else
+					_diffs[hand][JackBase][itv] = 1.F;
 
-				_diffs[hand][BaseMSD][itv] =
-				  (mean(futuramaTEWO) +
-				   weighted_average(TechBaseDifficultySequencing(futurama),
-									_diffs[hand][BaseNPS][itv],
-									7.5f,
-									9.f) * 2.F) /
-				  2.F;
+				float berp = 1.F;
+				if (!futurama.empty())
+					berp = TechBaseDifficultySequencing(futurama);
+
+				float scwerp = futuramaTEWO;
+				float shlop =
+				  weighted_average(berp, _diffs[hand][NPSBase][itv], 5.5F, 9.F);
+				_diffs[hand][TechBase][itv] = max(shlop, scwerp);
+
+				if (!sundae.empty())
+					_diffs[hand][NPSBase][itv] =
+					  mean(sundae) * 1.6F * 1.6F * 1.35F;
+				else
+					_diffs[hand][NPSBase][itv] = 1.F;
 			}
 			run_dependent_smoothing_pass(_doots[hand]);
-			DifficultyMSSmooth(_diffs[hand][BaseMS]);
-			DifficultyMSSmooth(_diffs[hand][BaseMSD]);
+			DifficultyMSSmooth(_diffs[hand][JackBase]);
+			DifficultyMSSmooth(_diffs[hand][CJBase]);
 
 			// ok this is pretty jank LOL, just increment the hand index
 			// when we finish left hand

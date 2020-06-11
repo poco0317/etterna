@@ -275,12 +275,11 @@ static const char* CalcPatternModNames[] = {
 XToString(CalcPatternMod);
 LuaXType(CalcPatternMod);
 
-static const char* CalcDiffValueNames[] = {
-	"BaseNPS",
-	"BaseMS",
-	"BaseMSD",
-	"MSD",
-};
+static const char* CalcDiffValueNames[] = { "NPSBase",
+											"JackBase",
+											"CJBase",
+											"TechBase",
+											"MSD" };
 XToString(CalcDiffValue);
 LuaXType(CalcDiffValue);
 

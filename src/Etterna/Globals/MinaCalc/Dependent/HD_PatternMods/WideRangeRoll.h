@@ -292,6 +292,7 @@ struct WideRangeRollMod
 				// don't know yet, so just wait and see
 				break;
 			case meta_meta_enigma:
+			case meta_unknowable_enigma:
 				// it's been too long... your vision becomes blurry.. your
 				// memory fades... why are we here again? what are we trying
 				// to do? who are we....

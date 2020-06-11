@@ -42,7 +42,7 @@ static const float stam_prop =
 // and chordstreams start lower
 // stam is a special case and may use normalizers again
 static const std::array<float, NUM_Skillset> basescalers = {
-	0.F, 0.97F, 0.92F, 0.83F, 0.94F, 0.715F, 0.73F, 0.95F
+	0.F, 0.97F, 0.92F, 0.83F, 0.94F, 0.95F, 0.73F, 1.F
 };
 
 void
@@ -549,24 +549,24 @@ Calc::CalcMain(const vector<NoteInfo>& NoteInfo,
 
 				if (highest_base_skillset == Skill_Technical) {
 					h.debugValues[0][TotalPatternMod].resize(numitv);
-					for (int i = 0; i < h.soap[BaseNPS].size(); ++i) {
+					for (int i = 0; i < h.soap[NPSBase].size(); ++i) {
 						float val = h.base_adj_diff[highest_base_skillset][i] /
-									h.soap[BaseMSD][i];
+									h.soap[TechBase][i];
 						h.debugValues[0][TotalPatternMod][i] = val;
 					}
 				} else if (highest_base_skillset == Skill_Chordjack) {
 					h.debugValues[0][TotalPatternMod].resize(numitv);
-					for (int i = 0; i < h.soap[BaseNPS].size(); ++i) {
+					for (int i = 0; i < h.soap[NPSBase].size(); ++i) {
 						float val = h.base_adj_diff[highest_base_skillset][i] /
-									(h.soap[BaseMSD][i] + h.soap[BaseNPS][i]) /
+									(h.soap[CJBase][i] + h.soap[NPSBase][i]) /
 									2.F;
 						h.debugValues[0][TotalPatternMod][i] = val;
 					}
 				} else {
 					h.debugValues[0][TotalPatternMod].resize(numitv);
-					for (int i = 0; i < h.soap[BaseNPS].size(); ++i) {
+					for (int i = 0; i < h.soap[NPSBase].size(); ++i) {
 						float val = h.base_adj_diff[highest_base_skillset][i] /
-									h.soap[BaseNPS][i];
+									h.soap[NPSBase][i];
 						h.debugValues[0][TotalPatternMod][i] = val;
 					}
 				}
@@ -716,73 +716,6 @@ Calc::InitializeHands(const vector<NoteInfo>& NoteInfo,
 	return true;
 }
 
-auto
-Hand::CalcMSEstimate(vector<float>& input, const int& burp) -> float
-{
-	static const bool dbg = false;
-
-	// how many ms values we use from here, if there are fewer than this
-	// number we'll mock up some values to water down intervals with a
-	// single extremely fast minijack, if there are more, we will truncate
-	unsigned int num_used = burp;
-
-	if (input.empty()) {
-		return 0.F;
-	}
-
-	// avoiding this for now because of smoothing
-	// single ms value, dunno if we want to do this? technically the tail
-	// end of an insanely hard burst that gets lopped off at the last note
-	// is still hard? if (input.size() < 2) return 1.f;
-
-	// sort before truncating/filling
-	sort(input.begin(), input.end());
-
-	// truncate if we have more values than what we care to sample, we're
-	// looking for a good estimate of the hardest part of this interval
-	// if above 1 and below used_ms_vals, fill up the stuff with dummies
-	// my god i was literally an idiot for doing what i was doing before
-	static const float ms_dummy = 360.F;
-
-	// mostly try to push down stuff like jumpjacks, not necessarily to push
-	// up "complex" stuff (this will push up intervals with few fast ms
-	// values kinda hard but it shouldn't matter as their base ms diff
-	// should be extremely low
-	float cv_yo = cv_trunc_fill(input, burp, ms_dummy) + 0.5F;
-	cv_yo = CalcClamp(cv_yo, 0.5F, 1.25F);
-
-	if (dbg && debug_lmao) {
-		std::string moop;
-		for (auto& v : input) {
-			moop.append(std::to_string(v));
-			moop.append(", ");
-		}
-
-		std::cout << "notes: " << moop << std::endl;
-	}
-
-	if (dbg && debug_lmao) {
-		std::cout << "cv : " << cv_yo << std::endl;
-	}
-
-	// basically doing a jank average, bigger m = lower difficulty
-	float m = sum_trunc_fill(input, burp, ms_dummy);
-
-	if (dbg && debug_lmao) {
-		std::cout << "m : " << m << std::endl;
-	}
-
-	// add 1 to num_used because some meme about sampling
-	// same thing as jack stuff, convert to bpm and then nps
-	float bpm_est = ms_to_bpm(m / (num_used + 1));
-	float nps_est = bpm_est / 15.F;
-	float fdiff = nps_est * cv_yo;
-	if (dbg && debug_lmao) {
-		std::cout << "diff : " << fdiff << std::endl;
-	}
-	return fdiff;
-}
-
 void
 Hand::InitBaseDiff(Finger& f1, Finger& f2)
 {
@@ -793,47 +726,13 @@ Hand::InitBaseDiff(Finger& f1, Finger& f2)
 	}
 
 	for (int i = 0; i < f1.size(); i++) {
-
-		if (dbg && debug_lmao) {
-			std::cout << "\ninterval : " << i << std::endl;
-		}
-
 		// scaler for things with higher things
 		static const float higher_thing_scaler = 1.175F;
 		float nps = 1.6F * static_cast<float>(f1[i].size() + f2[i].size());
-
-		auto do_diff_thingy = [this](vector<float>& input,
-									 const float& scaler) {
-			float mwerp = CalcMSEstimate(input, 3);
-			if (input.size() > 3) {
-				mwerp = max(mwerp, CalcMSEstimate(input, 4) * scaler);
-			}
-			if (input.size() > 4) {
-				mwerp = max(mwerp, CalcMSEstimate(input, 5) * scaler * scaler);
-			}
-			return mwerp;
-		};
-
-		float left_diff = do_diff_thingy(f1[i], higher_thing_scaler);
-		float right_diff = do_diff_thingy(f1[i], higher_thing_scaler);
-
-		float difficulty = 0.F;
-		float squiggly_line = 5.5F;
-		if (left_diff > right_diff) {
-			difficulty =
-			  weighted_average(left_diff, right_diff, squiggly_line, 9.F);
-		} else {
-			difficulty =
-			  weighted_average(right_diff, left_diff, squiggly_line, 9.F);
-		}
-		soap[BaseNPS][i] = finalscaler * nps;
-		soap[BaseMS][i] = finalscaler * difficulty;
-		// soap[BaseMSD][i] =
-		//  weighted_average(difficulty, nps, 7.76445F, 10.F) * finalscaler;
+		soap[NPSBase][i] = finalscaler * nps;
 	}
-	Smooth(soap[BaseNPS], 0.F);
-	DifficultyMSSmooth(soap[BaseMS]);
-	DifficultyMSSmooth(soap[BaseMSD]);
+
+	Smooth(soap[NPSBase], 0.F);
 }
 
 // each skillset should just be a separate calc function [todo]
@@ -856,56 +755,20 @@ Calc::Chisel(float player_skill,
 				return player_skill;
 			}
 			player_skill += resolution;
-			if (ss == Skill_Overall || ss == Skill_Stamina ||
-				ss == Skill_JackSpeed) {
+			if (ss == Skill_Overall || ss == Skill_Stamina) {
 				return 0.F; // not how we set these values
 			}
 
 			// reset tallied score, always deduct rather than accumulate now
 			gotpoints = static_cast<float>(MaxPoints);
-//#define DEBUG_JACK_MODELS
-#ifdef DEBUG_JACK_MODELS
-			if (ss == Skill_Jumpstream) {
-				left_hand.CalcInternal(gotpoints, player_skill, ss, stamina);
-				right_hand.CalcInternal(gotpoints, player_skill, ss, stamina);
-			}
 
-			if (ss == Skill_JackSpeed)
-				gotpoints -=
-				  JackLoss(player_skill, 1, max_points_lost, stamina);
-			else if (ss == Skill_Chordjack)
-				gotpoints -=
-				  JackLoss(player_skill, 2, max_points_lost, stamina);
-			else if (ss == Skill_Technical)
-				gotpoints -=
-				  JackLoss(player_skill, 3, max_points_lost, stamina);
-			else if (ss == Skill_Stream)
-				gotpoints -=
-				  JackLoss(player_skill, 0, max_points_lost, stamina) / 7.5f;
-#else
-			// jack sequencer point loss for jack speed and (maybe?)
-			// cj
-			// if (ss == Skill_JackSpeed) {
-			//	// this is slow but gives the best results, do separate
-			//	// passes for different jack types and figure out which
-			//	// is the most prominent of the file. We _don't_ want to
-			//	// do something like take the highest of a given type at
-			//	// multiple points throughout a file, that just results
-			//	// in oversaturation and bad grouping
-			//	jloss =
-			//	  max(JackLoss(player_skill, 1, max_points_lost, stamina),
-			//		  max(JackLoss(player_skill, 2, max_points_lost, stamina),
-			//			  JackLoss(player_skill, 3, max_points_lost, stamina)));
-			//	gotpoints -= jloss;
-			//} else {
 			left_hand.CalcInternal(gotpoints, player_skill, ss, stamina);
 
 			// already can't reach goal, move on
 			if (gotpoints > reqpoints) {
 				right_hand.CalcInternal(gotpoints, player_skill, ss, stamina);
 			}
-			//}
-#endif
+
 		} while (gotpoints < reqpoints);
 		player_skill -= resolution;
 		resolution /= 2.F;
@@ -916,20 +779,6 @@ Calc::Chisel(float player_skill,
 	// be recalculated with the final value already determined
 	// getting the jackstam debug output right is lame i know
 	if (debugoutput) {
-		float jl1 =
-		  JackLoss(player_skill, 1, max_points_lost, stamina, debugoutput);
-		float jl2 =
-		  JackLoss(player_skill, 2, max_points_lost, stamina, debugoutput);
-		float jl3 =
-		  JackLoss(player_skill, 3, max_points_lost, stamina, debugoutput);
-		if (jl1 > jl2 && jl1 > jl3) {
-			JackLoss(player_skill, 1, max_points_lost, stamina, debugoutput);
-		} else if (jl2 > jl3) {
-			JackLoss(player_skill, 2, max_points_lost, stamina, debugoutput);
-		} else {
-			JackLoss(player_skill, 3, max_points_lost, stamina, debugoutput);
-		}
-
 		left_hand.CalcInternal(
 		  gotpoints, player_skill, ss, stamina, debugoutput);
 		right_hand.CalcInternal(
@@ -1008,8 +857,22 @@ Hand::InitAdjDiff()
 		// stam, nothing, don't handle here
 		{},
 
-		// jackspeed, ignore for now
-		{},
+		// jackspeed
+		{
+		  OHTrill,
+		  Balance,
+		  Roll,
+		  OHJumpMod,
+		  Chaos,
+		  WideRangeJumptrill,
+		  WideRangeBalance,
+		  WideRangeRoll,
+		  FlamJam,
+		  RanMan,
+		  WideRangeAnchor,
+		  TheThing,
+		  TheThing2,
+		},
 
 		// chordjack
 		{ CJ, CJDensity, WideRangeAnchor },
@@ -1034,14 +897,14 @@ Hand::InitAdjDiff()
 	};
 
 	for (int i = 0; i < NUM_Skillset; ++i) {
-		base_adj_diff[i].resize(soap[BaseNPS].size());
-		base_diff_for_stam_mod[i].resize(soap[BaseNPS].size());
+		base_adj_diff[i].resize(soap[NPSBase].size());
+		base_diff_for_stam_mod[i].resize(soap[NPSBase].size());
 	}
 
 	// ok this loop is pretty wack i know, for each interval
-	for (int i = 0; i < soap[BaseNPS].size(); ++i) {
+	for (int i = 0; i < soap[NPSBase].size(); ++i) {
 		float tp_mods[NUM_Skillset] = {
-			1.F, 1.F, 1.F, 1.F, 1.F, 0.1F, 1.F, 1.F
+			1.F, 1.F, 1.F, 1.F, 1.F, 1.F, 1.F, 1.F
 		};
 
 		// total pattern mods for each skillset, we want this to be
@@ -1073,7 +936,7 @@ Hand::InitAdjDiff()
 			// might need optimization, or not since this is not
 			// outside of a dumb loop now and is done once instead
 			// of a few hundred times
-			float funk = soap[BaseNPS][i] * tp_mods[ss] * basescalers[ss];
+			float funk = soap[NPSBase][i] * tp_mods[ss] * basescalers[ss];
 			adj_diff = funk;
 			stam_base = funk;
 			switch (ss) {
@@ -1097,22 +960,27 @@ Hand::InitAdjDiff()
 					// maybe we should have 2 loops to avoid doing
 					// math twice
 					stam_base = max(
-					  adj_diff, soap[BaseNPS][i] * tp_mods[Skill_Handstream]);
+					  adj_diff, soap[NPSBase][i] * tp_mods[Skill_Handstream]);
 					break;
 				case Skill_Handstream:
 					// adj_diff /= fastsqrt(doot[OHJump][i]);
 					stam_base =
-					  max(funk, soap[BaseNPS][i] * tp_mods[Skill_Jumpstream]);
+					  max(funk, soap[NPSBase][i] * tp_mods[Skill_Jumpstream]);
+					break;
+				case Skill_JackSpeed:
+					adj_diff = soap[JackBase][i] * tp_mods[Skill_JackSpeed] *
+							   basescalers[ss] /
+							   max(fastpow(doot[CJ][i], 2.F), 1.F);
 					break;
 				case Skill_Chordjack:
 					adj_diff =
-					  soap[BaseMS][i] * tp_mods[Skill_Chordjack] *
+					  soap[CJBase][i] * tp_mods[Skill_Chordjack] *
 					  basescalers[ss] *
 					  CalcClamp(fastsqrt(doot[OHJumpMod][i]) + 0.06F, 0.F, 1.F);
 					break;
 				case Skill_Technical:
 					adj_diff =
-					  soap[BaseMSD][i] * tp_mods[ss] * basescalers[ss] /
+					  soap[TechBase][i] * tp_mods[ss] * basescalers[ss] /
 					  max(fastpow(doot[CJ][i], 2.F), 1.F) /
 					  max(max(doot[Stream][i], doot[JS][i]), doot[HS][i]) *
 					  doot[Chaos][i] / fastsqrt(doot[RanMan][i]);
@@ -1131,7 +999,7 @@ void
 Hand::CalcInternal(float& gotpoints, float& x, int ss, bool stam, bool debug)
 {
 
-	if (stam) {
+	if (stam && ss != Skill_JackSpeed) {
 		StamAdjust(x, ss);
 	}
 
@@ -1285,7 +1153,7 @@ MinaSDCalcDebug(const vector<NoteInfo>& NoteInfo,
 }
 #pragma endregion
 
-int mina_calc_version = 387;
+int mina_calc_version = 390;
 auto
 GetCalcVersion() -> int
 {

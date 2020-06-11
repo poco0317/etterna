@@ -20,7 +20,7 @@
 
 // bpm flux float precision etc
 static const float anchor_buffer_ms = 10.F;
-static const float anchor_speed_increase_cutoff_factor = 1.9F;
+static const float anchor_speed_increase_cutoff_factor = 2.1F;
 
 enum anch_status
 {
@@ -67,7 +67,6 @@ struct Anchor_Sequencing
 
 	// row_time of last note on this col
 	float _last = s_init;
-	float _now = s_init;
 	float _start = s_init;
 
 	inline void full_reset()
@@ -82,8 +81,6 @@ struct Anchor_Sequencing
 
 	inline void operator()(const col_type ct, const float& now)
 	{
-		_last = _now;
-
 		assert(ct == _ct);
 		_sc_ms = ms_from(now, _last);
 
@@ -121,27 +118,28 @@ struct Anchor_Sequencing
 				// current ms and len to 2
 
 				_start = _last;
-				_max_ms = _sc_ms;
 				_len = 2;
 				break;
 			case anchoring:
 				// increase anchor length and set new cutoff point
 				++_len;
-				_max_ms = _sc_ms;
 				break;
 			case anch_init:
 				// nothing to do
 				break;
 		}
-
-		// update row time after any potential resets
-		_now = now;
+		_max_ms = _sc_ms;
+		_last = now;
 	}
 
 	inline auto get_difficulty() -> float
 	{
+		if (_len <= 2)
+			return ms_to_scaled_nps(_sc_ms + 90.F);
+		if (_len == 3)
+			return ms_to_scaled_nps(_sc_ms + 180.F);
 		float flool = ms_from(_last, _start);
-		float pule = (flool + 360.F) / static_cast<float>(_len);
+		float pule = (flool + 270.F) / static_cast<float>(_len - 1);
 		float drool = ms_to_scaled_nps(pule);
 		return drool;
 	}
