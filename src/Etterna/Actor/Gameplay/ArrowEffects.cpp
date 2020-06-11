@@ -876,8 +876,12 @@ ArrowEffects::GetGlow(int iCol,
 float
 ArrowEffects::GetBrightness(const PlayerState* pPlayerState, float fNoteBeat)
 {
-	const auto fSongBeat = GAMESTATE->m_Position.m_fSongBeatVisible;
-	const auto fBeatsUntilStep = fNoteBeat - fSongBeat;
+	// no hide arrow if edit
+	if (GAMESTATE->IsEditing())
+		return 1.f;
+	float fSongBeat = pPlayerState->m_Position.m_fSongBeatVisible;
+	float fBeatsUntilStep = fNoteBeat - fSongBeat;
+
 
 	auto fBrightness = SCALE(fBeatsUntilStep, 0, -1, 1.f, 0.f);
 	CLAMP(fBrightness, 0, 1);

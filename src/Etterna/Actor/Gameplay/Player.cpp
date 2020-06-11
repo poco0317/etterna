@@ -658,10 +658,10 @@ Player::Load()
 	// Generate some cache data structure.
 	GenerateCacheDataStructure(m_pPlayerState, m_NoteData);
 
-	const int iDrawDistanceAfterTargetsPixels =
-	  DRAW_DISTANCE_AFTER_TARGET_PIXELS;
-	const int iDrawDistanceBeforeTargetsPixels =
-	  DRAW_DISTANCE_BEFORE_TARGET_PIXELS;
+	int iDrawDistanceAfterTargetsPixels =
+	  GAMESTATE->IsEditing() ? -100 : DRAW_DISTANCE_AFTER_TARGET_PIXELS;
+	int iDrawDistanceBeforeTargetsPixels =
+	  GAMESTATE->IsEditing() ? 400 : DRAW_DISTANCE_BEFORE_TARGET_PIXELS;
 
 	const auto fNoteFieldMiddle =
 	  (GRAY_ARROWS_Y_STANDARD + GRAY_ARROWS_Y_REVERSE) / 2;
