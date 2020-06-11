@@ -1572,7 +1572,7 @@ NoteDisplay::DrawActor(const TapNote& tn,
 					   float fColorScale,
 					   bool is_being_held) const
 {
-	if (tn.type == TapNoteType_AutoKeysound)
+	if (tn.type == TapNoteType_AutoKeysound && !GAMESTATE->m_bInStepEditor)
 		return;
 	if (fYOffset < field_args.draw_pixels_after_targets ||
 		fYOffset > field_args.draw_pixels_before_targets) {

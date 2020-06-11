@@ -95,6 +95,10 @@ GameState::GameState()
   , m_pCurSong(Message_CurrentSongChanged)
   , m_pCurSteps(Message_CurrentStepsChanged)
   , m_bGameplayLeadIn(Message_GameplayLeadInChanged)
+  , m_bInStepEditor(false)
+  , m_stEdit(Message_EditStepsTypeChanged)
+  , m_pEditSourceSteps(Message_EditSourceStepsChanged)
+  , m_stEditSource(Message_EditSourceStepsTypeChanged)
   , m_sEditLocalProfileID(Message_EditLocalProfileIDChanged)
   , m_gameplayMode(Message_GameplayModeChanged)
 {
@@ -301,6 +305,9 @@ GameState::Reset()
 
 	STATSMAN->Reset();
 	m_bTemporaryEventMode = false;
+	m_stEdit.Set(StepsType_Invalid);
+	m_pEditSourceSteps.Set(NULL);
+	m_stEditSource.Set(StepsType_Invalid);
 	sExpandedSectionName = "";
 
 	ApplyCmdline();
@@ -1415,6 +1422,7 @@ class LunaGameState : public Luna<GameState>
 	DEFINE_METHOD(GetMasterPlayerNumber, GetMasterPlayerNumber())
 	DEFINE_METHOD(GetNumMultiplayerNoteFields, m_iNumMultiplayerNoteFields)
 	DEFINE_METHOD(ShowW1, ShowW1())
+	DEFINE_METHOD(InStepEditor, m_bInStepEditor)
 
 	static int SetNumMultiplayerNoteFields(T* p, lua_State* L)
 	{
@@ -1542,6 +1550,16 @@ class LunaGameState : public Luna<GameState>
 		p->m_Environment->PushSelf(L);
 		return 1;
 	}
+	static int GetEditSourceSteps(T* p, lua_State* L)
+	{
+		Steps* pSteps = p->m_pEditSourceSteps;
+		if (pSteps) {
+			pSteps->PushSelf(L);
+		} else {
+			lua_pushnil(L);
+		}
+		return 1;
+	}
 	static int SetPreferredDifficulty(T* p, lua_State* L)
 	{
 		Difficulty dc = Enum::Check<Difficulty>(L, 2);
@@ -1635,6 +1653,55 @@ class LunaGameState : public Luna<GameState>
 		else
 			lua_pushnil(L);
 		return 1;
+	}
+
+	static int SetStepsForEditMode(T* p, lua_State* L)
+	{
+		// Arg forms:
+		// 1.  Edit existing steps:
+		//    song, steps
+		// 2.  Create new steps to edit:
+		//    song, nil, stepstype, difficulty
+		// 3.  Copy steps to new difficulty to edit:
+		//    song, steps, stepstype, difficulty
+		Song* song = Luna<Song>::check(L, 1);
+		Steps* steps = NULL;
+		if (!lua_isnil(L, 2)) {
+			steps = Luna<Steps>::check(L, 2);
+		}
+		// Form 1.
+		if (steps != NULL && lua_gettop(L) == 2) {
+			p->m_pCurSong.Set(song);
+			p->m_pCurSteps.Set(steps);
+			p->SetCurrentStyle(
+			  GAMEMAN->GetEditorStyleForStepsType(steps->m_StepsType),
+			  PLAYER_INVALID);
+			return 0;
+		}
+		StepsType stype = Enum::Check<StepsType>(L, 3);
+		Difficulty diff = Enum::Check<Difficulty>(L, 4);
+		Steps* new_steps = song->CreateSteps();
+		RString edit_name;
+		// Form 2.
+		if (steps == NULL) {
+			new_steps->CreateBlank(stype);
+			new_steps->SetMeter(1);
+			edit_name = "";
+		}
+		// Form 3.
+		else {
+			new_steps->CopyFrom(steps, stype, song->m_fMusicLengthSeconds);
+			edit_name = steps->GetDescription();
+		}
+		SongUtil::MakeUniqueEditDescription(song, stype, edit_name);
+		steps->SetDescription(edit_name);
+		song->AddSteps(new_steps);
+		p->m_pCurSong.Set(song);
+		p->m_pCurSteps.Set(steps);
+		p->SetCurrentStyle(
+		  GAMEMAN->GetEditorStyleForStepsType(steps->m_StepsType),
+		  PLAYER_INVALID);
+		return 0;
 	}
 
 	static int GetCurrentStepsCredits(T* t, lua_State* L)
@@ -1889,6 +1956,7 @@ class LunaGameState : public Luna<GameState>
 		ADD_METHOD(IsHumanPlayer);
 		ADD_METHOD(GetPlayerDisplayName);
 		ADD_METHOD(GetMasterPlayerNumber);
+		ADD_METHOD(InStepEditor);
 		ADD_METHOD(GetNumMultiplayerNoteFields);
 		ADD_METHOD(SetNumMultiplayerNoteFields);
 		ADD_METHOD(ShowW1);
@@ -1905,6 +1973,7 @@ class LunaGameState : public Luna<GameState>
 		ADD_METHOD(GetPreferredSong);
 		ADD_METHOD(SetTemporaryEventMode);
 		ADD_METHOD(Env);
+		ADD_METHOD(GetEditSourceSteps);
 		ADD_METHOD(SetPreferredDifficulty);
 		ADD_METHOD(GetPreferredDifficulty);
 		ADD_METHOD(GetSortOrder);
@@ -1960,6 +2029,7 @@ class LunaGameState : public Luna<GameState>
 		ADD_METHOD(HaveProfileToSave);
 		ADD_METHOD(SetFailTypeExplicitlySet);
 		ADD_METHOD(SetCurrentStyle);
+		ADD_METHOD(SetStepsForEditMode);
 		ADD_METHOD(IsCourseMode);
 		ADD_METHOD(GetEtternaVersion);
 		ADD_METHOD(CountNotesSeparately);

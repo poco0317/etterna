@@ -27,6 +27,8 @@ list(APPEND SCREEN_OPTION_HPP
 list(APPEND SCREEN_REST_SRC
 	"Others/Screen.cpp"
 	"Others/ScreenDebugOverlay.cpp"
+	"Others/ScreenEdit.cpp"
+	"Others/ScreenEditMenu.cpp"
 	"Others/ScreenEvaluation.cpp"
 	"Others/ScreenExit.cpp"
 	"Others/ScreenInstallOverlay.cpp"
@@ -57,6 +59,8 @@ list(APPEND SCREEN_REST_SRC
 list(APPEND SCREEN_REST_HPP
 	"Others/Screen.h"
 	"Others/ScreenDebugOverlay.h"
+	"Others/ScreenEdit.h"
+	"Others/ScreenEditMenu.h"
 	"Others/ScreenEvaluation.h"
 	"Others/ScreenExit.h"
 	"Others/ScreenInstallOverlay.h"

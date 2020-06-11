@@ -1114,7 +1114,9 @@ Player::Update(float fDeltaTime)
 
 	// Check for completely judged rows.
 	UpdateJudgedRows(fDeltaTime);
-	UpdateTapNotesMissedOlderThan(GetMaxStepDistanceSeconds());
+
+	if (!GAMESTATE->m_bInStepEditor)
+		UpdateTapNotesMissedOlderThan(GetMaxStepDistanceSeconds());
 }
 
 // Update a group of holds with shared scoring/life. All of these holds will
@@ -2573,10 +2575,12 @@ Player::CrossedRows(int iLastRowCrossed,
 			// crossed a new not-empty row
 			iLastSeenRow = iRow;
 
-			for (auto t = 0; t < m_NoteData.GetNumTracks(); ++t) {
-				const auto& tap = m_NoteData.GetTapNote(t, iRow);
-				if (tap.type == TapNoteType_AutoKeysound) {
-					PlayKeysound(tap, TNS_None);
+			if (!GAMESTATE->m_bInStepEditor) {
+				for (int t = 0; t < m_NoteData.GetNumTracks(); ++t) {
+					const TapNote& tap = m_NoteData.GetTapNote(t, iRow);
+					if (tap.type == TapNoteType_AutoKeysound) {
+						PlayKeysound(tap, TNS_None);
+					}
 				}
 			}
 		}

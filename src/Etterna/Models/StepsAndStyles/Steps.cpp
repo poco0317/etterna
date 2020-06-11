@@ -555,6 +555,10 @@ Steps::GenerateChartKey(NoteData& nd, TimingData* td) -> std::string
 void
 Steps::Compress() const
 {
+	// in editor, don't compress
+	if (GAMESTATE->m_bInStepEditor)
+		return;
+
 	if (!m_sFilename.empty()) {
 		/* We have a file on disk; clear all data in memory.
 		 * Data on profiles can't be accessed normally (need to mount and
