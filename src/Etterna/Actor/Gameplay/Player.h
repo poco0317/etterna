@@ -370,4 +370,23 @@ class JudgedRows
 	}
 };
 
+class PlayerPlus
+{
+	Player* m_pPlayer;
+	NoteData m_NoteData;
+
+  public:
+	PlayerPlus() { m_pPlayer = new Player(m_NoteData); }
+	~PlayerPlus() { delete m_pPlayer; }
+	void Load(const NoteData& nd)
+	{
+		m_NoteData = nd;
+		m_pPlayer->Load();
+	}
+	Player* operator->() { return m_pPlayer; }
+	const Player* operator->() const { return m_pPlayer; }
+	operator Player*() { return m_pPlayer; }
+	operator const Player*() const { return m_pPlayer; }
+};
+
 #endif
