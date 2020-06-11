@@ -38,16 +38,6 @@ ROW_Y_NAME(size_t i)
 }
 
 void
-EditMenu::StripLockedStepsAndDifficulty(vector<StepsAndDifficulty>& v)
-{
-	const Song* pSong = GetSelectedSong();
-	for (int i = (int)v.size() - 1; i >= 0; i--) {
-		if (v[i].pSteps && UNLOCKMAN->StepsIsLocked(pSong, v[i].pSteps))
-			v.erase(v.begin() + i);
-	}
-}
-
-void
 EditMenu::GetSongsToShowForGroup(const RString& sGroup,
 								 vector<Song*>& vpSongsOut)
 {
@@ -56,21 +46,6 @@ EditMenu::GetSongsToShowForGroup(const RString& sGroup,
 		return;
 	}
 	vpSongsOut = SONGMAN->GetSongs(SHOW_GROUPS.GetValue() ? sGroup : GROUP_ALL);
-	EditMode mode = EDIT_MODE.GetValue();
-	switch (mode) {
-		case EditMode_Practice:
-		case EditMode_Home:
-			for (int i = vpSongsOut.size() - 1; i >= 0; i--) {
-				const Song* pSong = vpSongsOut[i];
-				if (!pSong->NormallyDisplayed() || pSong->IsTutorial())
-					vpSongsOut.erase(vpSongsOut.begin() + i);
-			}
-			break;
-		case EditMode_Full:
-			break;
-		default:
-			FAIL_M(ssprintf("Invalid edit mode: %i", mode));
-	}
 	SongUtil::SortSongPointerArrayByTitle(vpSongsOut);
 }
 
@@ -94,10 +69,7 @@ EditMenu::GetGroupsToShow(vector<RString>& vsGroupsOut)
 
 EditMenu::EditMenu() {}
 
-EditMenu::~EditMenu()
-{
-	BANNERCACHE->Undemand();
-}
+EditMenu::~EditMenu() {}
 
 void
 EditMenu::Load(const RString& sType)
@@ -140,9 +112,6 @@ EditMenu::Load(const RString& sType)
 
 	m_textLabel[ROW_GROUP].SetVisible(SHOW_GROUPS.GetValue());
 	m_textValue[ROW_GROUP].SetVisible(SHOW_GROUPS.GetValue());
-
-	// Load low-res banners, if needed.
-	BANNERCACHE->Demand();
 
 	m_SongTextBanner.SetName("SongTextBanner");
 	m_SongTextBanner.Load(TEXT_BANNER_TYPE);
@@ -196,10 +165,9 @@ EditMenu::RefreshAll()
 		OnRowValueChanged(ROW_SONG);
 
 		// Select the current StepsType and difficulty if any
-		if (GAMESTATE->m_pCurSteps[PLAYER_1]) {
+		if (GAMESTATE->m_pCurSteps) {
 			for (unsigned i = 0; i < m_StepsTypes.size(); i++) {
-				if (m_StepsTypes[i] ==
-					GAMESTATE->m_pCurSteps[PLAYER_1]->m_StepsType) {
+				if (m_StepsTypes[i] == GAMESTATE->m_pCurSteps->m_StepsType) {
 					m_iSelection[ROW_STEPS_TYPE] = i;
 					OnRowValueChanged(ROW_STEPS_TYPE);
 				}
@@ -207,7 +175,7 @@ EditMenu::RefreshAll()
 
 			for (unsigned i = 0; i < m_vpSteps.size(); i++) {
 				const Steps* pSteps = m_vpSteps[i].pSteps;
-				if (pSteps == GAMESTATE->m_pCurSteps[PLAYER_1]) {
+				if (pSteps == GAMESTATE->m_pCurSteps) {
 					m_iSelection[ROW_STEPS] = i;
 					OnRowValueChanged(ROW_STEPS);
 				}
@@ -505,9 +473,6 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 					} else {
 						Steps* pSteps = SongUtil::GetStepsByDifficulty(
 						  GetSelectedSong(), GetSelectedStepsType(), dc);
-						if (pSteps &&
-							UNLOCKMAN->StepsIsLocked(GetSelectedSong(), pSteps))
-							pSteps = NULL;
 
 						switch (mode) {
 							case EditMode_Home:
@@ -526,7 +491,6 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 						}
 					}
 				}
-				StripLockedStepsAndDifficulty(m_vpSteps);
 
 				FOREACH(StepsAndDifficulty, m_vpSteps, s)
 				{
@@ -597,7 +561,6 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 						  StepsAndDifficulty(*pSteps, dc));
 					}
 				}
-				StripLockedStepsAndDifficulty(m_vpSteps);
 				CLAMP(m_iSelection[ROW_SOURCE_STEPS],
 					  0,
 					  m_vpSourceSteps.size() - 1);
