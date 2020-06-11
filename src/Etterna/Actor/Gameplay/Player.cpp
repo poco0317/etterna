@@ -1045,7 +1045,9 @@ Player::Update(float fDeltaTime)
 
 	// Check for completely judged rows.
 	UpdateJudgedRows(fDeltaTime);
-	UpdateTapNotesMissedOlderThan(GetMaxStepDistanceSeconds());
+
+	if (!GAMESTATE->m_bInStepEditor)
+		UpdateTapNotesMissedOlderThan(GetMaxStepDistanceSeconds());
 }
 
 // Update a group of holds with shared scoring/life. All of these holds will
@@ -2279,8 +2281,8 @@ Player::Step(int col,
 					float fWindowW5 = GetWindowSeconds(TW_W5);
 
 					// figure out overlap.
-					float fLowerBound = 0.0f;	 // negative upper limit
-					float fUpperBound = 0.0f;	 // positive lower limit
+					float fLowerBound = 0.0f;	// negative upper limit
+					float fUpperBound = 0.0f;	// positive lower limit
 					float fCompareWindow = 0.0f; // filled in here:
 					if (score == TNS_W4) {
 						fLowerBound = -fWindowW3;
@@ -2528,10 +2530,12 @@ Player::CrossedRows(int iLastRowCrossed,
 			// crossed a new not-empty row
 			iLastSeenRow = iRow;
 
-			for (int t = 0; t < m_NoteData.GetNumTracks(); ++t) {
-				const TapNote& tap = m_NoteData.GetTapNote(t, iRow);
-				if (tap.type == TapNoteType_AutoKeysound) {
-					PlayKeysound(tap, TNS_None);
+			if (!GAMESTATE->m_bInStepEditor) {
+				for (int t = 0; t < m_NoteData.GetNumTracks(); ++t) {
+					const TapNote& tap = m_NoteData.GetTapNote(t, iRow);
+					if (tap.type == TapNoteType_AutoKeysound) {
+						PlayKeysound(tap, TNS_None);
+					}
 				}
 			}
 		}

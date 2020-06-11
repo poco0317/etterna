@@ -72,6 +72,7 @@ list(APPEND ACTOR_MENU_SRC
 	"Menus/ComboGraph.cpp"
 	"Menus/DifficultyList.cpp"
 	"Menus/DualScrollBar.cpp"
+	"Menus/EditMenu.cpp"
 	"Menus/GraphDisplay.cpp"
 	"Menus/MenuTimer.cpp"
 	"Menus/ModIcon.cpp"
@@ -92,6 +93,7 @@ list(APPEND ACTOR_MENU_HPP
 	"Menus/ComboGraph.h"
 	"Menus/DifficultyList.h"
 	"Menus/DualScrollBar.h"
+	"Menus/EditMenu.h"
 	"Menus/GraphDisplay.h"
 	"Menus/MenuTimer.h"
 	"Menus/ModIcon.h"
@@ -111,6 +113,7 @@ list(APPEND ACTOR_GAMEPLAY_MENU_SRC
 	"GameplayAndMenus/BGAnimation.cpp"
 	"GameplayAndMenus/BGAnimationLayer.cpp"
 	"GameplayAndMenus/MeterDisplay.cpp"
+	"GameplayAndMenus/SnapDisplay.cpp"
 	"GameplayAndMenus/StepsDisplay.cpp"
 	"GameplayAndMenus/StreamDisplay.cpp"
 	"GameplayAndMenus/Transition.cpp")
@@ -119,6 +122,7 @@ list(APPEND ACTOR_GAMEPLAY_MENU_HPP
 	"GameplayAndMenus/BGAnimation.h"
 	"GameplayAndMenus/BGAnimationLayer.h"
 	"GameplayAndMenus/MeterDisplay.h"
+	"GameplayAndMenus/SnapDisplay.h"
 	"GameplayAndMenus/StepsDisplay.h"
 	"GameplayAndMenus/StreamDisplay.h"
 	"GameplayAndMenus/Transition.h")

@@ -214,17 +214,18 @@ class GameState
 
 	bool m_bLoadingNextSong;
 	int GetLoadingCourseSongIndex() const;
-	
+
 	RString GetEtternaVersion()
 	{
 		return "0.70.-" + to_string(mina_calc_version);
 	}
 
-	// is this the best place for this? it's not exactly a pref, and we shouldn't
-	// be copying and pasting these values everywhere as needed j1-j4 are now all 1.f
-	// to remove j1-3 without having to mess with expected array sizes in other areas
-	// yes i know this is lazy
-	vector<float> timingscales = { 1.00f, 1.00f, 1.00f, 1.00f, 0.84f, 0.66f, 0.50f, 0.33f, 0.20f };
+	// is this the best place for this? it's not exactly a pref, and we
+	// shouldn't be copying and pasting these values everywhere as needed j1-j4
+	// are now all 1.f to remove j1-3 without having to mess with expected array
+	// sizes in other areas yes i know this is lazy
+	vector<float> timingscales = { 1.00f, 1.00f, 1.00f, 1.00f, 0.84f,
+								   0.66f, 0.50f, 0.33f, 0.20f };
 	bool isplaylistcourse = false;
 	bool IsPlaylistCourse() { return isplaylistcourse; }
 	bool CountNotesSeparately();
@@ -314,6 +315,10 @@ class GameState
 	 *
 	 * Different options are available depending on this setting. */
 	bool m_bIsUsingStepTiming{ true };
+	bool m_bInStepEditor;
+	BroadcastOnChange<StepsType> m_stEdit;
+	BroadcastOnChangePtr<Steps> m_pEditSourceSteps;
+	BroadcastOnChange<StepsType> m_stEditSource;
 	BroadcastOnChange<RString> m_sEditLocalProfileID;
 	Profile* GetEditLocalProfile();
 	bool m_bIsChartPreviewActive;

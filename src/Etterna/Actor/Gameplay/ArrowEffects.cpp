@@ -345,10 +345,15 @@ ArrowEffects::GetYOffset(const PlayerState* pPlayerState,
 	 * spacing or entirely time spacing (respectively). Occasionally, we tween
 	 * between them. */
 	if (curr_options->m_fTimeSpacing != 1.0f) {
-		fYOffset = GetDisplayedBeat(pPlayerState, fNoteBeat) -
-				   GetDisplayedBeat(pPlayerState, fSongBeat);
-		fYOffset *= pCurSteps->GetTimingData()->GetDisplayedSpeedPercent(
-		  position.m_fSongBeatVisible, position.m_fMusicSecondsVisible);
+		if (GAMESTATE->m_bInStepEditor) {
+			fYOffset = fNoteBeat - fSongBeat;
+		} else {
+
+			fYOffset = GetDisplayedBeat(pPlayerState, fNoteBeat) -
+					   GetDisplayedBeat(pPlayerState, fSongBeat);
+			fYOffset *= pCurSteps->GetTimingData()->GetDisplayedSpeedPercent(
+			  position.m_fSongBeatVisible, position.m_fMusicSecondsVisible);
+		}
 		fYOffset *= 1 - curr_options->m_fTimeSpacing;
 	}
 
@@ -370,8 +375,8 @@ ArrowEffects::GetYOffset(const PlayerState* pPlayerState,
 	// Factor in scroll speed
 	float fScrollSpeed = curr_options->m_fScrollSpeed;
 	if (curr_options->m_fMaxScrollBPM != 0) {
-		fScrollSpeed = curr_options->m_fMaxScrollBPM /
-					   (pPlayerState->m_fReadBPM);
+		fScrollSpeed =
+		  curr_options->m_fMaxScrollBPM / (pPlayerState->m_fReadBPM);
 	}
 
 	// don't mess with the arrows after they've crossed 0

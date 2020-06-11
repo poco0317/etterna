@@ -1577,7 +1577,7 @@ NoteDisplay::DrawActor(const TapNote& tn,
 					   float fColorScale,
 					   bool is_being_held)
 {
-	if (tn.type == TapNoteType_AutoKeysound)
+	if (tn.type == TapNoteType_AutoKeysound && !GAMESTATE->m_bInStepEditor)
 		return;
 	if (fYOffset < field_args.draw_pixels_after_targets ||
 		fYOffset > field_args.draw_pixels_before_targets) {
@@ -1914,7 +1914,7 @@ NoteColumnRenderer::DrawPrimitives()
 	  m_field_render_args->last_row + 1,
 	  begin,
 	  end);
-	for (; begin != end; ++begin) {			
+	for (; begin != end; ++begin) {
 		const TapNote& tn = begin->second;
 		switch (tn.type) {
 			case TapNoteType_Empty:

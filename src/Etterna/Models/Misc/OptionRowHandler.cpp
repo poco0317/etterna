@@ -520,9 +520,12 @@ class OptionRowHandlerSteps : public OptionRowHandler
 		if (sParam == "EditSteps") {
 			m_ppStepsToFill = &GAMESTATE->m_pCurSteps;
 			m_pDifficultyToFill = &GAMESTATE->m_PreferredDifficulty;
+			m_pst = &GAMESTATE->m_stEdit;
 			m_vsReloadRowMessages.push_back(
 			  MessageIDToString(Message_EditStepsTypeChanged));
 		} else if (sParam == "EditSourceSteps") {
+			m_ppStepsToFill = &GAMESTATE->m_pEditSourceSteps;
+			m_pst = &GAMESTATE->m_stEditSource;
 			m_vsReloadRowMessages.push_back(
 			  MessageIDToString(Message_EditSourceStepsTypeChanged));
 			if (GAMESTATE->m_pCurSteps.Get() != NULL)
@@ -572,6 +575,9 @@ class OptionRowHandlerSteps : public OptionRowHandler
 						s = pSteps->GetDescription();
 					else
 						s = "NewEdit";
+				} else {
+					s = CustomDifficultyToLocalizedString(
+					  GetCustomDifficulty(GAMESTATE->m_stEdit, dc));
 				}
 				m_Def.m_vsChoices.push_back(s);
 			}
@@ -1363,7 +1369,9 @@ class OptionRowHandlerStepsType : public OptionRowHandler
 		CHECK_BLANK_ARG;
 
 		if (sParam == "EditStepsType") {
+			m_pstToFill = &GAMESTATE->m_stEdit;
 		} else if (sParam == "EditSourceStepsType") {
+			m_pstToFill = &GAMESTATE->m_stEditSource;
 			m_vsReloadRowMessages.push_back(
 			  MessageIDToString(Message_CurrentStepsP1Changed));
 			m_vsReloadRowMessages.push_back(
