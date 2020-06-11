@@ -32,6 +32,20 @@ function GameOverOrContinue()
 	end
 end
 
+function GetEditModeSubScreens()
+	return
+		"ScreenMiniMenuEditHelp," ..
+		"ScreenMiniMenuMainMenu," ..
+		"ScreenMiniMenuAreaMenu," ..
+		"ScreenMiniMenuStepsInformation," ..
+		"ScreenMiniMenuSongInformation," ..
+		"ScreenMiniMenuBackgroundChange," ..
+		"ScreenMiniMenuInsertTapAttack," ..
+		"ScreenMiniMenuInsertCourseAttack," ..
+		"ScreenMiniMenuCourseDisplay," ..
+		"ScreenEditOptions"
+end
+
 function ToGameplay()
 	local mode = GAMESTATE:GetGameplayMode()
 	if mode == "GameplayMode_Practice" then
