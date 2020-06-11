@@ -21,6 +21,7 @@ struct MenuRowDef
 	vector<std::string> choices;
 	bool bThemeTitle{ false };
 	bool bThemeItems{ false };
+	EditMode emShowIn = EditMode_Invalid;
 
 	MenuRowDef()
 	  : sName("")
@@ -28,7 +29,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const std::string& n,
 			   MenuRowUpdateEnabled pe,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -62,7 +63,7 @@ struct MenuRowDef
 	  , sName(n)
 	  , bEnabled(true)
 	  , pfnEnabled(pe)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -105,7 +106,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const std::string& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -113,8 +114,7 @@ struct MenuRowDef
 	  : iRowCode(r)
 	  , sName(n)
 	  , bEnabled(e)
-	  , pfnEnabled(nullptr)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -130,7 +130,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const std::string& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -163,8 +163,7 @@ struct MenuRowDef
 	  : iRowCode(r)
 	  , sName(n)
 	  , bEnabled(e)
-	  , pfnEnabled(nullptr)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)
@@ -207,7 +206,7 @@ struct MenuRowDef
 	MenuRowDef(int r,
 			   const std::string& n,
 			   bool e,
-
+			   EditMode ed,
 			   bool bTT,
 			   bool bTI,
 			   int d,
@@ -216,8 +215,7 @@ struct MenuRowDef
 	  : iRowCode(r)
 	  , sName(n)
 	  , bEnabled(e)
-	  , pfnEnabled(nullptr)
-
+	  , emShowIn(ed)
 	  , iDefaultChoice(d)
 	  , choices()
 	  , bThemeTitle(bTT)

@@ -420,6 +420,20 @@ auto
 StringToStyleType(const std::string& s) -> StyleType;
 LuaDeclareType(StyleType);
 
+enum EditMode
+{
+	EditMode_Practice,
+	EditMode_Home,
+	EditMode_Full,
+	NUM_EditMode,
+	EditMode_Invalid,
+};
+const RString&
+EditModeToString(EditMode em);
+EditMode
+StringToEditMode(const RString& s);
+LuaDeclareType(EditMode);
+
 /**
  * @brief The different types of sample music previews available.
  *
