@@ -268,6 +268,8 @@ class Steps
 	/** @brief The Song these Steps are associated with */
 	Song* m_pSong;
 
+	vector<NoteInfo> serializenotedatacache;
+
 	CachedObject<Steps> m_CachedObject;
 
 	void SetDisplayBPM(const DisplayBPM type) { this->displayBPMType = type; }

@@ -387,18 +387,25 @@ SongManager::InitSongsFromDisk(LoadingWindow* ld)
 void
 SongManager::CalcTestStuff()
 {
+#ifndef USING_CALCTESTS
+	return;
+#endif
 
 	vector<float> test_vals[NUM_Skillset];
 
 	// output calc differences for chartkeys and targets and stuff
 	for (auto p : testChartList) {
+		auto ss = p.first;
+		LOG->Trace("\nStarting calc test group %s\n",
+				   SkillsetToString(ss).c_str());
 		for (auto chart : p.second.filemapping) {
-			auto ss = p.first;
+
 			if (StepsByKey.count(chart.first))
 				test_vals[ss].emplace_back(
 				  StepsByKey[chart.first]->DoATestThing(
 					chart.second.ev, ss, chart.second.rate));
 		}
+		LOG->Trace("\n\n");
 	}
 
 	FOREACH_ENUM(Skillset, ss)
@@ -410,6 +417,18 @@ SongManager::CalcTestStuff()
 				test_vals[ss].size(),
 			  SkillsetToString(ss).c_str());
 	}
+
+	// bzzzzzzzzzzzz this won't work for what i want unless we also make dummy
+	// entries in testlist for stuff and don't set an ev
+	// int counter = 0;
+	// for (auto& ohno : StepsByKey){
+	//	ohno.second->DoATestThing(40.f, Skill_Overall, 1.f);
+	//	++counter;
+	//	if (counter > 500)
+	//		break;
+	//}
+
+	SaveCalcTestXmlToDir();
 }
 
 void
@@ -1754,8 +1773,9 @@ CalcTestList::CreateNode() const
 void
 SongManager::LoadCalcTestNode() const
 {
-	// disable for release
+#ifndef USING_CALCTESTS
 	return;
+#endif
 	string fn = "Save/" + calctest_XML;
 	int iError;
 	unique_ptr<RageFileBasic> pFile(FILEMAN->Open(fn, RageFile::READ, iError));
@@ -1828,8 +1848,9 @@ SongManager::SaveCalcTestCreateNode() const
 void
 SongManager::SaveCalcTestXmlToDir() const
 {
-	// disable for release
+#ifndef USING_CALCTESTS
 	return;
+#endif
 	string fn = "Save/" + calctest_XML;
 	// calc test hardcode stuff cuz ASDKLFJASKDJLFHASHDFJ
 	unique_ptr<XNode> xml(SaveCalcTestCreateNode());

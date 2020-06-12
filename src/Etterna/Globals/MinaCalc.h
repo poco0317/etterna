@@ -11,7 +11,8 @@
 #ifndef MINACALC_API
 #define MINACALC_API
 #endif
-
+#define USING_NEW_CALC
+#define USING_CALCTESTS
 typedef std::vector<std::vector<float>> MinaSD;
 typedef std::vector<std::vector<float>> Finger;
 typedef std::vector<Finger> ProcessedFingers;
@@ -37,7 +38,7 @@ class Hand
 	/*	Spits out a rough estimate of difficulty based on the ms values within
 	the interval The vector passed to it is the vector of ms values within each
 	interval, and not the full vector of intervals. */
-	static float CalcMSEstimate(std::vector<float> input);
+	float CalcMSEstimate(std::vector<float>& input, const int& burp);
 
 	/*	Averages nps and ms estimates for difficulty to get a rough initial
 	value. This is relatively robust as patterns that get overrated by nps
@@ -97,13 +98,7 @@ class Hand
 	// but that might just be too confusing idk
 	std::vector<float> stam_adj_diff;
 	std::vector<std::vector<std::vector<float>>> debugValues;
-
-  private:
-	const bool SmoothDifficulty =
-	  true; // Do we moving average the difficulty intervals?
 };
-
-struct JumpHandChordData;
 
 class Calc
 {
@@ -116,13 +111,13 @@ class Calc
 								float music_rate,
 								float score_goal);
 
-	void JackStamAdjust(float x, int t, int mode);
-	float JackLoss(float x, int mode, bool stam);
+	void JackStamAdjust(float x, int t, int mode, bool debug = false);
+	float JackLoss(float x, int mode, float mpl, bool stam, bool debug = false);
 	void SequenceJack(const Finger& f, int track, int mode);
 
 	bool debugmode = false;
-	bool capssr = true; // set to true for scores, false for cache
-	int numitv;
+	bool ssr = true; // set to true for scores, false for cache
+	int numitv = 0;
 
 	/*	Splits up the chart by each hand and calls ProcessFinger on each "track"
 	before passing the results to the hand initialization functions. Also passes
@@ -161,64 +156,7 @@ class Calc
 				 bool stamina,
 				 bool debugoutput = false);
 
-	void TheThingLookerFinderThing(const std::vector<NoteInfo>& NoteInfo,
-								   float music_rate,
-								   std::vector<float> doot[]);
-
-	JumpHandChordData gen_jump_hand_chord_data(
-	  const std::vector<NoteInfo>& NoteInfo);
-
-	// nerf psuedo chords that are flams into oblivion
-	void SetFlamJamMod(const std::vector<NoteInfo>& NoteInfo,
-					   std::vector<float> doot[],
-					   float& music_rate);
-
-	void SetStreamMod(const std::vector<NoteInfo>& NoteInfo,
-					  std::vector<float> doot[ModCount],
-					  float music_rate);
-
-	void SetAnchorMod(const std::vector<NoteInfo>& NoteInfo,
-					  unsigned int t1,
-					  unsigned int t2,
-					  std::vector<float> doot[ModCount]);
-
-	// no longer going to necessarily be downscalers - that they were
-	// was a structural flaw of the old calc
-	void SetHSMod(const JumpHandChordData& data,
-				  std::vector<float> doot[ModCount]);
-	void SetJumpMod(const JumpHandChordData& data,
-					std::vector<float> doot[ModCount]);
-	void SetCJMod(const JumpHandChordData& data,
-				  std::vector<float> doot[ModCount]);
-
-	// run pattern mods that require specific sequencing at the same time to
-	// avoid iterating through all rows of the noteinfo more than once
-	// ok well we do it once per hand and we can probably solve that but...
-	void SetSequentialDownscalers(const std::vector<NoteInfo>& NoteInfo,
-								  unsigned int t1,
-								  unsigned int t2,
-								  float music_rate,
-								  std::vector<float> doot[ModCount]);
-
-	void WideRangeRollScaler(const std::vector<NoteInfo>& NoteInfo,
-							 unsigned int t1,
-							 unsigned int t2,
-							 float music_rate,
-							 std::vector<float> doot[ModCount]);
-	void WideRangeJumptrillScaler(const std::vector<NoteInfo>& NoteInfo,
-								  unsigned int t1,
-								  unsigned int t2,
-								  float music_rate,
-								  std::vector<float> doot[ModCount]);
-	void WideRangeAnchorScaler(const std::vector<NoteInfo>& NoteInfo,
-							   float music_rate,
-							   std::vector<float> doot[ModCount]);
-	void WideRangeBalanceScaler(const std::vector<NoteInfo>& NoteInfo,
-								float music_rate,
-								std::vector<float> doot[ModCount]);
-	std::vector<std::vector<float>> jacks[4];
-	std::vector<std::vector<float>> jacks2[4];
-	std::vector<std::vector<float>> jacks3[4];
+	std::vector<std::vector<float>> jacks[4][4];
 	std::vector<std::vector<float>> stam_adj_jacks[4];
 	Hand left_hand;
 	Hand right_hand;
@@ -226,12 +164,7 @@ class Calc
   private:
 	std::vector<std::vector<int>> nervIntervals;
 
-	// Const calc params
-	const bool SmoothPatterns =
-	  true; // Do we moving average the pattern modifier intervals?
 	const float IntervalSpan = 0.5f; // Intervals of time we slice the chart at
-	const bool logpatterns = false;
-	float fingerbias = 1.f;
 };
 
 MINACALC_API std::vector<float>

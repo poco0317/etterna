@@ -529,7 +529,7 @@ DownloadManager::Update(float fDeltaSeconds)
 void
 DownloadManager::UpdateHTTP(float fDeltaSeconds)
 {
-	if (!HTTPRunning && HTTPRequests.size() == 0 || gameplay)
+	if (HTTPRequests.size() == 0 || gameplay)
 		return;
 	timeval timeout;
 	int rc, maxfd = -1;
@@ -568,6 +568,7 @@ DownloadManager::UpdateHTTP(float fDeltaSeconds)
 	int msgs_left;
 	while ((msg = curl_multi_info_read(mHTTPHandle, &msgs_left))) {
 		/* Find out which handle this message is about */
+		int idx_to_delete = -1;
 		for (size_t i = 0; i < HTTPRequests.size(); ++i) {
 			if (msg->easy_handle == HTTPRequests[i]->handle) {
 				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
@@ -584,10 +585,14 @@ DownloadManager::UpdateHTTP(float fDeltaSeconds)
 					curl_formfree(HTTPRequests[i]->form);
 				HTTPRequests[i]->form = nullptr;
 				delete HTTPRequests[i];
-				HTTPRequests.erase(HTTPRequests.begin() + i);
+				idx_to_delete = i;
 				break;
 			}
 		}
+		// Delete this here instead of within the loop to avoid iterator
+		// invalidation
+		if (idx_to_delete != -1)
+			HTTPRequests.erase(HTTPRequests.begin() + idx_to_delete);
 	}
 	return;
 }
@@ -1178,7 +1183,7 @@ DownloadManager::UploadScores()
 	for (auto& vec : scores) {
 		for (auto& s : vec) {
 			// probably not worth uploading fails, they get rescored now
-			if (s->GetGrade() != Grade_Failed)
+			if (s->GetGrade() == Grade_Failed)
 				continue;
 			// handle rescores, ignore upload check
 			if (newly_rescored.count(s))
@@ -1613,10 +1618,13 @@ DownloadManager::RequestReplayData(const string& scoreid,
 				}
 			}
 			auto& lbd = DLMAN->chartLeaderboards[chartkey];
-			auto it = find_if(
-			  lbd.begin(), lbd.end(), [userid, username](OnlineScore& a) {
-				  return a.userid == userid && a.username == username;
-			  });
+			auto it = find_if(lbd.begin(),
+							  lbd.end(),
+							  [userid, username, scoreid](OnlineScore& a) {
+								  return a.userid == userid &&
+										 a.username == username &&
+										 a.scoreid == scoreid;
+							  });
 			if (it != lbd.end()) {
 				it->hs.SetOnlineReplayTimestampVector(timestamps);
 				it->hs.SetOffsetVector(offsets);
@@ -1633,9 +1641,10 @@ DownloadManager::RequestReplayData(const string& scoreid,
 		}
 
 		auto& lbd = DLMAN->chartLeaderboards[chartkey];
-		auto it =
-		  find_if(lbd.begin(), lbd.end(), [userid, username](OnlineScore& a) {
-			  return a.userid == userid && a.username == username;
+		auto it = find_if(
+		  lbd.begin(), lbd.end(), [userid, username, scoreid](OnlineScore& a) {
+			  return a.userid == userid && a.username == username &&
+					 a.scoreid == scoreid;
 		  });
 		if (it != lbd.end()) {
 			it->hs.SetOnlineReplayTimestampVector(timestamps);

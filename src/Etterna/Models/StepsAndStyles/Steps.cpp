@@ -398,8 +398,13 @@ Steps::CalcEtternaMetadata()
 
 	if (m_StepsType == StepsType_dance_solo)
 		diffByRate = SoloCalc(cereal);
-	else
+	else {
+#ifdef USING_NEW_CALC
+		diffByRate = MinaSDCalc(cereal);
+#else
 		diffByRate = MinaSDCalc_OLD(cereal);
+#endif
+	}
 
 	ChartKey = GenerateChartKey(*m_pNoteData, GetTimingData());
 
@@ -1025,7 +1030,9 @@ class LunaSteps : public Luna<Steps>
 			for (int j = 0; j < 2; ++j) {
 				vector<float> poop;
 				if (!p->calcdebugoutput.empty()) // empty for non 4k
-					poop = p->calcdebugoutput[j][0][i];
+					if (!p->calcdebugoutput[j]
+						   .empty()) // empty for "garbage files"
+						poop = p->calcdebugoutput[j][0][i];
 				LuaHelpers::CreateTableFromArray(poop, L);
 				lua_rawseti(L, -2, j + 1);
 			}
@@ -1042,7 +1049,9 @@ class LunaSteps : public Luna<Steps>
 			for (int j = 0; j < 2; ++j) {
 				vector<float> poop;
 				if (!p->calcdebugoutput.empty()) // empty for non 4k
-					poop = p->calcdebugoutput[j][1][i];
+					if (!p->calcdebugoutput[j]
+						   .empty()) // empty for "garbage files"
+						poop = p->calcdebugoutput[j][1][i];
 				LuaHelpers::CreateTableFromArray(poop, L);
 				lua_rawseti(L, -2, j + 1);
 			}
@@ -1059,7 +1068,9 @@ class LunaSteps : public Luna<Steps>
 			for (int j = 0; j < 2; ++j) {
 				vector<float> poop;
 				if (!p->calcdebugoutput.empty()) // empty for non 4k
-					poop = p->calcdebugoutput[j][2][i];
+					if (!p->calcdebugoutput[j]
+						   .empty()) // empty for "garbage files"
+						poop = p->calcdebugoutput[j][2][i];
 				LuaHelpers::CreateTableFromArray(poop, L);
 				lua_rawseti(L, -2, j + 1);
 			}
