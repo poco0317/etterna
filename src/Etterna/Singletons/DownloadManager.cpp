@@ -1324,7 +1324,9 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		// path gets normalized so starts with a /
 		// so we have to remove that /
 		string path = FILEMAN->ResolvePath("Cache/" + group + ".zip");
+#ifdef _WIN32
 		path.erase(0, 1);
+#endif
 		curl_mime_filedata(field, path.c_str());
 
 		headerlist = curl_slist_append(
