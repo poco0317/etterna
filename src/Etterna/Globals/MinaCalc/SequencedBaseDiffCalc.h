@@ -135,7 +135,7 @@ struct ceejay
 		}
 
 		// pushing back ms values, so multiply to nerf
-		float pewpew = 3.F;
+		float pewpew = 1.F;
 
 		if (is_over_3_note_anch) {
 			// biggy boy anchors and beyond
