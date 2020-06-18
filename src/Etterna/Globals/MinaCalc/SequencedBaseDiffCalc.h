@@ -107,7 +107,8 @@ struct ceejay
 		is_cj = last_row_count > 1 && row_count > 1;
 		was_cj = last_row_count > 1 && last_last_row_count > 1;
 
-		is_scj = (row_count == 1 && last_row_count > 1) &&
+		is_scj = ((row_count == 1 && last_row_count > 1) ||
+				  (row_count > 1 && last_row_count == 1)) &&
 				 ((row_notes & last_row_notes) != 0u);
 
 		is_at_least_3_note_anch =
@@ -119,6 +120,7 @@ struct ceejay
 		last_last_row_notes = last_row_notes;
 		last_row_notes = row_notes;
 
+		is_over_3_note_anch = is_at_least_3_note_anch && last_was_3_note_anch;
 		last_was_3_note_anch = is_at_least_3_note_anch;
 	}
 
@@ -135,7 +137,7 @@ struct ceejay
 		// pushing back ms values, so multiply to nerf
 		float pewpew = 3.F;
 
-		if (is_at_least_3_note_anch && last_was_3_note_anch) {
+		if (is_over_3_note_anch) {
 			// biggy boy anchors and beyond
 			pewpew = 1.F;
 		} else if (is_at_least_3_note_anch) {
@@ -203,6 +205,7 @@ struct ceejay
 		is_scj = false;
 		is_at_least_3_note_anch = false;
 		last_was_3_note_anch = false;
+		is_over_3_note_anch = false;
 
 		last_row_count = 0;
 		last_last_row_count = 0;
@@ -219,6 +222,7 @@ struct ceejay
 	bool is_scj = false;
 	bool is_at_least_3_note_anch = false;
 	bool last_was_3_note_anch = false;
+	bool is_over_3_note_anch = false;
 
 	int last_row_count = 0;
 	int last_last_row_count = 0;
