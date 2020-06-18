@@ -148,11 +148,11 @@ struct ceejay
 					// was cj a little bit ago..
 					if (was_cj) {
 						// single note jack with 2 chords behind it
-						pewpew = 1.25F;
+						pewpew = 1.F;
 					} else {
 						// single note, not a jack, 2 chords behind
 						// it
-						pewpew = 1.5F;
+						pewpew = 1.F;
 					}
 				}
 			} else {
@@ -160,10 +160,10 @@ struct ceejay
 				if (was_cj) {
 					// cj now and was cj before, but not necessarily
 					// with strong anchors
-					pewpew = 1.15F;
+					pewpew = 1.F;
 				} else {
 					// cj now but wasn't even cj before
-					pewpew = 1.25F;
+					pewpew = 1.F;
 				}
 			}
 		}
