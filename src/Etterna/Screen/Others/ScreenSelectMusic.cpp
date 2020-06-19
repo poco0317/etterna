@@ -461,7 +461,6 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 			SONGMAN->GenerateCachefilesForGroup(
 			  GetMusicWheel()->GetSelectedSection());
 			AfterMusicChange();
-			SCREENMAN->SystemMessage("Did cache stuff");
 			return true;
 		} else if (bHoldingCtrl && c == 'F' && m_MusicWheel.IsSettled() &&
 				   input.type == IET_FIRST_PRESS) {
