@@ -168,6 +168,7 @@ class DownloadManager
 	map<string, Download*> downloads; // Active downloads
 	vector<HTTPRequest*>
 	  HTTPRequests; // Active HTTP requests (async, curlMulti)
+	vector<HTTPRequest*> rankRequests;
 
 	map<string, Download*> finishedDownloads;
 	map<string, Download*> pendingInstallDownloads;
@@ -239,6 +240,7 @@ class DownloadManager
 	Download* DownloadAndInstallPack(DownloadablePack* pack,
 									 bool mirror = false);
 	void Update(float fDeltaSeconds);
+	void UpdateRanker();
 	void UpdatePacks(float fDeltaSeconds);
 	void UpdateHTTP(float fDeltaSeconds);
 	bool InstallSmzip(const string& sZipFile);

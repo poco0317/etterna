@@ -520,11 +520,85 @@ DownloadManager::Update(float fDeltaSeconds)
 {
 	if (!initialized)
 		init();
+	UpdateRanker();
 	if (gameplay)
 		return;
 	UpdatePacks(fDeltaSeconds);
 	UpdateHTTP(fDeltaSeconds);
 	return;
+}
+void
+DownloadManager::UpdateRanker()
+{
+	if (rankRequests.size() == 0)
+		return;
+
+	timeval timeout;
+	int rc, maxfd = -1;
+	CURLMcode mc;
+	fd_set fdread, fdwrite, fdexcep;
+	long curl_timeo = -1;
+	FD_ZERO(&fdread);
+	FD_ZERO(&fdwrite);
+	FD_ZERO(&fdexcep);
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 1;
+	curl_multi_timeout(mHTTPHandle, &curl_timeo);
+
+	mc = curl_multi_fdset(mHTTPHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
+	if (mc != CURLM_OK) {
+		error = "curl_multi_fdset() failed, code " + to_string(mc);
+		return;
+	}
+	if (maxfd == -1) {
+		rc = 0;
+	} else {
+		rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
+	}
+	switch (rc) {
+		case -1:
+			error = "select error" + to_string(mc);
+			break;
+		case 0:	 /* timeout */
+		default: /* action */
+			curl_multi_perform(mHTTPHandle, &HTTPRunning);
+			break;
+	}
+
+
+	CURLMsg* msg;
+	int msgs_left;
+	while ((msg = curl_multi_info_read(mHTTPHandle, &msgs_left))) {
+		/* Find out which handle this message is about */
+		int idx_to_delete = -1;
+		for (size_t i = 0; i < rankRequests.size(); ++i) {
+			if (msg->easy_handle == rankRequests[i]->handle) {
+				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
+					rankRequests[i]->Failed(*(rankRequests[i]), msg);
+					LOG->Trace("CURL UNSUPPORTED PROTOCOL (Probably https)");
+				} else if (msg->msg == CURLMSG_DONE) {
+					rankRequests[i]->Done(*(rankRequests[i]), msg);
+				} else
+					rankRequests[i]->Failed(*(rankRequests[i]), msg);
+				if (rankRequests[i]->handle != nullptr)
+					curl_easy_cleanup(rankRequests[i]->handle);
+				rankRequests[i]->handle = nullptr;
+				if (rankRequests[i]->form != nullptr)
+					curl_formfree(rankRequests[i]->form);
+				rankRequests[i]->form = nullptr;
+				delete rankRequests[i];
+				idx_to_delete = i;
+				break;
+			}
+		}
+		// Delete this here instead of within the loop to avoid iterator
+		// invalidation
+		if (idx_to_delete != -1)
+			rankRequests.erase(rankRequests.begin() + idx_to_delete);
+	}
+	return;
+
+
 }
 void
 DownloadManager::UpdateHTTP(float fDeltaSeconds)
@@ -1341,17 +1415,28 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		// curl_easy_setopt(curl, CURLOPT_COOKIE,
 		// "XDEBUG_SESSION=XDEBUG_ECLIPSE;");
 
+		if (mHTTPHandle == nullptr)
+			mHTTPHandle = curl_multi_init();
+
+		HTTPRequest* req = new HTTPRequest(curl);
+		req->Done = [](HTTPRequest& req, CURLMsg*) {
+			LOG->Trace("%s", req.result.c_str());
+		};
+
+		curl_multi_add_handle(mHTTPHandle, req->handle);
+		rankRequests.push_back(req);
+
+		/*
 		res = curl_easy_perform(curl);
 
 		LOG->Trace("\nCURL RESPONSE NUMBER %d\n", res);
 
-		/* always cleanup */
 		curl_easy_cleanup(curl);
 
-		/* then cleanup the form */
 		curl_mime_free(form);
-		/* free slist */
 		curl_slist_free_all(headerlist);
+		*/
+		SCREENMAN->SystemMessage(ssprintf("Sent request to rank %s", group.c_str()));
 	}
 	else
 	{
