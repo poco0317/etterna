@@ -1353,6 +1353,10 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		/* free slist */
 		curl_slist_free_all(headerlist);
 	}
+	else
+	{
+		SCREENMAN->SystemMessage("Curl init failed");
+	}
 }
 void
 DownloadManager::EndSessionIfExists()
