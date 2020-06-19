@@ -18,8 +18,10 @@ class DownloadablePack;
 class ProgressData
 {
   public:
-	curl_off_t total{ 0 };		// total bytes
+	curl_off_t dltotal{ 0 };		// total bytes
 	curl_off_t downloaded{ 0 }; // bytes downloaded
+	curl_off_t ultotal{ 0 };
+	curl_off_t uploaded{ 0 };
 	float time{ 0 };			// seconds passed
 };
 
@@ -52,8 +54,8 @@ class Download
 			   to_string((progress.downloaded > 0 ? progress.downloaded
 												  : p_RFWrapper.bytes) /
 						 1024) +
-			   (progress.total > 0
-				  ? "/" + to_string(progress.total / 1024) + " (KB)"
+			   (progress.dltotal > 0
+				  ? "/" + to_string(progress.dltotal / 1024) + " (KB)"
 				  : "");
 	}
 	CURL* handle{ nullptr };
@@ -174,9 +176,11 @@ class DownloadManager
 	map<string, Download*> pendingInstallDownloads;
 	CURLM* mPackHandle{ nullptr }; // Curl multi handle for packs downloads
 	CURLM* mHTTPHandle{ nullptr }; // Curl multi handle for httpRequests
+	CURLM* mUploadHandle{ nullptr };
 	CURLMcode ret = CURLM_CALL_MULTI_PERFORM;
 	int downloadingPacks{ 0 };
 	int HTTPRunning{ 0 };
+	int uploadingPacks{ 0 };
 	bool loggingIn{
 		false
 	}; // Currently logging in (Since it's async, to not try twice)

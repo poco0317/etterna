@@ -194,8 +194,21 @@ progressfunc(void* clientp,
 			 curl_off_t ulnow)
 {
 	auto ptr = static_cast<ProgressData*>(clientp);
-	ptr->total = dltotal;
+	ptr->dltotal = dltotal;
 	ptr->downloaded = dlnow;
+	return 0;
+}
+int
+pogressfunc(void* p,
+			curl_off_t dltotal,
+			curl_off_t dlnow,
+			curl_off_t ultotal,
+			curl_off_t ulnow)
+{
+	auto pogress = static_cast<ProgressData*>(p);
+	pogress->ultotal = ultotal;
+	pogress->uploaded = ulnow;
+	SCREENMAN->SystemMessage(ssprintf("Current upload progress: %ld / %ld", ulnow, ultotal));
 	return 0;
 }
 size_t
@@ -543,9 +556,9 @@ DownloadManager::UpdateRanker()
 	FD_ZERO(&fdexcep);
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 1;
-	curl_multi_timeout(mHTTPHandle, &curl_timeo);
+	curl_multi_timeout(mUploadHandle, &curl_timeo);
 
-	mc = curl_multi_fdset(mHTTPHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
+	mc = curl_multi_fdset(mUploadHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
 	if (mc != CURLM_OK) {
 		error = "curl_multi_fdset() failed, code " + to_string(mc);
 		return;
@@ -561,14 +574,14 @@ DownloadManager::UpdateRanker()
 			break;
 		case 0:	 /* timeout */
 		default: /* action */
-			curl_multi_perform(mHTTPHandle, &HTTPRunning);
+			curl_multi_perform(mUploadHandle, &uploadingPacks);
 			break;
 	}
 
 
 	CURLMsg* msg;
 	int msgs_left;
-	while ((msg = curl_multi_info_read(mHTTPHandle, &msgs_left))) {
+	while ((msg = curl_multi_info_read(mUploadHandle, &msgs_left))) {
 		/* Find out which handle this message is about */
 		int idx_to_delete = -1;
 		for (size_t i = 0; i < rankRequests.size(); ++i) {
@@ -750,7 +763,7 @@ DownloadManager::UpdatePacks(float fDeltaSeconds)
 					if (i->second->p_RFWrapper.file.IsOpen())
 						i->second->p_RFWrapper.file.Close();
 					if (msg->data.result != CURLE_PARTIAL_FILE &&
-						i->second->progress.total <=
+						i->second->progress.dltotal <=
 						  i->second->progress.downloaded) {
 						timeSinceLastDownload = 0;
 						i->second->Done(i->second);
@@ -1415,15 +1428,21 @@ DownloadManager::UploadPackForRanking(const RString& group)
 		// curl_easy_setopt(curl, CURLOPT_COOKIE,
 		// "XDEBUG_SESSION=XDEBUG_ECLIPSE;");
 
-		if (mHTTPHandle == nullptr)
-			mHTTPHandle = curl_multi_init();
+		// Progress Info.
+		ProgressData pogress;
+		curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, pogressfunc);
+		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &pogress);
+		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+
+		if (mUploadHandle == nullptr)
+			mUploadHandle = curl_multi_init();
 
 		HTTPRequest* req = new HTTPRequest(curl);
 		req->Done = [](HTTPRequest& req, CURLMsg*) {
 			LOG->Trace("%s", req.result.c_str());
 		};
 
-		curl_multi_add_handle(mHTTPHandle, req->handle);
+		curl_multi_add_handle(mUploadHandle, req->handle);
 		rankRequests.push_back(req);
 
 		/*
@@ -3087,7 +3106,7 @@ class LunaDownload : public Luna<Download>
 	}
 	static int GetTotalKB(T* p, lua_State* L)
 	{
-		lua_pushnumber(L, static_cast<int>(p->progress.total));
+		lua_pushnumber(L, static_cast<int>(p->progress.dltotal));
 		return 1;
 	}
 	static int Stop(T* p, lua_State* L)
