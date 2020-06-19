@@ -1155,7 +1155,7 @@ SongManager::ForceReloadSongGroup(const RString& sGroupName) const
 void
 SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 {
-	LOG->Trace("Generating cache files for %s", sGroupName.c_str());
+	SCREENMAN->SystemMessage(ssprintf("Generating cache files for %s", sGroupName.c_str()));
 	auto songs = GetSongs(sGroupName);
 	for (auto s : songs) {
 		auto sdir = s->GetSongDir();
@@ -1220,7 +1220,7 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 	}
 	LOG->Trace("Finished generating cache files for %s", sGroupName.c_str());
 
-	LOG->Trace("Zipping song directory...");
+	SCREENMAN->SystemMessage("Zipping song directory...");
 	miniz_cpp::zip_file fi;
 	std::vector<RString> flist;
 	GetDirListingRecursive("Songs/" + sGroupName + "/", "*", flist);
