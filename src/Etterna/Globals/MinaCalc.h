@@ -2,6 +2,7 @@
 #include "Etterna/Models/NoteData/NoteDataStructures.h"
 #include <vector>
 #include <array>
+#include <chrono>
 
 // For internal, must be preprocessor defined
 #if defined(MINADLL_COMPILE) && defined(_WIN32)
@@ -16,6 +17,12 @@
 typedef std::vector<std::vector<float>> MinaSD;
 using Finger = std::vector<std::vector<float>>;
 using ProcessedFingers = std::vector<Finger>;
+
+// Amount of time describing a row in a chart, relative to the "first" row
+// The first row is 0
+typedef std::chrono::duration<float, std::milli> rowTime;
+// Amount of time describing the distance between rows/notes
+typedef std::chrono::duration<float, std::milli> msTime;
 
 class Calc;
 
@@ -41,7 +48,7 @@ struct RowInfo
 	unsigned row_notes = 0U;
 	int row_count = 0;
 	std::array<int, num_hands> hand_counts = { 0, 0 };
-	float row_time = 0.F;
+	rowTime row_time{ 0 };
 };
 
 class Calc

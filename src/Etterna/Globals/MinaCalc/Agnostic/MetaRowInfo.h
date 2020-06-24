@@ -10,9 +10,9 @@ struct metaRowInfo
 	static const bool dbg = false;
 	static const bool dbg_lv2 = false;
 
-	float time = s_init;
+	rowTime time{ s_init };
 	// time from last row (ms)
-	float ms_now = ms_init;
+	msTime ms_now{ ms_init };
 	int count = 0;
 	int last_count = 0;
 	int last_last_count = 0;
@@ -156,7 +156,7 @@ struct metaRowInfo
 
 	inline void operator()(const metaRowInfo& last,
 						   metaItvInfo& mitvi,
-						   const float& row_time,
+						   const rowTime& row_time,
 						   const int& row_count,
 						   const unsigned& row_notes)
 	{

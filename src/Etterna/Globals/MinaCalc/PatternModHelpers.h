@@ -48,6 +48,18 @@ mean(const vector<T>& v) -> float
 	return static_cast<float>(sum(v)) / static_cast<float>(v.size());
 }
 
+inline auto
+sum(const vector<msTime>& v) -> msTime
+{
+	return std::accumulate(begin(v), end(v), msTime(0));
+}
+
+inline auto
+mean(const vector<msTime>& v) -> float
+{
+	return sum(v).count() / static_cast<float>(v.size());
+}
+
 // Coefficient of variation
 inline auto
 cv(const vector<float>& input) -> float
@@ -56,6 +68,18 @@ cv(const vector<float>& input) -> float
 	float average = mean(input);
 	for (float i : input) {
 		sd += (i - average) * (i - average);
+	}
+
+	return fastsqrt(sd / static_cast<float>(input.size())) / average;
+}
+
+inline auto
+cv(const vector<msTime>& input) -> float
+{
+	float sd = 0.F;
+	float average = mean(input);
+	for (msTime i : input) {
+		sd += (i.count() - average) * (i.count() - average);
 	}
 
 	return fastsqrt(sd / static_cast<float>(input.size())) / average;

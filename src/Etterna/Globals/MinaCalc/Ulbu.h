@@ -231,7 +231,7 @@ struct TheGreatBazoinkazoinkInTheSky
 		_wrr.advance_sequencing(_mhi->_bt,
 								_mhi->_mt,
 								_mhi->_last_mt,
-								_seq._mw_any_ms.get_now(),
+								msTime(_seq._mw_any_ms.get_now()),
 								_seq.get_sc_ms_now(_mhi->_ct));
 		_wrjt.advance_sequencing(
 		  _mhi->_bt, _mhi->_mt, _mhi->_last_mt, _seq._mw_any_ms);
@@ -317,7 +317,7 @@ struct TheGreatBazoinkazoinkInTheSky
 	// update base difficulty stuff
 	inline void update_sequenced_base_diffs(const unsigned& /*row_notes*/,
 											const int& /*row_count*/,
-											const float&  /*any_ms*/,
+											const msTime&  /*any_ms*/,
 											const col_type& ct)
 	{
 		// jack speed updates with highest anchor difficulty seen
@@ -347,9 +347,9 @@ struct TheGreatBazoinkazoinkInTheSky
 		setup_dependent_mods();
 
 		for (auto& ids : hand_col_ids) {
-			float row_time = s_init;
-			float last_row_time = s_init;
-			float any_ms = ms_init;
+			rowTime row_time{ s_init };
+			rowTime last_row_time{ s_init };
+			msTime any_ms{ ms_init };
 
 			unsigned row_notes = 0U;
 			int row_count = 0;
@@ -374,7 +374,7 @@ struct TheGreatBazoinkazoinkInTheSky
 					// don't like having this here
 					any_ms = ms_from(row_time, last_row_time);
 
-					assert(any_ms > 0.F);
+					assert(any_ms.count() > 0.F);
 
 					ct = determine_col_type(row_notes, ids);
 

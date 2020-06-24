@@ -172,9 +172,9 @@ struct RM_Sequencer
 	bool is_bursting = false;
 	bool had_burst = false;
 
-	float last_anchor_time = s_init;
+	rowTime last_anchor_time{ s_init };
 
-	float _start = s_init;
+	rowTime _start{ s_init };
 
 #pragma region functions
 
@@ -186,8 +186,8 @@ struct RM_Sequencer
 		_rmb = rmb_init;
 		_last_rmb = rmb_init;
 
-		_start = s_init;
-		last_anchor_time = s_init;
+		_start = rowTime(s_init);
+		last_anchor_time = rowTime(s_init);
 
 		is_bursting = false;
 		had_burst = false;
@@ -213,7 +213,7 @@ struct RM_Sequencer
 		 * can only restart when we're on an anchor col, the anchor col should
 		 * have already been updated and _last would be now, so calculate the
 		 * start time from as._sc_ms */
-		_start = as._last - (as._sc_ms / 1000.F);
+		_start = as._last - as._sc_ms;
 		// should always be equivalent to NOW,
 		last_anchor_time = as._last;
 
@@ -545,13 +545,13 @@ struct RM_Sequencer
 			return 1.F;
 		}
 
-		float flool = ms_from(last_anchor_time, _start);
+		msTime flool = ms_from(last_anchor_time, _start);
 
 		// may be unnecessary
 		// float glunk =
 		// CalcClamp(static_cast<float>(_rm.off_taps_sh) / 4.F, 0.1F, 1.F);
 
-		float pule = (flool) / static_cast<float>(_rm._len - 1);
+		float pule = flool.count() / static_cast<float>(_rm._len - 1);
 		float drool = ms_to_scaled_nps(pule) * rma_diff_scaler;
 		return drool /** glunk*/;
 	}

@@ -20,10 +20,10 @@ struct flam
 
 	// ms values, 3 ms values = 4 rows, optimize by just recycling values
 	// without resetting and indexing up to the size counter to get duration
-	std::array<float, 3> ms = {
-		0.F,
-		0.F,
-		0.F,
+	std::array<msTime, 3> ms = {
+		msTime(0),
+		msTime(0),
+		msTime(0),
 	};
 
 	// is this row exclusively additive with the current flam sequence?
@@ -33,7 +33,7 @@ struct flam
 	}
 
 	// to avoid keeping another float ??? idk
-	inline auto get_dur() -> float
+	inline auto get_dur() -> msTime
 	{
 		// cba to loop
 		switch (size) {
@@ -54,10 +54,10 @@ struct flam
 				break;
 		}
 		assert(0);
-		return 0.F;
+		return msTime(0);
 	}
 
-	inline void start(const float& ms_now, const unsigned& notes)
+	inline void start(const msTime& ms_now, const unsigned& notes)
 	{
 		flammin = true;
 		unsigned_unseen = 0U;
@@ -65,7 +65,7 @@ struct flam
 		grow(ms_now, notes);
 	}
 
-	inline void grow(const float& ms_now, const unsigned& notes)
+	inline void grow(const msTime& ms_now, const unsigned& notes)
 	{
 		if (size == max_flam_jammies) {
 			return;
@@ -92,9 +92,9 @@ struct FJ_Sequencer
 	flam flim;
 
 	// scan for flam chords in this window
-	float group_tol = 0.F;
+	float group_tol{ 0 };
 	// tolerance for each column step
-	float step_tol = 0.F;
+	float step_tol{ 0 };
 	float mod_scaler = 0.F;
 
 	// number of flams
@@ -116,8 +116,8 @@ struct FJ_Sequencer
 
 	inline void set_params(const float& gt, const float& st, const float& ms)
 	{
-		group_tol = gt;
-		step_tol = st;
+		group_tol = gt * 1000;
+		step_tol = st * 1000;
 		mod_scaler = ms;
 	}
 
@@ -149,16 +149,16 @@ struct FJ_Sequencer
 	}
 
 	// check for anything that would break the sequence
-	inline auto flammin_tol_check(const float& ms_now) -> bool
+	inline auto flammin_tol_check(const msTime& ms_now) -> bool
 	{
 		// check if ms from last row is greater than the group tolerance
-		if (ms_now > group_tol) {
+		if (ms_now.count() > group_tol) {
 			return false;
 		}
 
 		// check if the new flam duration would exceed the group tolerance with
 		// the current row added
-		if (flim.get_dur() + ms_now > group_tol) {
+		if ((flim.get_dur() + ms_now).count() > group_tol) {
 			return false;
 		}
 
@@ -166,7 +166,7 @@ struct FJ_Sequencer
 		return true;
 	}
 
-	inline void operator()(const float& ms_now, const unsigned& notes)
+	inline void operator()(const msTime& ms_now, const unsigned& notes)
 	{
 		// if we already have the max number of flams
 		// (maybe should remove this shortcut optimization)
@@ -178,7 +178,7 @@ struct FJ_Sequencer
 		// haven't started, if we're under the step tolerance, start
 		if (!flim.flammin) {
 			// 99.99% of cases
-			if (ms_now > step_tol) {
+			if (ms_now.count() > step_tol) {
 				return;
 			}
 			{
@@ -222,13 +222,13 @@ struct FJ_Sequencer
 	inline auto construct_mod_part() -> float
 	{
 		// total duration of flam
-		float dur = flim.get_dur();
+		msTime dur = flim.get_dur();
 
 		// scale to size of flam, we want jumpflams to punish less than quad
 		// flams (while still downscaling jumptrill flams)
 		// flams that register as 95% of the size adjusted window will be
 		// punished less than those that register at 2%
-		float dur_prop = dur / group_tol;
+		float dur_prop = dur.count() / group_tol;
 		dur_prop /= (static_cast<float>(flim.size) / mod_scaler);
 		dur_prop = CalcClamp(dur_prop, 0.F, 1.F);
 

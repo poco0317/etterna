@@ -96,15 +96,15 @@ struct techyo
 			return;
 		}
 
-		float a = seq.get_sc_ms_now(ct);
-		float b = ms_init;
+		msTime a = seq.get_sc_ms_now(ct);
+		msTime b(ms_init);
 		if (ct == col_ohjump) {
 			b = seq.get_sc_ms_now(ct, false);
 		} else {
 			b = seq.get_cc_ms_now();
 		}
 
-		float c = fastsqrt(a) * fastsqrt(b);
+		float c = fastsqrt(a.count()) * fastsqrt(b.count());
 
 		float pineapple = seq._mw_any_ms.get_cv_of_window(4);
 		float porcupine = seq._mw_sc_ms[col_left].get_cv_of_window(4);

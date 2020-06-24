@@ -19,7 +19,7 @@
  * other option is "cc_ms", for cross column ms */
 
 // bpm flux float precision etc
-static const float anchor_spacing_buffer_ms = 10.F;
+static const msTime anchor_buffer_ms{ 10 };
 static const float anchor_speed_increase_cutoff_factor = 1.9F;
 static const int len_cap = 6;
 
@@ -61,30 +61,30 @@ struct Anchor_Sequencing
 	 */
 
 	int _len = 1;
-	float _sc_ms = ms_init;
+	msTime _sc_ms{ ms_init };
 
 	// if we exceed this + buffer, break the anchor sequence
-	float _max_ms = ms_init;
+	msTime _max_ms{ ms_init };
 
 	// rather than a buffer cap maybe a len cap will be more scalable, track the
 	// difficulty at the cap and when queried beyond it, just return this value
 	float _len_cap_diff = ms_init;
 
 	// row_time of last note on this col
-	float _last = s_init;
-	float _start = s_init;
+	rowTime _last{ s_init };
+	rowTime _start{ s_init };
 
 	inline void full_reset()
 	{
 		// never reset col_type
-		_sc_ms = ms_init;
-		_max_ms = ms_init;
-		_last = s_init;
+		_sc_ms = msTime(ms_init);
+		_max_ms = msTime(ms_init);
+		_last = msTime(s_init);
 		_len = 1;
 		_status = anch_init;
 	}
 
-	inline void operator()(const col_type ct, const float& now)
+	inline void operator()(const col_type ct, const rowTime& now)
 	{
 		assert(ct == _ct);
 		_sc_ms = ms_from(now, _last);
@@ -99,9 +99,9 @@ struct Anchor_Sequencing
 		// new anchor was the last row_time, and the new max_ms should be the
 		// current ms value
 
-		if (_sc_ms > _max_ms + anchor_spacing_buffer_ms) {
+		if (_sc_ms > _max_ms + anchor_buffer_ms) {
 			_status = reset_too_slow;
-		} else if (_sc_ms * 2.5F < _max_ms) {
+		} else if (_sc_ms.count() * 2.5F < _max_ms.count()) {
 			_status = reset_too_fast;
 		} else {
 			_status = anchoring;
@@ -141,7 +141,7 @@ struct Anchor_Sequencing
 	// returns an adjusted MS value, not converted to nps
 	inline auto get_ms() -> float
 	{
-		assert(_sc_ms > 0.F);
+		assert(_sc_ms.count() > 0.F);
 
 		float anchor_time_buffer_ms = 100.F;
 
@@ -151,7 +151,7 @@ struct Anchor_Sequencing
 		if (_len > len_cap)
 			return _len_cap_diff;
 
-		float flool = ms_from(_last, _start);
+		float flool = ms_from(_last, _start).count();
 		float pule = (flool + anchor_time_buffer_ms) / static_cast<float>(_len - 1);
 
 		if (_len == len_cap)
@@ -189,7 +189,7 @@ struct AnchorSequencer
 	}
 
 	// derives sc_ms, which sequencer general will pull for its moving window
-	inline void operator()(const col_type ct, const float& row_time)
+	inline void operator()(const col_type ct, const rowTime& row_time)
 	{
 		// update the one
 		if (ct == col_left || ct == col_right) {
@@ -278,14 +278,14 @@ struct SequencerGeneral
 		// single notes are simple
 		if (ct == col_left || ct == col_right) {
 
-			_mw_sc_ms.at(ct)(_as.anch.at(ct)._sc_ms);
+			_mw_sc_ms.at(ct)(_as.anch.at(ct)._sc_ms.count());
 		}
 
 		// oh jumps mean we do both, we will allow whatever is querying for the
 		// value to choose which column value they want (lower by default)
 		if (ct == col_ohjump) {
 			for (auto& c : ct_loop_no_jumps) {
-				_mw_sc_ms.at(c)(_as.anch.at(c)._sc_ms);
+				_mw_sc_ms.at(c)(_as.anch.at(c)._sc_ms.count());
 			}
 		}
 	}
@@ -294,11 +294,11 @@ struct SequencerGeneral
 	// column, for this we need to take the last row_time on the cross column,
 	// (anchor sequencer has it as _last) and derive a new ms value from it and
 	// the current row_time
-	inline void set_cc_ms(const col_type& ct, const float& row_time)
+	inline void set_cc_ms(const col_type& ct, const rowTime& row_time)
 	{
 		// single notes are simple, grab the _last of ct inverted
 		if (ct == col_left || ct == col_right) {
-			_mw_cc_ms(ms_from(row_time, _as.anch.at(invert_col(ct))._last));
+			_mw_cc_ms(ms_from(row_time, _as.anch.at(invert_col(ct))._last).count());
 		}
 
 		// jumps are tricky, tehcnically we have 2 cc_ms values, but also
@@ -312,14 +312,14 @@ struct SequencerGeneral
 		// checks will work, we can't just shortcut and make a get function
 		// which swaps where it returns from
 		if (ct == col_ohjump) {
-			_mw_cc_ms(get_sc_ms_now(col_ohjump));
+			_mw_cc_ms(get_sc_ms_now(col_ohjump).count());
 		}
 	}
 
 	// stuff
 	inline void advance_sequencing(const col_type& ct,
-								   const float& row_time,
-								   const float& ms_now)
+								   const rowTime& row_time,
+								   const msTime& ms_now)
 	{ // update sequencers
 		_as(ct, row_time);
 
@@ -329,15 +329,15 @@ struct SequencerGeneral
 		// sc ms needs to be set first, cc ms will reference it for ohjumps
 		set_sc_ms(ct);
 		set_cc_ms(ct, row_time);
-		_mw_any_ms(ms_now);
+		_mw_any_ms(ms_now.count());
 	}
 
 	[[nodiscard]] inline auto get_sc_ms_now(const col_type& ct,
-											bool lower = true) const -> float
+											bool lower = true) const -> msTime
 	{
 		if (ct == col_init) {
 
-			return ms_init;
+			return msTime{ ms_init };
 		}
 
 		// if ohjump, grab the smaller value by default
@@ -345,30 +345,30 @@ struct SequencerGeneral
 			if (lower) {
 				return _mw_sc_ms[col_left].get_now() <
 						   _mw_sc_ms[col_right].get_now()
-						 ? _mw_sc_ms[col_left].get_now()
-						 : _mw_sc_ms[col_right].get_now();
+						 ? msTime(_mw_sc_ms[col_left].get_now())
+						 : msTime(_mw_sc_ms[col_right].get_now());
 			}
 			{
 				// return the higher value instead (dunno if we'll ever need
 				// this but it's good to have the option)
 				return _mw_sc_ms[col_left].get_now() >
 						   _mw_sc_ms[col_right].get_now()
-						 ? _mw_sc_ms[col_left].get_now()
-						 : _mw_sc_ms[col_right].get_now();
+						 ? msTime(_mw_sc_ms[col_left].get_now())
+						 : msTime(_mw_sc_ms[col_right].get_now());
 			}
 		}
 
 		// simple
-		return _mw_sc_ms.at(ct).get_now();
+		return msTime(_mw_sc_ms.at(ct).get_now());
 	}
 
-	[[nodiscard]] inline auto get_any_ms_now() const -> float
+	[[nodiscard]] inline auto get_any_ms_now() const -> msTime
 	{
-		return _mw_any_ms.get_now();
+		return msTime(_mw_any_ms.get_now());
 	}
-	[[nodiscard]] inline auto get_cc_ms_now() const -> float
+	[[nodiscard]] inline auto get_cc_ms_now() const -> msTime
 	{
-		return _mw_cc_ms.get_now();
+		return msTime(_mw_cc_ms.get_now());
 	}
 
 	inline void full_reset()

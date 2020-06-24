@@ -41,7 +41,7 @@ struct FlamJamMod
 
 	inline void setup() { fj.set_params(group_tol, step_tol, scaler); }
 
-	inline void advance_sequencing(const float& ms_now, const unsigned& notes)
+	inline void advance_sequencing(const msTime& ms_now, const unsigned& notes)
 	{
 		fj(ms_now, notes);
 	}

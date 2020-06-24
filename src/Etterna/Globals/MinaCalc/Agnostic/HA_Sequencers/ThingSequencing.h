@@ -99,7 +99,7 @@ struct the_slip
 		return false;
 	}
 
-	inline void start(const float& ms_now, const unsigned& notes)
+	inline void start(const msTime& ms_now, const unsigned& notes)
 	{
 		slip = notes;
 		slide = 0;
@@ -107,7 +107,7 @@ struct the_slip
 		grow(ms_now, notes);
 	}
 
-	inline void grow(const float& /*ms_now*/, const unsigned& /*notes*/)
+	inline void grow(const msTime& /*ms_now*/, const unsigned& /*notes*/)
 	{
 		// ms[slide] = ms_now;
 		++slide;
@@ -239,7 +239,7 @@ struct TT_Sequencing
 		scaler = ms;
 	}
 
-	inline void complete_slip(const float& ms_now, const unsigned& notes)
+	inline void complete_slip(const msTime& ms_now, const unsigned& notes)
 	{
 		if (slip_counter < max_slips) {
 			mod_parts.at(slip_counter) = construct_mod_part();
@@ -261,7 +261,7 @@ struct TT_Sequencing
 		return notes == 3 || notes == 7 || notes == 12 || notes == 14;
 	}
 
-	inline void operator()(const float& ms_now, const unsigned& notes)
+	inline void operator()(const msTime& ms_now, const unsigned& notes)
 	{
 		// ignore quads
 		if (notes == 15) {

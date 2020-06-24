@@ -181,7 +181,7 @@ fastwalk(const vector<NoteInfo>& ni,
 
 		nri.row_notes = ri.notes;
 		nri.row_count = column_count(ri.notes);
-		nri.row_time = scaled_time;
+		nri.row_time = rowTime(scaled_time);
 
 		int left = 0;
 		int right = 0;

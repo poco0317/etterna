@@ -53,8 +53,8 @@ struct WideRangeRollMod
 	float hi_im_a_float = 0.F;
 
 	// WE CAN JUST MOVE THE TIMING CHECK FUNCTIONS INTO CALCWINDOW LUL
-	vector<float> idk_ms = { 0.F, 0.F, 0.F, 0.F };
-	vector<float> seq_ms = { 0.F, 0.F, 0.F };
+	vector<msTime> idk_ms = { msTime(0), msTime(0), msTime(0), msTime(0) };
+	vector<msTime> seq_ms = { msTime(0), msTime(0), msTime(0) };
 
 	float moving_cv = cv_reset;
 	float pmod = min_mod;
@@ -72,10 +72,10 @@ struct WideRangeRollMod
 		hi_im_a_float = 0.F;
 
 		for (auto& v : seq_ms) {
-			v = 0.F;
+			v = msTime(0);
 		}
 		for (auto& v : idk_ms) {
-			v = 0.F;
+			v = msTime(0);
 		}
 
 		moving_cv = cv_reset;
@@ -110,7 +110,7 @@ struct WideRangeRollMod
 
 	inline auto do_timing_thing(const float& scaler) -> bool
 	{
-		_mw_adj_ms(seq_ms[1]);
+		_mw_adj_ms(seq_ms[1].count());
 
 		if (_mw_adj_ms.get_cv_of_window(window) > other_cv_threshold) {
 			return false;
@@ -132,8 +132,8 @@ struct WideRangeRollMod
 
 	inline auto do_other_timing_thing(const float& scaler) -> bool
 	{
-		_mw_adj_ms(idk_ms[1]);
-		_mw_adj_ms(idk_ms[2]);
+		_mw_adj_ms(idk_ms[1].count());
+		_mw_adj_ms(idk_ms[2].count());
 
 		if (_mw_adj_ms.get_cv_of_window(window) > other_cv_threshold) {
 			return false;
@@ -168,7 +168,7 @@ struct WideRangeRollMod
 		}
 	}
 
-	inline void handle_ccsjjscc_timing_check(const float& now)
+	inline void handle_ccsjjscc_timing_check(const msTime& now)
 	{
 		// translate over the values
 		idk_ms[2] = seq_ms[0];
@@ -247,8 +247,8 @@ struct WideRangeRollMod
 	inline void advance_sequencing(const base_type& bt,
 								   const meta_type& mt,
 								   const meta_type& _last_mt,
-								   const float& any_ms,
-								   const float& tc_ms)
+								   const msTime& any_ms,
+								   const msTime& tc_ms)
 	{
 		// we will let ohjumps through here
 		
@@ -305,8 +305,8 @@ struct WideRangeRollMod
 	}
 
 	inline void update_seq_ms(const base_type& bt,
-							  const float& any_ms,
-							  const float& tc_ms)
+							  const msTime& any_ms,
+							  const msTime& tc_ms)
 	{
 		seq_ms[0] = seq_ms[1]; // last_last
 		seq_ms[1] = seq_ms[2]; // last

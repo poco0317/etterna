@@ -5,8 +5,8 @@
  * sequencers do their stuff */
 static const std::array<unsigned, 4> col_ids = { 1U, 2U, 4U, 8U };
 
-static const float s_init = -5.F;
-static const float ms_init = 5000.F;
+static const int s_init = -5000;
+static const int ms_init = 5000;
 
 // global multiplier to standardize baselines
 static const float finalscaler = 3.632F;
@@ -34,9 +34,9 @@ column_count(const unsigned& notes) -> int
 }
 
 inline auto
-ms_from(const float& now, const float& last) -> float
+ms_from(const rowTime& now, const rowTime& last) -> msTime
 {
-	return (now - last) * 1000.F;
+	return (now - last);
 }
 
 inline auto
@@ -55,7 +55,7 @@ ms_to_nps(const float& x) -> float
 inline auto
 ms_to_scaled_nps(const float& ms) -> float
 {
-	return ms_to_nps(ms) * finalscaler;
+	return ms * finalscaler;
 }
 
 inline auto
