@@ -116,8 +116,8 @@ struct FJ_Sequencer
 
 	inline void set_params(const float& gt, const float& st, const float& ms)
 	{
-		group_tol = gt * 1000;
-		step_tol = st * 1000;
+		group_tol = gt;
+		step_tol = st;
 		mod_scaler = ms;
 	}
 
