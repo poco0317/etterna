@@ -42,7 +42,7 @@ jobs:
         run: brew install cmake nasm ninja
 
       - name: Generate CMake
-        run: mkdir build && cd build && cmake -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -G Ninja ..
+        run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DOPENSSL_ROOT_DIR=/usr/local/opt/openssl -G Ninja ..
 
       - name: Build Project
         run: cd build && ninja
