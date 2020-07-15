@@ -16,10 +16,10 @@
 #include "RageThreads.h"
 #include "RageTimer.h"
 #include "RageUtil/Utils/RageUtil.h"
-#include <mutex>
+
 #include <atomic>
 #include <thread>
-
+#include <algorithm>
 #include <set>
 
 #include "arch/Threads/Threads.h"
@@ -191,7 +191,7 @@ InitThreads()
 	bInitialized = true;
 
 	/* Register the "unknown thread" slot. */
-	int slot = FindEmptyThreadSlot();
+	const int slot = FindEmptyThreadSlot();
 	strcpy(g_ThreadSlots[slot].m_szName, "Unknown thread");
 	g_ThreadSlots[slot].m_iID = GetInvalidThreadId();
 	sprintf(g_ThreadSlots[slot].m_szThreadFormattedOutput, "Unknown thread");
@@ -265,7 +265,7 @@ RageThread::Create(int (*fn)(void*), void* data)
 	 */
 	LockMut(GetThreadSlotsLock());
 
-	int slotno = FindEmptyThreadSlot();
+	const int slotno = FindEmptyThreadSlot();
 	m_pSlot = &g_ThreadSlots[slotno];
 
 	strcpy(m_pSlot->m_szName, m_sName.c_str());
@@ -280,16 +280,16 @@ RageThread::Create(int (*fn)(void*), void* data)
 	m_pSlot->m_pImpl = MakeThread(fn, data, &m_pSlot->m_iID);
 }
 
-RageThreadRegister::RageThreadRegister(const RString& sName)
+RageThreadRegister::RageThreadRegister(const std::string& sName)
 {
 	InitThreads();
 	LockMut(GetThreadSlotsLock());
 
-	int iSlot = FindEmptyThreadSlot();
+	const int iSlot = FindEmptyThreadSlot();
 
 	m_pSlot = &g_ThreadSlots[iSlot];
 
-	strcpy(m_pSlot->m_szName, sName);
+	strcpy(m_pSlot->m_szName, sName.c_str());
 	sprintf(m_pSlot->m_szThreadFormattedOutput, "Thread: %s", sName.c_str());
 
 	m_pSlot->m_iID = GetThisThreadId();
@@ -342,7 +342,7 @@ RageThread::Wait()
 {
 	ASSERT(m_pSlot != NULL);
 	ASSERT(m_pSlot->m_pImpl != NULL);
-	int ret = m_pSlot->m_pImpl->Wait();
+	const int ret = m_pSlot->m_pImpl->Wait();
 
 	LockMut(GetThreadSlotsLock());
 
@@ -437,7 +437,7 @@ Checkpoints::SetCheckpoint(const char* file, int line, const char* message)
 
 	++slot->m_iCurCheckpoint;
 	slot->m_iNumCheckpoints =
-	  max(slot->m_iNumCheckpoints, slot->m_iCurCheckpoint);
+	  std::max(slot->m_iNumCheckpoints, slot->m_iCurCheckpoint);
 	slot->m_iCurCheckpoint %= CHECKPOINT_COUNT;
 }
 
@@ -500,7 +500,7 @@ Checkpoints::GetLogs(char* pBuf, int iSize, const char* delim)
  * already owns.
  */
 
-RageMutex::RageMutex(const RString& name)
+RageMutex::RageMutex(const std::string& name)
   : m_pMutex(MakeMutex(this))
   , m_sName(name)
   , m_LockedBy(GetInvalidThreadId())
@@ -516,7 +516,7 @@ RageMutex::~RageMutex()
 void
 RageMutex::Lock()
 {
-	uint64_t iThisThreadId = GetThisThreadId();
+	const uint64_t iThisThreadId = GetThisThreadId();
 	if (m_LockedBy == iThisThreadId) {
 		++m_LockCnt;
 		return;
@@ -526,17 +526,19 @@ RageMutex::Lock()
 		const ThreadSlot* ThisSlot = GetThreadSlotFromID(GetThisThreadId());
 		const ThreadSlot* OtherSlot = GetThreadSlotFromID(m_LockedBy);
 
-		RString ThisSlotName = "(???"
-							   ")"; // stupid trigraph warnings
-		RString OtherSlotName = "(???"
-								")"; // stupid trigraph warnings
+		std::string ThisSlotName = "(???"
+								   ")"; // stupid trigraph warnings
+		std::string OtherSlotName = "(???"
+									")"; // stupid trigraph warnings
 		if (ThisSlot)
-			ThisSlotName = ssprintf(
-			  "%s (%i)", ThisSlot->GetThreadName(), (int)ThisSlot->m_iID);
+			ThisSlotName = ssprintf("%s (%i)",
+									ThisSlot->GetThreadName(),
+									static_cast<int>(ThisSlot->m_iID));
 		if (OtherSlot)
-			OtherSlotName = ssprintf(
-			  "%s (%i)", OtherSlot->GetThreadName(), (int)OtherSlot->m_iID);
-		const RString sReason =
+			OtherSlotName = ssprintf("%s (%i)",
+									 OtherSlot->GetThreadName(),
+									 static_cast<int>(OtherSlot->m_iID));
+		const std::string sReason =
 		  ssprintf("Thread deadlock on mutex %s between %s and %s",
 				   GetName().c_str(),
 				   ThisSlotName.c_str(),
@@ -545,7 +547,7 @@ RageMutex::Lock()
 		/* Don't leave GetThreadSlotsLock() locked when we call
 		 * ForceCrashHandlerDeadlock. */
 		GetThreadSlotsLock().Lock();
-		uint64_t CrashHandle = OtherSlot ? OtherSlot->m_iID : 0;
+		const uint64_t CrashHandle = OtherSlot ? OtherSlot->m_iID : 0;
 		GetThreadSlotsLock().Unlock();
 
 		/* Pass the crash handle of the other thread, so it can backtrace that
@@ -627,7 +629,7 @@ LockMutex::Unlock()
 	}
 }
 
-RageEvent::RageEvent(const RString& name)
+RageEvent::RageEvent(const std::string& name)
   : RageMutex(name)
   , m_pEvent(MakeEvent(m_pMutex))
 {
@@ -649,7 +651,7 @@ RageEvent::Wait(RageTimer* pTimeout)
 	/* A zero RageTimer also means no timeout. */
 	if (pTimeout != NULL && pTimeout->IsZero())
 		pTimeout = NULL;
-	bool bRet = m_pEvent->Wait(pTimeout);
+	const bool bRet = m_pEvent->Wait(pTimeout);
 
 	m_LockedBy = GetThisThreadId();
 	return bRet;
@@ -677,7 +679,7 @@ RageEvent::WaitTimeoutSupported() const
 	return m_pEvent->WaitTimeoutSupported();
 }
 
-RageSemaphore::RageSemaphore(const RString& sName, int iInitialValue)
+RageSemaphore::RageSemaphore(const std::string& sName, int iInitialValue)
   : m_pSema(MakeSemaphore(iInitialValue))
   , m_sName(sName)
 {
@@ -711,7 +713,7 @@ RageSemaphore::Wait(bool bFailOnTimeout)
 	/* We waited too long.  We're probably deadlocked, though unlike mutexes, we
 	 * can't tell which thread we're stuck on. */
 	const ThreadSlot* ThisSlot = GetThreadSlotFromID(GetThisThreadId());
-	const RString sReason =
+	const std::string sReason =
 	  ssprintf("Semaphore timeout on mutex %s on thread %s",
 			   GetName().c_str(),
 			   ThisSlot ? ThisSlot->GetThreadName()

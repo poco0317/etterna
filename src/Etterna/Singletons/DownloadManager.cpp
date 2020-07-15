@@ -9,33 +9,36 @@
 #include "ScoreManager.h"
 #include "Etterna/Models/Misc/GamePreferences.h"
 #include "Etterna/Screen/Network/ScreenNetSelectMusic.h"
-#include "RageUtil/File/RageFileManager.h"
 #include "ProfileManager.h"
 #include "SongManager.h"
 #include "Etterna/Screen/Others/ScreenInstallOverlay.h"
-#include "CommandLineActions.h"
 #include "Etterna/Screen/Others/ScreenSelectMusic.h"
 #include "Etterna/Globals/SpecialFiles.h"
-#include "Etterna/Models/Misc/Foreach.h"
 #include "Etterna/Models/Songs/Song.h"
-#include "RageUtil/Misc/RageString.h"
-#include <Etterna/Singletons/FilterManager.h>
 #include "Etterna/Models/Misc/PlayerStageStats.h"
-#include "Etterna/Models/Misc/Grade.h"
-#include "SongManager.h" // i didn't want to do this but i also didn't want to figure how not to have to so... -mina
-
 #include "curl/curl.h"
+#include "Etterna/Models/Songs/SongOptions.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/stringbuffer.h"
-using namespace rapidjson;
-#include <iostream>
-#include <unordered_set>
+
 #ifdef _WIN32
 #include <intrin.h>
 #endif
-shared_ptr<DownloadManager> DLMAN = nullptr;
+
+#include <unordered_set>
+#include <algorithm>
+
+using std::function;
+using std::map;
+using std::pair;
+using std::string;
+using std::to_string;
+
+using namespace rapidjson;
+
+std::shared_ptr<DownloadManager> DLMAN = nullptr;
 LuaReference DownloadManager::EMPTY_REFERENCE = LuaReference();
 
 static Preference<unsigned int> maxDLPerSecond(
@@ -44,11 +47,11 @@ static Preference<unsigned int> maxDLPerSecond(
 static Preference<unsigned int> maxDLPerSecondGameplay(
   "maximumBytesDownloadedPerSecondDuringGameplay",
   1000000);
-static Preference<RString> packListURL(
+static Preference<std::string> packListURL(
   "PackListURL",
   "https://api.etternaonline.com/v2/packs");
-static Preference<RString> serverURL("BaseAPIURL",
-									 "https://api.etternaonline.com/v2");
+static Preference<std::string> serverURL("BaseAPIURL",
+										 "https://api.etternaonline.com/v2");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -124,12 +127,12 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 {
 	if (!FILEMAN->Mount("zip", sZipFile, TEMP_ZIP_MOUNT_POINT))
 		FAIL_M(static_cast<string>("Failed to mount " + sZipFile).c_str());
-	vector<RString> v_packs;
+	vector<std::string> v_packs;
 	GetDirListing(TEMP_ZIP_MOUNT_POINT + "*", v_packs, true, true);
 
 	string doot = TEMP_ZIP_MOUNT_POINT;
 	if (v_packs.size() > 1) {
-		doot += sZipFile.substr(sZipFile.find_last_of("/") +
+		doot += sZipFile.substr(sZipFile.find_last_of('/') +
 								1); // attempt to whitelist pack name, this
 									// should be pretty simple/safe solution for
 									// a lot of pad packs -mina
@@ -138,7 +141,7 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 
 	vector<string> vsFiles;
 	{
-		vector<RString> vsRawFiles;
+		vector<std::string> vsRawFiles;
 		GetDirListingRecursive(doot, "*", vsRawFiles);
 
 		if (vsRawFiles.empty()) {
@@ -147,14 +150,13 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 		}
 
 		vector<string> vsPrettyFiles;
-		FOREACH_CONST(RString, vsRawFiles, s)
-		{
-			if (GetExtension(*s).EqualsNoCase("ctl"))
+		for (auto& s : vsRawFiles) {
+			if (EqualsNoCase(GetExtension(s), "ctl"))
 				continue;
 
-			vsFiles.push_back(*s);
+			vsFiles.push_back(s);
 
-			string s2 = s->Right(s->length() - TEMP_ZIP_MOUNT_POINT.length());
+			string s2 = tail(s, s.length() - TEMP_ZIP_MOUNT_POINT.length());
 			vsPrettyFiles.push_back(s2);
 		}
 		sort(vsPrettyFiles.begin(), vsPrettyFiles.end());
@@ -162,17 +164,15 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 	string sResult = "Success installing " + sZipFile;
 	string extractTo =
 	  downloadPacksToAdditionalSongs ? "AdditionalSongs/" : "Songs/";
-	FOREACH_CONST(string, vsFiles, sSrcFile)
-	{
-		string sDestFile = *sSrcFile;
-		sDestFile =
-		  RString(sDestFile.c_str())
-			.Right(sDestFile.length() - TEMP_ZIP_MOUNT_POINT.length());
+	for (auto& sSrcFile : vsFiles) {
+		string sDestFile = sSrcFile;
+		sDestFile = tail(std::string(sDestFile.c_str()),
+						 sDestFile.length() - TEMP_ZIP_MOUNT_POINT.length());
 
-		RString sDir, sThrowAway;
+		std::string sDir, sThrowAway;
 		splitpath(sDestFile, sDir, sThrowAway, sThrowAway);
 
-		if (!FileCopy(*sSrcFile, extractTo + sDestFile)) {
+		if (!FileCopy(sSrcFile, extractTo + sDestFile)) {
 			sResult = "Error extracting " + sDestFile;
 			break;
 		}
@@ -213,11 +213,7 @@ ends_with(std::string const& value, std::string const& ending)
 		return false;
 	return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
-inline bool
-starts_with(std::string const& value, std::string const& start)
-{
-	return value.rfind(start, 0) == 0;
-}
+
 inline void
 checkProtocol(string& url)
 {
@@ -244,7 +240,7 @@ inline CURL*
 initCURLHandle(bool withBearer)
 {
 	CURL* curlHandle = initBasicCURLHandle();
-	struct curl_slist* list = NULL;
+	struct curl_slist* list = nullptr;
 	if (withBearer)
 		list = curl_slist_append(
 		  list, ("Authorization: Bearer " + DLMAN->authToken).c_str());
@@ -258,7 +254,7 @@ addFileToForm(curl_httppost*& form,
 			  string field,
 			  string fileName,
 			  string filePath,
-			  RString& contents)
+			  std::string& contents)
 {
 	RageFile rFile;
 	if (!rFile.Open(filePath))
@@ -353,7 +349,7 @@ SetCURLFormPostField(CURL* curlHandle,
 inline void
 EmptyTempDLFileDir()
 {
-	vector<RString> files;
+	vector<std::string> files;
 	FILEMAN->GetDirListing(DL_DIR + "*", files, false, true);
 	for (auto& file : files) {
 		if (FILEMAN->IsAFile(file))
@@ -447,12 +443,12 @@ DownloadManager::EncodeSpaces(string& str)
 
 	// Parse spaces (curl doesnt parse them properly)
 	bool foundSpaces = false;
-	size_t index = str.find(" ", 0);
+	size_t index = str.find(' ', 0);
 	while (index != string::npos) {
 
 		str.erase(index, 1);
 		str.insert(index, "%20");
-		index = str.find(" ", index);
+		index = str.find(' ', index);
 		foundSpaces = true;
 	}
 	return foundSpaces;
@@ -471,7 +467,7 @@ Download::Update(float fDeltaSeconds)
 Download*
 DownloadManager::DownloadAndInstallPack(DownloadablePack* pack, bool mirror)
 {
-	vector<RString> packs;
+	vector<std::string> packs;
 	SONGMAN->GetSongGroupNames(packs);
 	for (auto packName : packs) {
 		if (packName == pack->name) {
@@ -481,7 +477,7 @@ DownloadManager::DownloadAndInstallPack(DownloadablePack* pack, bool mirror)
 		}
 	}
 	if (downloadingPacks >= maxPacksToDownloadAtOnce) {
-		DLMAN->DownloadQueue.push_back(make_pair(pack, mirror));
+		DLMAN->DownloadQueue.push_back(std::make_pair(pack, mirror));
 		return nullptr;
 	}
 	Download* dl = DownloadAndInstallPack(mirror ? pack->mirror : pack->url,
@@ -506,12 +502,11 @@ DownloadManager::Update(float fDeltaSeconds)
 		return;
 	UpdatePacks(fDeltaSeconds);
 	UpdateHTTP(fDeltaSeconds);
-	return;
 }
 void
 DownloadManager::UpdateHTTP(float fDeltaSeconds)
 {
-	if (!HTTPRunning && HTTPRequests.size() == 0 || gameplay)
+	if (HTTPRequests.empty() || gameplay)
 		return;
 	timeval timeout;
 	int rc, maxfd = -1;
@@ -539,7 +534,7 @@ DownloadManager::UpdateHTTP(float fDeltaSeconds)
 		case -1:
 			error = "select error" + to_string(mc);
 			break;
-		case 0:  /* timeout */
+		case 0:	 /* timeout */
 		default: /* action */
 			curl_multi_perform(mHTTPHandle, &HTTPRunning);
 			break;
@@ -550,6 +545,7 @@ DownloadManager::UpdateHTTP(float fDeltaSeconds)
 	int msgs_left;
 	while ((msg = curl_multi_info_read(mHTTPHandle, &msgs_left))) {
 		/* Find out which handle this message is about */
+		int idx_to_delete = -1;
 		for (size_t i = 0; i < HTTPRequests.size(); ++i) {
 			if (msg->easy_handle == HTTPRequests[i]->handle) {
 				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
@@ -566,18 +562,21 @@ DownloadManager::UpdateHTTP(float fDeltaSeconds)
 					curl_formfree(HTTPRequests[i]->form);
 				HTTPRequests[i]->form = nullptr;
 				delete HTTPRequests[i];
-				HTTPRequests.erase(HTTPRequests.begin() + i);
+				idx_to_delete = i;
 				break;
 			}
 		}
+		// Delete this here instead of within the loop to avoid iterator
+		// invalidation
+		if (idx_to_delete != -1)
+			HTTPRequests.erase(HTTPRequests.begin() + idx_to_delete);
 	}
-	return;
 }
 void
 DownloadManager::UpdatePacks(float fDeltaSeconds)
 {
 	timeSinceLastDownload += fDeltaSeconds;
-	if (pendingInstallDownloads.size() > 0 && !gameplay) {
+	if (!pendingInstallDownloads.empty() && !gameplay) {
 		// Install all pending packs
 		for (auto i = pendingInstallDownloads.begin();
 			 i != pendingInstallDownloads.end();
@@ -630,7 +629,7 @@ DownloadManager::UpdatePacks(float fDeltaSeconds)
 		case -1:
 			error = "select error" + to_string(mc);
 			break;
-		case 0:  /* timeout */
+		case 0:	 /* timeout */
 		default: /* action */
 			curl_multi_perform(mPackHandle, &downloadingPacks);
 			for (auto& dl : downloads)
@@ -703,7 +702,6 @@ DownloadManager::UpdatePacks(float fDeltaSeconds)
 		else
 			SONGMAN->DifferentialReload();
 	}
-	return;
 }
 
 string
@@ -943,7 +941,7 @@ DownloadManager::UploadScore(HighScore* hs,
 	const auto& columns = hs->GetTrackVector();
 	const auto& types = hs->GetTapNoteTypeVector();
 	const auto& rows = hs->GetNoteRowVector();
-	if (offsets.size() > 0) {
+	if (!offsets.empty()) {
 		replayString = "[";
 		auto steps = SONGMAN->GetStepsByChartkey(hs->GetChartKey());
 		if (steps == nullptr) {
@@ -1002,7 +1000,7 @@ DownloadManager::UploadScore(HighScore* hs,
 							 &req](int status) {
 				if (status == 22) {
 					LOG->Trace("Score upload response contains error, retrying "
-							   "(http status: %d error status: %d response "
+							   "(http status: %ld error status: %d response "
 							   "body: \"%s\")",
 							   response_code,
 							   status,
@@ -1027,7 +1025,7 @@ DownloadManager::UploadScore(HighScore* hs,
 				if (status != 406 || PREFSMAN->m_verbose_log > 1)
 					LOG->Trace(
 					  "Score upload response contains error "
-					  "(http status: %d error status: %d response body: "
+					  "(http status: %ld error status: %d response body: "
 					  "\"%s\" score key: \"%s\")",
 					  response_code,
 					  status,
@@ -1050,7 +1048,7 @@ DownloadManager::UploadScore(HighScore* hs,
 			} else {
 				LOG->Trace("Score upload response contains error and we failed "
 						   "to recognize it"
-						   "(http status: %d response body: \"%s\")",
+						   "(http status: %ld response body: \"%s\")",
 						   response_code,
 						   req.result.c_str());
 			}
@@ -1083,7 +1081,7 @@ DownloadManager::UploadScore(HighScore* hs,
 			// HTTPRunning = response_code;// TODO: Why were we doing this?
 		} else {
 			LOG->Trace("Score upload response malformed json "
-					   "(http status: %d response body: \"%s\")",
+					   "(http status: %ld response body: \"%s\")",
 					   response_code,
 					   req.result.c_str());
 		}
@@ -1097,8 +1095,6 @@ DownloadManager::UploadScore(HighScore* hs,
 	curl_multi_add_handle(mHTTPHandle, req->handle);
 	HTTPRequests.push_back(req);
 	CHECKPOINT_M("Finished creating UploadScore request");
-
-	return;
 }
 
 // this is for new/live played scores that have replaydata in memory
@@ -1141,7 +1137,6 @@ uploadSequentially()
 		DLMAN->ScoreUploadSequentialQueue.pop_front();
 		DLMAN->UploadScoreWithReplayDataFromDisk(hs, uploadSequentially);
 	}
-	return;
 }
 
 bool
@@ -1183,7 +1178,7 @@ DownloadManager::UploadScores()
 	}
 
 	if (!toUpload.empty())
-		LOG->Trace("Updating online scores. (Uploading %d scores)",
+		LOG->Trace("Updating online scores. (Uploading %zu scores)",
 				   toUpload.size());
 	else
 		return false;
@@ -1230,7 +1225,7 @@ DownloadManager::ForceUploadScoresForChart(const std::string& ck, bool startnow)
 	if (startnow) {
 		this->sequentialScoreUploadTotalWorkload =
 		  this->ScoreUploadSequentialQueue.size();
-		LOG->Trace("Starting sequential upload of %d scores",
+		LOG->Trace("Starting sequential upload of %zu scores",
 				   this->ScoreUploadSequentialQueue.size());
 		uploadSequentially();
 	}
@@ -1249,7 +1244,7 @@ DownloadManager::ForceUploadScoresForPack(const std::string& pack,
 	if (startnow) {
 		this->sequentialScoreUploadTotalWorkload =
 		  this->ScoreUploadSequentialQueue.size();
-		LOG->Trace("Starting sequential upload of %d scores",
+		LOG->Trace("Starting sequential upload of %zu scores",
 				   this->ScoreUploadSequentialQueue.size());
 		uploadSequentially();
 	}
@@ -1332,7 +1327,6 @@ DownloadManager::RefreshUserRank()
 		MESSAGEMAN->Broadcast("OnlineUpdate");
 	};
 	SendRequest("user/" + sessionUser + "/ranks", {}, done, true, false, true);
-	return;
 }
 OnlineTopScore
 DownloadManager::GetTopSkillsetScore(unsigned int rank,
@@ -1520,7 +1514,7 @@ DownloadManager::RequestReplayData(const string& scoreid,
 					!note[1].IsNumber())
 					continue;
 				replayData.push_back(
-				  make_pair(note[0].GetFloat(), note[1].GetFloat()));
+				  std::make_pair(note[0].GetFloat(), note[1].GetFloat()));
 
 				timestamps.push_back(note[0].GetFloat());
 				offsets.push_back(note[1].GetFloat() / 1000.f);
@@ -1583,7 +1577,7 @@ DownloadManager::RequestReplayData(const string& scoreid,
 		if (!callback.IsNil() && callback.IsSet()) {
 			auto L = LUA->Get();
 			callback.PushSelf(L);
-			RString Error =
+			std::string Error =
 			  "Error running RequestChartLeaderBoard Finish Function: ";
 			lua_newtable(L); // dunno whats going on here -mina
 			for (unsigned i = 0; i < replayData.size(); ++i) {
@@ -1836,7 +1830,7 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 			Lua* L = LUA->Get();
 			ref.PushSelf(L);
 			if (!lua_isnil(L, -1)) {
-				RString Error =
+				std::string Error =
 				  "Error running RequestChartLeaderBoard Finish Function: ";
 				lua_newtable(L);
 				for (unsigned i = 0; i < vec.size(); ++i) {
@@ -1885,7 +1879,7 @@ DownloadManager::RefreshCoreBundles()
 						!pack["packname"].IsString())
 						continue;
 					auto name = pack["packname"].GetString();
-					auto dlPack = find_if(
+					auto dlPack = std::find_if(
 					  dlPacks.begin(),
 					  dlPacks.end(),
 					  [&name](DownloadablePack x) { return x.name == name; });
@@ -1915,7 +1909,7 @@ DownloadManager::DownloadCoreBundle(const string& whichoneyo, bool mirror)
 			 return x1->size < x2->size;
 		 });
 	for (auto pack : bundle)
-		DLMAN->DownloadQueue.push_back(make_pair(pack, mirror));
+		DLMAN->DownloadQueue.push_back(std::make_pair(pack, mirror));
 }
 
 void
@@ -2046,7 +2040,6 @@ DownloadManager::RefreshTop25(Skillset ss)
 		MESSAGEMAN->Broadcast("OnlineUpdate");
 	};
 	SendRequest(req, {}, done);
-	return;
 }
 // Skillset ratings (we dont care about mod lvl, username, about, etc)
 void
@@ -2094,7 +2087,6 @@ DownloadManager::RefreshUserData()
 		MESSAGEMAN->Broadcast("OnlineUpdate");
 	};
 	SendRequest("user/" + sessionUser, {}, done);
-	return;
 }
 
 void
@@ -2121,13 +2113,13 @@ DownloadManager::OnLogin()
 }
 
 void
-DownloadManager::StartSession(string user,
-							  string pass,
-							  function<void(bool loggedIn)> callback =
-								[](bool) { return; })
+DownloadManager::StartSession(
+  string user,
+  string pass,
+  function<void(bool loggedIn)> callback = [](bool) {})
 {
 	string url = serverURL.Get() + "/login";
-	if (loggingIn || user == "") {
+	if (loggingIn || user.empty()) {
 		return;
 	}
 	DLMAN->loggingIn = true;
@@ -2205,7 +2197,7 @@ DownloadManager::GetSkillsetRating(Skillset ss)
 void
 DownloadManager::RefreshPackList(const string& url)
 {
-	if (url == "")
+	if (url.empty())
 		return;
 	auto done = [](HTTPRequest& req, CURLMsg*) {
 		Document d;
@@ -2223,7 +2215,7 @@ DownloadManager::RefreshPackList(const string& url)
 		for (auto& pack_obj : packs->GetArray()) {
 			DownloadablePack tmp;
 			if (pack_obj.HasMember("id") && pack_obj["id"].IsString())
-				tmp.id = stoi(pack_obj["id"].GetString());
+				tmp.id = std::stoi(pack_obj["id"].GetString());
 			else
 				tmp.id = 0;
 
@@ -2288,7 +2280,6 @@ DownloadManager::RefreshPackList(const string& url)
 		DLMAN->RefreshCoreBundles();
 	};
 	SendRequestToURL(url, {}, done, false, false, true, false);
-	return;
 }
 
 Download::Download(string url, string filename, function<void(Download*)> done)
@@ -2297,7 +2288,7 @@ Download::Download(string url, string filename, function<void(Download*)> done)
 	m_Url = url;
 	handle = initBasicCURLHandle();
 	m_TempFileName =
-	  DL_DIR + (filename != "" ? filename : MakeTempFileName(url));
+	  DL_DIR + (!filename.empty() ? filename : MakeTempFileName(url));
 	auto opened = p_RFWrapper.file.Open(m_TempFileName, 2);
 	ASSERT_M(opened, p_RFWrapper.file.GetError());
 	DLMAN->EncodeSpaces(m_Url);
@@ -2342,13 +2333,12 @@ Download::Failed()
 bool
 findStringIC(const std::string& strHaystack, const std::string& strNeedle)
 {
-	auto it = std::search(strHaystack.begin(),
-						  strHaystack.end(),
-						  strNeedle.begin(),
-						  strNeedle.end(),
-						  [](char ch1, char ch2) {
-							  return std::toupper(ch1) == std::toupper(ch2);
-						  });
+	auto it = std::search(
+	  strHaystack.begin(),
+	  strHaystack.end(),
+	  strNeedle.begin(),
+	  strNeedle.end(),
+	  [](char ch1, char ch2) { return toupper(ch1) == toupper(ch2); });
 	return (it != strHaystack.end());
 }
 
@@ -2384,9 +2374,9 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	{
 		vector<DownloadablePack>& packs = DLMAN->downloadablePacks;
 		vector<DownloadablePack*> dling;
-		for (unsigned i = 0; i < packs.size(); ++i) {
-			if (packs[i].downloading)
-				dling.push_back(&(packs[i]));
+		for (auto& pack : packs) {
+			if (pack.downloading)
+				dling.push_back(&pack);
 		}
 		lua_createtable(L, dling.size(), 0);
 		for (unsigned i = 0; i < dling.size(); ++i) {
@@ -2416,8 +2406,8 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		map<string, Download*>& dls = DLMAN->downloads;
 		lua_createtable(L, dls.size(), 0);
 		int j = 0;
-		for (auto it = dls.begin(); it != dls.end(); ++it) {
-			it->second->PushSelf(L);
+		for (auto& dl : dls) {
+			dl.second->PushSelf(L);
 			lua_rawseti(L, -2, j + 1);
 			j++;
 		}
@@ -2637,7 +2627,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			if (!f.IsNil() && f.IsSet()) {
 				auto L = LUA->Get();
 				f.PushSelf(L);
-				RString Error =
+				std::string Error =
 				  "Error running RequestChartLeaderBoard Finish Function: ";
 				hs->PushSelf(L);
 				LuaHelpers::RunScriptOnStack(
@@ -2664,12 +2654,12 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			lua_pushvalue(L, 2);
 			ref.SetFromStack(L);
 		}
-		if (leaderboardScores.size() != 0) {
+		if (!leaderboardScores.empty()) {
 			if (!ref.IsNil()) {
 				ref.PushSelf(L);
 				if (!lua_isnil(L, -1)) {
-					RString Error = "Error running RequestChartLeaderBoard "
-									"Finish Function: ";
+					std::string Error = "Error running RequestChartLeaderBoard "
+										"Finish Function: ";
 					lua_newtable(L);
 					for (unsigned i = 0; i < leaderboardScores.size(); ++i) {
 						auto& s = leaderboardScores[i];
@@ -2690,7 +2680,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	static int GetChartLeaderBoard(T* p, lua_State* L)
 	{
 		vector<HighScore*> filteredLeaderboardScores;
-		unordered_set<string> userswithscores;
+		std::unordered_set<string> userswithscores;
 		auto& leaderboardScores = DLMAN->chartLeaderboards[SArg(1)];
 		string country = "";
 		if (!lua_isnoneornil(L, 2)) {
@@ -2709,7 +2699,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			if (p->topscoresonly &&
 				userswithscores.count(leaderboardHighScore.GetName()) == 1)
 				continue;
-			if (country != "" && country != "Global" &&
+			if (!country.empty() && country != "Global" &&
 				leaderboardHighScore.countryCode != country)
 				continue;
 
@@ -2717,7 +2707,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			userswithscores.emplace(leaderboardHighScore.GetName());
 		}
 
-		if (filteredLeaderboardScores.size() > 0 && p->currentrateonly) {
+		if (!filteredLeaderboardScores.empty() && p->currentrateonly) {
 			std::sort(filteredLeaderboardScores.begin(),
 					  filteredLeaderboardScores.end(),
 					  [](const HighScore* a, const HighScore* b) -> bool {

@@ -1,8 +1,7 @@
 #include "Etterna/Globals/global.h"
 #include "Etterna/Singletons/CryptManager.h"
-#include "Foreach.h"
 #include "Etterna/Singletons/GameState.h"
-#include "Etterna/Globals/MinaCalc.h"
+#include "Etterna/MinaCalc/MinaCalc.h"
 #include "PlayerState.h"
 #include "Etterna/Singletons/PrefsManager.h"
 #include "Profile.h"
@@ -12,13 +11,8 @@
 #include "PlayerAI.h"
 #include "Etterna/Singletons/NetworkSyncManager.h"
 #include "AdjustSync.h"
-#include <fstream>
-#include <sstream>
-#include "Etterna/Singletons/CryptManager.h"
 #include "Etterna/Singletons/ScoreManager.h"
 #include "Etterna/Singletons/DownloadManager.h"
-#include "Etterna/Globals/MinaCalc.h"
-#include "Etterna/Globals/MinaCalcOld.h"
 #include "Etterna/Models/Songs/Song.h"
 #include "GamePreferences.h"
 
@@ -32,6 +26,9 @@
 #include <windows.h>
 #include <winsock2.h>
 #pragma comment(lib, "IPHLPAPI.lib")
+
+#include <algorithm>
+#include <cassert>
 
 // we just need this for purposes of unique machine id.
 // So any one or two mac's is fine.
@@ -51,11 +48,11 @@ getMacHash(uint16_t& mac1, uint16_t& mac2)
 	IP_ADAPTER_INFO AdapterInfo[32];
 	DWORD dwBufLen = sizeof(AdapterInfo);
 
-	DWORD dwStatus = GetAdaptersInfo(AdapterInfo, &dwBufLen);
+	const auto dwStatus = GetAdaptersInfo(AdapterInfo, &dwBufLen);
 	if (dwStatus != ERROR_SUCCESS)
 		return; // no adapters.
 
-	PIP_ADAPTER_INFO pAdapterInfo = AdapterInfo;
+	auto* const pAdapterInfo = AdapterInfo;
 	mac1 = hashMacAddress(pAdapterInfo);
 	if (pAdapterInfo->Next)
 		mac2 = hashMacAddress(pAdapterInfo->Next);
@@ -63,7 +60,7 @@ getMacHash(uint16_t& mac1, uint16_t& mac2)
 	// sort the mac addresses. We don't want to invalidate
 	// both macs if they just change order.
 	if (mac1 > mac2) {
-		uint16_t tmp = mac2;
+		const auto tmp = mac2;
 		mac2 = mac1;
 		mac1 = tmp;
 	}
@@ -75,7 +72,7 @@ getCpuHash()
 	int cpuinfo[4] = { 0, 0, 0, 0 };
 	__cpuid(cpuinfo, 0);
 	uint16_t hash = 0;
-	uint16_t* ptr = (uint16_t*)(&cpuinfo[0]);
+	auto* ptr = (uint16_t*)(&cpuinfo[0]);
 	for (uint32_t i = 0; i < 8; i++)
 		hash += ptr[i];
 
@@ -265,7 +262,7 @@ static uint16_t*
 computeSystemUniqueId()
 {
 	static uint16_t id[3];
-	static bool computed = false;
+	static auto computed = false;
 	if (computed)
 		return id;
 
@@ -279,11 +276,11 @@ string
 getSystemUniqueId()
 {
 	// get the name of the computer
-	string str = getMachineName();
+	auto str = getMachineName();
 
-	uint16_t* id = computeSystemUniqueId();
+	auto* id = computeSystemUniqueId();
 	for (uint32_t i = 0; i < 3; i++)
-		str = str + "." + to_string(id[i]);
+		str = str + "." + std::to_string(id[i]);
 	return str;
 }
 /* Arcade:	for the current stage (one song).
@@ -293,7 +290,6 @@ getSystemUniqueId()
 
 StageStats::StageStats()
 {
-	m_playMode = PlayMode_Invalid;
 	m_Stage = Stage_Invalid;
 	m_iStageIndex = -1;
 	m_vpPlayedSongs.clear();
@@ -316,16 +312,16 @@ StageStats::Init()
 void
 StageStats::AssertValid(PlayerNumber pn) const
 {
-	ASSERT(m_vpPlayedSongs.size() != 0);
-	ASSERT(m_vpPossibleSongs.size() != 0);
+	ASSERT(!m_vpPlayedSongs.empty());
+	ASSERT(!m_vpPossibleSongs.empty());
 	ASSERT(m_player.m_iStepsPlayed > 0);
-	ASSERT(m_player.m_vpPossibleSteps.size() != 0);
-	ASSERT(m_player.m_vpPossibleSteps[0] != NULL);
-	ASSERT_M(m_playMode < NUM_PlayMode, ssprintf("playmode %i", m_playMode));
+	ASSERT(!m_player.m_vpPossibleSteps.empty());
+	ASSERT(m_player.m_vpPossibleSteps[0] != nullptr);
 	ASSERT_M(m_player.m_vpPossibleSteps[0]->GetDifficulty() < NUM_Difficulty,
 			 ssprintf("Invalid Difficulty %i",
 					  m_player.m_vpPossibleSteps[0]->GetDifficulty()));
-	ASSERT_M((int)m_vpPlayedSongs.size() == m_player.m_iStepsPlayed,
+	ASSERT_M(static_cast<int>(m_vpPlayedSongs.size()) ==
+			   m_player.m_iStepsPlayed,
 			 ssprintf("%i Songs Played != %i Steps Played for player %i",
 					  (int)m_vpPlayedSongs.size(),
 					  (int)m_player.m_iStepsPlayed,
@@ -340,15 +336,14 @@ StageStats::AssertValid(PlayerNumber pn) const
 void
 StageStats::AssertValid(MultiPlayer pn) const
 {
-	ASSERT(m_vpPlayedSongs.size() != 0);
-	ASSERT(m_vpPossibleSongs.size() != 0);
-	ASSERT(m_multiPlayer[pn].m_vpPossibleSteps.size() != 0);
-	ASSERT(m_multiPlayer[pn].m_vpPossibleSteps[0] != NULL);
-	ASSERT_M(m_playMode < NUM_PlayMode, ssprintf("playmode %i", m_playMode));
+	ASSERT(!m_vpPlayedSongs.empty());
+	ASSERT(!m_vpPossibleSongs.empty());
+	ASSERT(!m_multiPlayer[pn].m_vpPossibleSteps.empty());
+	ASSERT(m_multiPlayer[pn].m_vpPossibleSteps[0] != nullptr);
 	ASSERT_M(m_player.m_vpPossibleSteps[0]->GetDifficulty() < NUM_Difficulty,
 			 ssprintf("difficulty %i",
 					  m_player.m_vpPossibleSteps[0]->GetDifficulty()));
-	ASSERT((int)m_vpPlayedSongs.size() == m_player.m_iStepsPlayed);
+	ASSERT(static_cast<int>(m_vpPlayedSongs.size()) == m_player.m_iStepsPlayed);
 	ASSERT(m_vpPossibleSongs.size() == m_player.m_vpPossibleSteps.size());
 }
 
@@ -358,7 +353,7 @@ StageStats::GetAverageMeter(PlayerNumber pn) const
 	AssertValid(pn);
 
 	// TODO: This isn't correct for courses.
-	int iTotalMeter = 0;
+	auto iTotalMeter = 0;
 
 	for (unsigned i = 0; i < m_vpPlayedSongs.size(); i++) {
 		const Steps* pSteps = m_player.m_vpPossibleSteps[i];
@@ -371,10 +366,14 @@ void
 StageStats::AddStats(const StageStats& other)
 {
 	ASSERT(!other.m_vpPlayedSongs.empty());
-	FOREACH_CONST(Song*, other.m_vpPlayedSongs, s)
-	m_vpPlayedSongs.push_back(*s);
-	FOREACH_CONST(Song*, other.m_vpPossibleSongs, s)
-	m_vpPossibleSongs.push_back(*s);
+	for (const auto& s : other.m_vpPlayedSongs) {
+		m_vpPlayedSongs.push_back(s);
+	}
+
+	for (const auto& s : other.m_vpPossibleSongs) {
+		m_vpPossibleSongs.push_back(s);
+	}
+
 	m_Stage = Stage_Invalid; // meaningless
 	m_iStageIndex = -1;		 // meaningless
 
@@ -407,8 +406,8 @@ float
 StageStats::GetTotalPossibleStepsSeconds() const
 {
 	float fSecs = 0;
-	FOREACH_CONST(Song*, m_vpPossibleSongs, s)
-	fSecs += (*s)->GetStepsSeconds();
+	for (const auto& s : m_vpPossibleSongs)
+		fSecs += s->GetStepsSeconds();
 	return fSecs / m_fMusicRate;
 }
 
@@ -432,9 +431,9 @@ DetermineScoreEligibility(const PlayerStageStats& pss, const PlayerState& ps)
 		return false;
 
 	// just because you had failoff, doesn't mean you didn't fail.
-	FOREACHM_CONST(float, float, pss.m_fLifeRecord, fail)
-	if (fail->second == 0.f)
-		return false;
+	for (const auto& fail : pss.m_fLifeRecord)
+		if (fail.second == 0.F)
+			return false;
 
 	// cut out stuff with under 200 notes to prevent super short vibro files
 	// from being dumb
@@ -460,7 +459,7 @@ DetermineScoreEligibility(const PlayerStageStats& pss, const PlayerState& ps)
 
 	// mods that modify notedata other than mirror (too lazy to figure out how
 	// to check for these in po)
-	string mods = ps.m_PlayerOptions.GetStage().GetString();
+	auto mods = ps.m_PlayerOptions.GetStage().GetString();
 
 	// should take care of all 3 shuffle mods
 	if (mods.find("Shuffle") != mods.npos)
@@ -510,8 +509,8 @@ DetermineScoreEligibility(const PlayerStageStats& pss, const PlayerState& ps)
 static HighScore
 FillInHighScore(const PlayerStageStats& pss,
 				const PlayerState& ps,
-				RString sRankingToFillInMarker,
-				RString sPlayerGuid)
+				std::string sRankingToFillInMarker,
+				std::string sPlayerGuid)
 {
 	CHECKPOINT_M("Filling Highscore");
 	HighScore hs;
@@ -531,12 +530,12 @@ FillInHighScore(const PlayerStageStats& pss,
 	hs.SetAliveSeconds(pss.m_fAliveSeconds);
 	hs.SetMaxCombo(pss.GetMaxCombo().m_cnt);
 
-	vector<RString> asModifiers;
+	vector<std::string> asModifiers;
 	{
-		RString sPlayerOptions = ps.m_PlayerOptions.GetStage().GetString();
+		auto sPlayerOptions = ps.m_PlayerOptions.GetStage().GetString();
 		if (!sPlayerOptions.empty())
 			asModifiers.push_back(sPlayerOptions);
-		RString sSongOptions = GAMESTATE->m_SongOptions.GetStage().GetString();
+		auto sSongOptions = GAMESTATE->m_SongOptions.GetStage().GetString();
 		if (!sSongOptions.empty())
 			asModifiers.push_back(sSongOptions);
 	}
@@ -563,7 +562,7 @@ FillInHighScore(const PlayerStageStats& pss,
 
 	// should maybe just make the setscorekey function do this internally rather
 	// than recalling the datetime object -mina
-	RString ScoreKey =
+	auto ScoreKey =
 	  "S" +
 	  BinaryToHex(CryptManager::GetSHA1ForString(hs.GetDateTime().GetString()));
 	hs.SetScoreKey(ScoreKey);
@@ -609,7 +608,7 @@ FillInHighScore(const PlayerStageStats& pss,
 			hs.RescoreToWife3(maxpoints);
 
 		if (hs.GetEtternaValid()) {
-			vector<float> dakine = pss.CalcSSR(hs.GetSSRNormPercent());
+			auto dakine = pss.CalcSSR(hs.GetSSRNormPercent());
 			FOREACH_ENUM(Skillset, ss)
 			hs.SetSkillsetSSR(ss, dakine[ss]);
 
@@ -633,7 +632,7 @@ StageStats::FinalizeScores(bool bSummary)
 	CHECKPOINT_M("Finalizing Score");
 	SCOREMAN->camefromreplay =
 	  false; // if we're viewing an online replay this gets set to true -mina
-	if (PREFSMAN->m_sTestInitialScreen.Get() != "") {
+	if (!PREFSMAN->m_sTestInitialScreen.Get().empty()) {
 		m_player.m_iPersonalHighScoreIndex = 0;
 		m_player.m_iMachineHighScoreIndex = 0;
 	}
@@ -648,20 +647,18 @@ StageStats::FinalizeScores(bool bSummary)
 
 	// whether or not to save scores when the stage was failed depends on if
 	// this is a course or not... it's handled below in the switch.
-	RString sPlayerGuid = PROFILEMAN->IsPersistentProfile(PLAYER_1)
-							? PROFILEMAN->GetProfile(PLAYER_1)->m_sGuid
-							: RString("");
+	const auto sPlayerGuid = PROFILEMAN->GetProfile(PLAYER_1)->m_sGuid;
 	m_player.m_HighScore = FillInHighScore(m_player,
 										   *GAMESTATE->m_pPlayerState,
 										   RANKING_TO_FILL_IN_MARKER,
 										   sPlayerGuid);
 
-	HighScore& hs = m_player.m_HighScore;
+	auto& hs = m_player.m_HighScore;
 
 	const Steps* pSteps = GAMESTATE->m_pCurSteps;
 
-	ASSERT(pSteps != NULL);
-	Profile* zzz = PROFILEMAN->GetProfile(PLAYER_1);
+	assert(pSteps != nullptr);
+	auto* const zzz = PROFILEMAN->GetProfile(PLAYER_1);
 	if (GamePreferences::m_AutoPlay != PC_HUMAN) {
 		if (PlayerAI::pScoreData) {
 			CHECKPOINT_M("Determined a Replay is loaded");
@@ -691,12 +688,12 @@ StageStats::FinalizeScores(bool bSummary)
 		return;
 	}
 	// new score structure -mina
-	int istop2 = SCOREMAN->AddScore(hs);
+	const auto istop2 = SCOREMAN->AddScore(hs);
 	if (DLMAN->ShouldUploadScores() && !AdjustSync::IsSyncDataChanged()) {
 		CHECKPOINT_M("Uploading score with replaydata.");
 		hs.SetTopScore(istop2); // ayy i did it --lurker
-		auto steps = SONGMAN->GetStepsByChartkey(hs.GetChartKey());
-		auto td = steps->GetTimingData();
+		auto* steps = SONGMAN->GetStepsByChartkey(hs.GetChartKey());
+		auto* td = steps->GetTimingData();
 		hs.timeStamps = td->ConvertReplayNoteRowsToTimestamps(
 		  m_player.GetNoteRowVector(), hs.GetMusicRate());
 		DLMAN->UploadScoreWithReplayData(&hs);
@@ -721,7 +718,7 @@ StageStats::FinalizeScores(bool bSummary)
 		NSMAN->ReportHighScore(&hs, m_player);
 	if (m_player.m_fWifeScore > 0.f) {
 
-		bool writesuccess = hs.WriteReplayData();
+		const auto writesuccess = hs.WriteReplayData();
 		if (writesuccess) {
 			CHECKPOINT_M("Unloading ReplayData after successful write");
 			hs.UnloadReplayData();
@@ -732,23 +729,19 @@ StageStats::FinalizeScores(bool bSummary)
 							 hs);
 	mostrecentscorekey = hs.GetScoreKey();
 	zzz->m_lastSong.FromSong(GAMESTATE->m_pCurSong);
+	if (m_bLivePlay) {
+		GAMESTATE->SavePlayerProfile();
+	}
 
 	CHECKPOINT_M("Finished Finalizing Score");
 	LOG->Trace("done saving stats and high scores");
-}
-
-// all scores are saved so all scores are highscores, remove this later -mina
-bool
-StageStats::PlayerHasHighScore(PlayerNumber pn) const
-{
-	return true;
 }
 
 unsigned int
 StageStats::GetMinimumMissCombo() const
 {
 	unsigned int iMin = INT_MAX;
-	iMin = min(iMin, m_player.m_iCurMissCombo);
+	iMin = std::min(iMin, m_player.m_iCurMissCombo);
 	return iMin;
 }
 
@@ -772,7 +765,7 @@ class LunaStageStats : public Luna<StageStats>
 	static int GetPlayedSongs(T* p, lua_State* L)
 	{
 		lua_newtable(L);
-		for (int i = 0; i < (int)p->m_vpPlayedSongs.size(); ++i) {
+		for (auto i = 0; i < static_cast<int>(p->m_vpPlayedSongs.size()); ++i) {
 			p->m_vpPlayedSongs[i]->PushSelf(L);
 			lua_rawseti(L, -2, i + 1);
 		}
@@ -781,7 +774,8 @@ class LunaStageStats : public Luna<StageStats>
 	static int GetPossibleSongs(T* p, lua_State* L)
 	{
 		lua_newtable(L);
-		for (int i = 0; i < (int)p->m_vpPossibleSongs.size(); ++i) {
+		for (auto i = 0; i < static_cast<int>(p->m_vpPossibleSongs.size());
+			 ++i) {
 			p->m_vpPossibleSongs[i]->PushSelf(L);
 			lua_rawseti(L, -2, i + 1);
 		}
@@ -809,11 +803,6 @@ class LunaStageStats : public Luna<StageStats>
 	}
 	DEFINE_METHOD(GetStageIndex, m_iStageIndex)
 	DEFINE_METHOD(GetStepsSeconds, m_fStepsSeconds)
-	static int PlayerHasHighScore(T* p, lua_State* L)
-	{
-		lua_pushboolean(L, p->PlayerHasHighScore(PLAYER_1));
-		return 1;
-	}
 	static int GetLivePlay(T* p, lua_State* L)
 	{
 		lua_pushboolean(L, p->m_bLivePlay);
@@ -832,7 +821,6 @@ class LunaStageStats : public Luna<StageStats>
 		ADD_METHOD(GetStage);
 		ADD_METHOD(GetStageIndex);
 		ADD_METHOD(GetStepsSeconds);
-		ADD_METHOD(PlayerHasHighScore);
 		ADD_METHOD(GetLivePlay);
 	}
 };
