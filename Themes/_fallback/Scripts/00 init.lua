@@ -36,6 +36,16 @@ PLAYER_2 = "PlayerNumber_P2"
 NUM_PLAYERS = #PlayerNumber
 OtherPlayer = {[PLAYER_1] = PLAYER_2, [PLAYER_2] = PLAYER_1}
 
+do
+	local namespace = {}
+	for k,v in pairs(SONGMAN) do
+		namespace[k] = function(_, ...)
+			return v(...)
+		end
+	end
+	SONGMAN = namespace
+end
+
 --- Find the last occurence of text in the `string`
 -- @string text
 -- @return int 0 if not found
