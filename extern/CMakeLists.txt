@@ -25,6 +25,11 @@ set(SQLITECPP_RUN_CPPCHECK OFF CACHE BOOL "" FORCE) # Disable SQLiteCpp static a
 set(SQLITECPP_RUN_CPPLINT OFF CACHE BOOL "" FORCE)  # Disable SQLiteCpp lintiPng
 add_subdirectory(SQLiteCpp)
 
+## lunasvg
+set(LUNASVG_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LUNASVG_ENABLE_CAIRO OFF CACHE BOOL "" FORCE)
+add_subdirectory(lunasvg)
+
 ## websocketpp
 add_subdirectory(asio-1.12.2) # Only required for websocketpp
 add_subdirectory(websocketpp)
@@ -65,7 +70,7 @@ list(APPEND EXT_TARGETS
     tomcrypt libtommath
     zlib libmad pcre
     ogg vorbis glfw
-    libcurl)
+    libcurl lunasvg)
 
 list(APPEND LUA_TARGETS luajit lua minilua buildvm)
 
