@@ -22,9 +22,13 @@ RageSurface_svg_Load(const std::string& sPath, RageSurface*& ret, bool bHeaderOn
 	}
 
 	lunasvg::SVGDocument d;
-	d.loadFromFile(sPath);
+	if (!d.loadFromFile(f.GetPath().c_str()))
+		return RageSurfaceUtils::OPEN_FATAL_ERROR;
 
 	auto b = d.renderToBitmap();
+
+	if (b.data() == nullptr)
+		return RageSurfaceUtils::OPEN_FATAL_ERROR;
 
 	if (bHeaderOnly) {
 		ret = CreateSurfaceFrom(
@@ -45,7 +49,7 @@ RageSurface_svg_Load(const std::string& sPath, RageSurface*& ret, bool bHeaderOn
 
 	if (ret == nullptr)
 		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT;
-	ret->stb_loadpoint = false;
+	ret->svg_loaded = true;
 	return RageSurfaceUtils::OPEN_OK;
 }
 
@@ -113,7 +117,6 @@ TryOpenFile(const std::string& sPath,
 	}
 
 	LOG->Trace("Format %s failed: %s", format.c_str(), error.c_str());
-	ret->svg_loaded = true;
 	return nullptr;
 }
 
