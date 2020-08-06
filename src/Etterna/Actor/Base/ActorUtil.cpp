@@ -518,6 +518,7 @@ ActorUtil::InitFileTypeLists()
 	ExtensionToFileType["jpeg"] = FT_Bitmap;
 	ExtensionToFileType["jpg"] = FT_Bitmap;
 	ExtensionToFileType["png"] = FT_Bitmap;
+	ExtensionToFileType["svg"] = FT_Bitmap;
 
 	// Update RageSoundReader_FileReader when adding new sound formats.
 	ExtensionToFileType["mp3"] = FT_Sound;

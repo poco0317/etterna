@@ -8,7 +8,46 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "RageSurface.h"
 
+#include <../lunasvg/include/svgdocument.h>
+
 #include <set>
+
+RageSurfaceUtils::OpenResult
+RageSurface_svg_Load(const std::string& sPath, RageSurface*& ret, bool bHeaderOnly, std::string& error)
+{
+	RageFile f;
+	if (!f.Open(sPath)) {
+		error = f.GetError();
+		return RageSurfaceUtils::OPEN_FATAL_ERROR;
+	}
+
+	lunasvg::SVGDocument d;
+	d.loadFromFile(sPath);
+
+	auto b = d.renderToBitmap();
+
+	if (bHeaderOnly) {
+		ret = CreateSurfaceFrom(
+		  b.width(), b.height(), 32, 0, 0, 0, 0, nullptr, b.width() * 4);
+		return RageSurfaceUtils::OPEN_OK;
+	}
+	else {
+		ret = CreateSurfaceFrom(b.width(),
+								b.height(),
+								32,
+								Swap32BE(0xFF000000),
+								Swap32BE(0x00FF0000),
+								Swap32BE(0x0000FF00),
+								Swap32BE(0x000000FF),
+								b.data(),
+								b.width() * 4);
+	}
+
+	if (ret == nullptr)
+		return RageSurfaceUtils::OPEN_UNKNOWN_FILE_FORMAT;
+	ret->stb_loadpoint = false;
+	return RageSurfaceUtils::OPEN_OK;
+}
 
 RageSurfaceUtils::OpenResult
 RageSurface_stb_Load(const std::string& sPath,
@@ -59,7 +98,14 @@ TryOpenFile(const std::string& sPath,
 {
 	RageSurface* ret = nullptr;
 	RageSurfaceUtils::OpenResult result;
-	result = RageSurface_stb_Load(sPath, ret, bHeaderOnly, error);
+
+	auto ext = GetExtension(sPath);
+	MakeLower(ext);
+	if (EqualsNoCase(ext, "svg")) {
+		result = RageSurface_svg_Load(sPath, ret, bHeaderOnly, error);
+	} else {
+		result = RageSurface_stb_Load(sPath, ret, bHeaderOnly, error);
+	}
 
 	if (result == RageSurfaceUtils::OPEN_OK) {
 		ASSERT(ret != nullptr);
@@ -67,6 +113,7 @@ TryOpenFile(const std::string& sPath,
 	}
 
 	LOG->Trace("Format %s failed: %s", format.c_str(), error.c_str());
+	ret->svg_loaded = true;
 	return nullptr;
 }
 

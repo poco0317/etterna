@@ -92,6 +92,7 @@ struct RageSurface
 	uint8_t* pixels;
 	bool pixels_owned;
 	bool stb_loadpoint;
+	bool svg_loaded = false;
 	int32_t w = 0, h = 0, pitch = 0;
 	int32_t flags = 0;
 
