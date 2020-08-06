@@ -8,7 +8,8 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "RageSurface.h"
 
-#include <../lunasvg/include/svgdocument.h>
+// lunasvg includes
+#include <svgdocument.h>
 
 #include <set>
 
