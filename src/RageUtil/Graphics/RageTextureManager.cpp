@@ -42,6 +42,7 @@ namespace {
 std::map<RageTextureID, std::shared_ptr<RageTexture>> m_mapPathToTexture;
 std::map<RageTextureID, std::shared_ptr<RageTexture>> m_textures_to_update;
 std::map<std::shared_ptr<RageTexture>, RageTextureID> m_texture_ids_by_pointer;
+std::set<std::shared_ptr<RageTexture>> s_active_handouts;
 } // namespace;
 
 RageTextureManager::RageTextureManager() {}
@@ -113,6 +114,25 @@ RageTextureManager::RegisterTexture(RageTextureID ID, std::shared_ptr<RageTextur
 
 	m_mapPathToTexture[ID] = pTexture;
 	m_texture_ids_by_pointer[pTexture] = ID;
+}
+
+void
+RageTextureManager::RegisterHandout(std::shared_ptr<RageTexture> pt)
+{
+	if (s_active_handouts.find(pt) == s_active_handouts.end()) {
+		s_active_handouts.emplace(pt);
+	}
+}
+
+std::shared_ptr<RageTexture>
+RageTextureManager::FindHandout(RageTexture* pt)
+{
+	for (auto p : s_active_handouts)
+		if (p->GetID() == pt->GetID())
+			return p;
+
+	std::shared_ptr<RageTexture> nothing;
+	return nothing;
 }
 
 void

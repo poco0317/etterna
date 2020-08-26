@@ -1367,16 +1367,21 @@ class LunaSprite : public Luna<Sprite>
 	static int SetTexture(T* p, lua_State* L)
 	{
 		auto pTexture = Luna<RageTexture>::check(L, 1);
-		std::shared_ptr<RageTexture> rt(pTexture);
-		rt = TEXTUREMAN->CopyTexture(rt);
-		p->SetTexture(rt);
+		std::shared_ptr<RageTexture> rt = TEXTUREMAN->FindHandout(pTexture);
+		if (rt != nullptr) {
+			// this shouldnt be necessary but apparently it is
+			rt->m_iRefCount++;
+			p->SetTexture(rt);
+		}
 		COMMON_RETURN_SELF;
 	}
 	static int GetTexture(T* p, lua_State* L)
 	{
 		auto pTexture = p->GetTexture();
-		if (pTexture != nullptr)
+		if (pTexture != nullptr) {
+			TEXTUREMAN->RegisterHandout(pTexture);
 			pTexture->PushSelf(L);
+		}
 		else
 			lua_pushnil(L);
 		return 1;
