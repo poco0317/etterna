@@ -248,6 +248,125 @@ RageSurfaceUtils::GetAverageRGB(const RageSurface* img)
 	return RageColor(rt / pixelCount / 255.F, gt / pixelCount / 255.F, gt / pixelCount / 255.F, 1.F);
 }
 
+// contains all color attributes and also these 2
+struct RageColorEx
+{
+	// these are usually uint8_t but we bitshift below so just for precaution
+	uint64_t r = 0;
+	uint64_t g = 0;
+	uint64_t b = 0;
+	uint64_t a = 0;
+	uint64_t count = 0; // how many colors
+	uint64_t degrade = 0; // grainy bitshift color stuff
+	double weight = 1; // weight of certain rgb in dom rgb calc
+
+	// color matches according to degrade value of this
+	bool matches(RageColorEx other)
+	{
+		return r == (other.r >> degrade) && g == (other.g >> degrade) &&
+			   b == (other.b >> degrade);
+	}
+};
+
+// transcribed and adapted from:
+// https://github.com/pieroxy/color-finder/blob/384fc7f84672068c7d34bb25d4a623bbc07f39c3/src/colorfinder-1.1.js
+const RageColor
+RageSurfaceUtils::GetDominantRGB(const RageSurface* img)
+{
+	// this is a weighted count list
+	std::unordered_map<std::string, RageColorEx> counts;
+	// this is a color count list
+	std::unordered_map<std::string, RageColorEx> colorData;
+
+	uint64_t pixelCount = 0;
+	int degrade = 6;
+
+	// place all the ... pixels .. uhh ......
+	for (auto y = 0; y < img->h; ++y) {
+		auto row = static_cast<uint8_t*>(img->pixels) + img->pitch * y;
+
+		for (auto x = 0; x < img->w; ++x) {
+			const auto val = decodepixel(row, img->fmt.BytesPerPixel);
+			if (img->fmt.BitsPerPixel == 8) {
+				if (img->fmt.palette->colors[val].a) {
+					RageColorEx rgb;
+					rgb.r = img->fmt.palette->colors[val].r;
+					rgb.g = img->fmt.palette->colors[val].g;
+					rgb.b = img->fmt.palette->colors[val].b;
+					rgb.count = 1;
+					std::string k = ssprintf("%d,%d,%d",
+											 rgb.r >> degrade,
+											 rgb.g >> degrade,
+											 rgb.b >> degrade);
+					if (colorData.count(k)) {
+						colorData[k].count++;
+					} else {
+						colorData[k] = rgb;
+					}
+					pixelCount++;					
+				}
+			} else {
+				if (val & img->fmt.Amask) {
+					uint8_t tempR = 0;
+					uint8_t tempG = 0;
+					uint8_t tempB = 0;
+					img->fmt.GetRGB(val, &tempR, &tempG, &tempB);
+					RageColorEx rgb;
+					rgb.r = tempR;
+					rgb.g = tempG;
+					rgb.b = tempB;
+					rgb.count = 1;
+					std::string k = ssprintf("%d,%d,%d",
+											 rgb.r >> degrade,
+											 rgb.g >> degrade,
+											 rgb.b >> degrade);
+					if (colorData.count(k)) {
+						colorData[k].count++;
+					} else {
+						colorData[k] = rgb;
+					}
+					pixelCount++;
+				}
+			}
+
+			row += img->fmt.BytesPerPixel;
+		}
+	}
+
+	uint64_t totalCount = 0;
+	RageColorEx finalRGB;
+	
+	// repeat iterations
+	for (int i = 0; i < 4; i++, degrade -= 2) {
+		for (auto& c : colorData) {
+			int totalWeight = c.second.weight * c.second.count;
+			totalCount++;
+			if (finalRGB.matches(c.second)) {
+				RageColorEx nc;
+				nc.r = c.second.r >> degrade;
+				nc.g = c.second.g >> degrade;
+				nc.b = c.second.b >> degrade;
+				std::string k = ssprintf("%d,%d,%d", nc.r, nc.g, nc.b);
+				if (counts.count(k)) {
+					counts[k].count += totalWeight;
+				} else {
+					counts[k] = nc;
+					counts[k].count = totalWeight;
+				}
+			}
+		}
+		for (auto& c : counts) {
+			if (c.second.weight > finalRGB.count) {
+				finalRGB.count = c.second.weight;
+				finalRGB.r = c.second.r;
+				finalRGB.g = c.second.g;
+				finalRGB.b = c.second.b;
+			}
+		}
+	}
+	return RageColor(finalRGB.r / 255.F, finalRGB.g / 255.F, finalRGB.b / 255.F, 1.F);
+}
+
 // Local helper for FixHiddenAlpha.
 static void
 FindAlphaRGB(const RageSurface* img,
