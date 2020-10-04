@@ -1,6 +1,6 @@
 #include "Etterna/Globals/global.h"
 #include "EditMenu.h"
-#include "RageUtil/Misc/RageLog.h"
+#include "Etterna/Actor/Base/ActorUtil.h"
 #include "Etterna/Singletons/SongManager.h"
 #include "Etterna/Singletons/GameState.h"
 #include "Etterna/Singletons/ThemeManager.h"
@@ -26,19 +26,19 @@ XToString(EditMenuAction);
 XToLocalizedString(EditMenuAction);
 StringToX(EditMenuAction);
 
-static RString
+static std::string
 ARROWS_X_NAME(size_t i)
 {
 	return ssprintf("Arrows%dX", static_cast<int>(i + 1));
 }
-static RString
+static std::string
 ROW_Y_NAME(size_t i)
 {
 	return ssprintf("Row%dY", static_cast<int>(i + 1));
 }
 
 void
-EditMenu::GetSongsToShowForGroup(const RString& sGroup,
+EditMenu::GetSongsToShowForGroup(const std::string& sGroup,
 								 vector<Song*>& vpSongsOut)
 {
 	if (sGroup == "") {
@@ -50,7 +50,7 @@ EditMenu::GetSongsToShowForGroup(const RString& sGroup,
 }
 
 void
-EditMenu::GetGroupsToShow(vector<RString>& vsGroupsOut)
+EditMenu::GetGroupsToShow(vector<std::string>& vsGroupsOut)
 {
 	vsGroupsOut.clear();
 	if (!SHOW_GROUPS.GetValue())
@@ -58,7 +58,7 @@ EditMenu::GetGroupsToShow(vector<RString>& vsGroupsOut)
 
 	SONGMAN->GetSongGroupNames(vsGroupsOut);
 	for (int i = vsGroupsOut.size() - 1; i >= 0; i--) {
-		const RString& sGroup = vsGroupsOut[i];
+		const std::string& sGroup = vsGroupsOut[i];
 		vector<Song*> vpSongs;
 		GetSongsToShowForGroup(sGroup, vpSongs);
 		// strip groups that have no unlocked songs
@@ -72,9 +72,9 @@ EditMenu::EditMenu() {}
 EditMenu::~EditMenu() {}
 
 void
-EditMenu::Load(const RString& sType)
+EditMenu::Load(const std::string& sType)
 {
-	LOG->Trace("EditMenu::Load");
+	Locator::getLogger()->trace("EditMenu::Load");
 
 	SHOW_GROUPS.Load(sType, "ShowGroups");
 	ARROWS_X.Load(sType, ARROWS_X_NAME, NUM_ARROWS);
@@ -508,7 +508,7 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 				  THEME->GetString(m_sName, "No Steps selected."));
 				m_StepsDisplay.Unset();
 			} else {
-				RString s =
+				std::string s =
 				  CustomDifficultyToLocalizedString(GetCustomDifficulty(
 					GetSelectedStepsType(), GetSelectedDifficulty()));
 
@@ -578,7 +578,7 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 				m_textValue[ROW_SOURCE_STEPS].SetVisible(
 				  GetSelectedSteps() ? false : true);
 				{
-					RString s;
+					std::string s;
 					if (GetSelectedSourceDifficulty() == Difficulty_Invalid) {
 						s = BLANK;
 					} else {
@@ -606,10 +606,6 @@ EditMenu::OnRowValueChanged(EditMenuRow row)
 				// Stick autosave in the list first so that people will see it.
 				// -Kyz
 				Song* cur_song = GetSelectedSong();
-				if (cur_song != NULL && cur_song->HasAutosaveFile() &&
-					!cur_song->WasLoadedFromAutosave()) {
-					m_Actions.push_back(EditMenuAction_LoadAutosave);
-				}
 				if (GetSelectedSteps()) {
 					switch (mode) {
 						case EditMode_Practice:

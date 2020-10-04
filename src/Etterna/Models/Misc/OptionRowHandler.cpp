@@ -548,7 +548,7 @@ class OptionRowHandlerSteps : public OptionRowHandler
 			m_vsReloadRowMessages.push_back(
 			  MessageIDToString(Message_EditStepsTypeChanged));
 		} else if (sParam == "EditSourceSteps") {
-			m_ppStepsToFill = &GAMESTATE->m_pEditSourceSteps;
+			m_ppStepsToFill->Set(GAMESTATE->m_pEditSourceSteps.Get());
 			m_pst = &GAMESTATE->m_stEditSource;
 			m_vsReloadRowMessages.push_back(
 			  MessageIDToString(Message_EditSourceStepsTypeChanged));
@@ -601,6 +601,7 @@ class OptionRowHandlerSteps : public OptionRowHandler
 						s = pSteps->GetDescription();
 					} else {
 						s = "NewEdit";
+					}
 				} else {
 					s = CustomDifficultyToLocalizedString(
 					  GetCustomDifficulty(GAMESTATE->m_stEdit, dc));

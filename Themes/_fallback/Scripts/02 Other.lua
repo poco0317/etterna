@@ -79,17 +79,6 @@ function ComboTransformCommand(self, params)
 	self:y(y)
 end
 
-function GetEditModeSubScreens()
-	return "ScreenMiniMenuEditHelp," ..
-		"ScreenMiniMenuMainMenu," ..
-			"ScreenMiniMenuAreaMenu," ..
-				"ScreenMiniMenuStepsInformation," ..
-					"ScreenMiniMenuSongInformation," ..
-						"ScreenMiniMenuBackgroundChange," ..
-							"ScreenMiniMenuInsertTapAttack," ..
-								"ScreenMiniMenuInsertCourseAttack," .. "ScreenMiniMenuCourseDisplay," .. "ScreenEditOptions"
-end
-
 function GetCoursesToShowRanking()
 	local CoursesToShowRanking = PREFSMAN:GetPreference("CoursesToShowRanking")
 	if CoursesToShowRanking ~= "" then

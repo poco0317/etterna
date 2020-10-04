@@ -1682,7 +1682,7 @@ class LunaGameState : public Luna<GameState>
 		StepsType stype = Enum::Check<StepsType>(L, 3);
 		Difficulty diff = Enum::Check<Difficulty>(L, 4);
 		Steps* new_steps = song->CreateSteps();
-		RString edit_name;
+		std::string edit_name;
 		// Form 2.
 		if (steps == NULL) {
 			new_steps->CreateBlank(stype);
@@ -1691,7 +1691,7 @@ class LunaGameState : public Luna<GameState>
 		}
 		// Form 3.
 		else {
-			new_steps->CopyFrom(steps, stype, song->m_fMusicLengthSeconds);
+			new_steps->CopyFrom(steps, stype);
 			edit_name = steps->GetDescription();
 		}
 		SongUtil::MakeUniqueEditDescription(song, stype, edit_name);

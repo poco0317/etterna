@@ -15,6 +15,7 @@
 #include "Etterna/Models/Songs/Song.h"
 #include "Etterna/Models/StepsAndStyles/Style.h"
 #include "Etterna/Singletons/ThemeManager.h"
+#include "Etterna/Models/Misc/BackgroundUtil.h"
 
 #include <algorithm>
 
@@ -956,13 +957,13 @@ NoteField::DrawPrimitives()
 						}
 
 						if (IS_ON_SCREEN(fLowestBeat)) {
-							vector<RString> vsBGChanges;
+							vector<std::string> vsBGChanges;
 							for (BackgroundLayer const& bl : viLowestIndex) {
 								ASSERT(iter[bl] != GAMESTATE->m_pCurSong
 													 ->GetBackgroundChanges(bl)
 													 .end());
 								const BackgroundChange& change = *iter[bl];
-								RString s = change.GetTextDescription();
+								std::string s = change.GetTextDescription();
 								if (bl != 0) {
 									s = ssprintf("%d: ", bl) + s;
 								}

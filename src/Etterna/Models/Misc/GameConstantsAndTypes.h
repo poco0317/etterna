@@ -428,10 +428,10 @@ enum EditMode
 	NUM_EditMode,
 	EditMode_Invalid,
 };
-const RString&
+const std::string&
 EditModeToString(EditMode em);
 EditMode
-StringToEditMode(const RString& s);
+StringToEditMode(const std::string& s);
 LuaDeclareType(EditMode);
 
 /**

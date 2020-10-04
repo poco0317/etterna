@@ -8,7 +8,6 @@
 #include "Etterna/Models/Misc/LocalizedString.h"
 #include "RageUtil/File/RageFile.h"
 #include "RageUtil/File/RageFileManager.h"
-#include "RageUtil/Misc/RageLog.h"
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Singletons/ScreenManager.h"
 #include "Etterna/Screen/Others/ScreenPrompt.h"
@@ -19,7 +18,7 @@
 #include "Etterna/Models/StepsAndStyles/Steps.h"
 #include "Etterna/Singletons/ThemeManager.h"
 
-static const RString TEMP_FILE_NAME = "--temp--";
+static const std::string TEMP_FILE_NAME = "--temp--";
 
 #define EXPLANATION_TEXT(row)                                                  \
 	THEME->GetString(m_sName, "Explanation" + EditMenuRowToString(row))
@@ -42,7 +41,7 @@ ScreenEditMenu::Init()
 	// Edit mode DOES NOT WORK if the master player is not player 1.  The same
 	// is true of various parts of this poorly designed screen. -Kyz
 	if (GAMESTATE->GetMasterPlayerNumber() != PLAYER_1) {
-		LOG->Warn("Master player number was not player 1, forcing it to player "
+		Locator::getLogger()->warn("Master player number was not player 1, forcing it to player "
 				  "1 so that edit mode will work.  If playing in edit mode "
 				  "doesn't work, this might be related.");
 		GAMESTATE->SetMasterPlayerNumber(PLAYER_1);
@@ -88,25 +87,24 @@ ScreenEditMenu::HandleScreenMessage(const ScreenMessage SM)
 		RefreshNumStepsLoadedFromProfile();
 	} else if (SM == SM_Success &&
 			   m_Selector.GetSelectedAction() == EditMenuAction_Delete) {
-		LOG->Trace("Delete successful; deleting steps from memory");
+		Locator::getLogger()->trace("Delete successful; deleting steps from memory");
 
 		Song* pSong = GAMESTATE->m_pCurSong;
 		Steps* pStepsToDelete = GAMESTATE->m_pCurSteps;
 		FOREACH_PlayerNumber(pn) { GAMESTATE->m_pCurSteps.Set(NULL); }
-		bool bSaveSong = !pStepsToDelete->WasLoadedFromProfile();
 		pSong->DeleteSteps(pStepsToDelete);
 		SONGMAN->Invalidate(pSong);
 
 		/* Only save to the main .SM file if the steps we're deleting
 		 * were loaded from it. */
-		if (bSaveSong) {
+		if (true) {
 			pSong->Save();
 			SCREENMAN->ZeroNextUpdate();
 		}
 		SCREENMAN->SendMessageToTopScreen(SM_RefreshSelector);
 	} else if (SM == SM_Failure &&
 			   m_Selector.GetSelectedAction() == EditMenuAction_Delete) {
-		LOG->Trace("Delete failed; not deleting steps");
+		Locator::getLogger()->trace("Delete failed; not deleting steps");
 	} else if (SM == SM_BackFromEditDescription) {
 		if (!ScreenTextEntry::s_bCancelledLast) {
 			SOUND->StopMusic();
@@ -155,15 +153,15 @@ ScreenEditMenu::MenuRight(const InputEventPlus&)
 	return true;
 }
 
-static RString
+static std::string
 GetCopyDescription(const Steps* pSourceSteps)
 {
-	RString s = pSourceSteps->GetDescription();
+	std::string s = pSourceSteps->GetDescription();
 	return s;
 }
 
 static void
-SetCurrentStepsDescription(const RString& s)
+SetCurrentStepsDescription(const std::string& s)
 {
 	GAMESTATE->m_pCurSteps->SetDescription(s);
 }
@@ -237,8 +235,8 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 
 	switch (m_Selector.EDIT_MODE) {
 		case EditMode_Full: {
-			RString sDir = pSong->GetSongDir();
-			RString sTempFile = sDir + TEMP_FILE_NAME;
+			std::string sDir = pSong->GetSongDir();
+			std::string sTempFile = sDir + TEMP_FILE_NAME;
 			RageFile file;
 			if (!file.Open(sTempFile, RageFile::WRITE)) {
 				ScreenPrompt::Prompt(SM_None, SONG_DIR_READ_ONLY);
@@ -277,7 +275,7 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 		case EditMenuAction_LoadAutosave:
 			if (pSong) {
 				FOREACH_PlayerNumber(pn) { GAMESTATE->m_pCurSteps.Set(NULL); }
-				pSong->LoadAutosaveFile();
+				//pSong->LoadAutosaveFile();
 				SONGMAN->Invalidate(pSong);
 				SCREENMAN->SendMessageToTopScreen(SM_RefreshSelector);
 			}
@@ -300,10 +298,10 @@ ScreenEditMenu::MenuStart(const InputEventPlus&)
 						FAIL_M("Cannot create steps in EditMode_Practice");
 				}
 
-				RString sEditName;
+				std::string sEditName;
 				if (pSourceSteps) {
 					pSteps->CopyFrom(
-					  pSourceSteps, st, pSong->m_fMusicLengthSeconds);
+					  pSourceSteps, st);
 					sEditName = GetCopyDescription(pSourceSteps);
 				} else {
 					pSteps->CreateBlank(st);
@@ -378,7 +376,7 @@ ScreenEditMenu::RefreshExplanationText()
 void
 ScreenEditMenu::RefreshNumStepsLoadedFromProfile()
 {
-	RString s =
-	  ssprintf("edits used: %d", SONGMAN->GetNumStepsLoadedFromProfile());
+	std::string s =
+	  ssprintf("edits used: %d", 0);
 	m_textNumStepsLoadedFromProfile.SetText(s);
 }

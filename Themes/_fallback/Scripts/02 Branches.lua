@@ -40,10 +40,7 @@ function GetEditModeSubScreens()
 		"ScreenMiniMenuStepsInformation," ..
 		"ScreenMiniMenuSongInformation," ..
 		"ScreenMiniMenuBackgroundChange," ..
-		"ScreenMiniMenuInsertTapAttack," ..
-		"ScreenMiniMenuInsertCourseAttack," ..
-		"ScreenMiniMenuCourseDisplay," ..
-		"ScreenEditOptions"
+		"ScreenMiniMenuInsertTapAttack"
 end
 
 function ToGameplay()

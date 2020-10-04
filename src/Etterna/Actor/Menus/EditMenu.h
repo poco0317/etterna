@@ -27,13 +27,13 @@ enum EditMenuRow
  * @brief Turn the EditMenuRow into a string.
  * @param r the row.
  * @return the string. */
-const RString&
+const std::string&
 EditMenuRowToString(EditMenuRow r);
 /**
  * @brief Turn the EditMenuRow into a localized string.
  * @param r the row.
  * @return the localized string. */
-const RString&
+const std::string&
 EditMenuRowToLocalizedString(EditMenuRow r);
 
 /** @brief The different actions one can take on a step. */
@@ -54,13 +54,13 @@ enum EditMenuAction
  * @brief Turn the EditMenuAction into a string.
  * @param ema the action.
  * @return the string. */
-const RString&
+const std::string&
 EditMenuActionToString(EditMenuAction ema);
 /**
  * @brief Turn the EditMenuAction into a localized string.
  * @param ema the action.
  * @return the localized string. */
-const RString&
+const std::string&
 EditMenuActionToLocalizedString(EditMenuAction ema);
 
 /** @brief How many arrows are used for the EditMenu? */
@@ -77,7 +77,7 @@ class EditMenu : public ActorFrame
 	EditMenu();
 	/** @brief Destroy the EditMenu. */
 	~EditMenu();
-	void Load(const RString& sType);
+	void Load(const std::string& sType);
 
 	/** @brief Determine if we can move up.
 	 * @return true if we can, false otherwise. */
@@ -116,7 +116,7 @@ class EditMenu : public ActorFrame
 
 	/** @brief Retrieve the currently selected group.
 	 * @return the current group. */
-	RString GetSelectedGroup() const
+	std::string GetSelectedGroup() const
 	{
 		if (!SHOW_GROUPS.GetValue())
 			return GROUP_ALL;
@@ -210,9 +210,9 @@ class EditMenu : public ActorFrame
   private:
 	struct StepsAndDifficulty;
 
-	void GetSongsToShowForGroup(const RString& sGroup,
+	void GetSongsToShowForGroup(const std::string& sGroup,
 								vector<Song*>& vpSongsOut);
-	void GetGroupsToShow(vector<RString>& vsGroupsOut);
+	void GetGroupsToShow(vector<std::string>& vsGroupsOut);
 
 	void UpdateArrows();
 	AutoActor m_sprArrows[NUM_ARROWS];
@@ -243,7 +243,7 @@ class EditMenu : public ActorFrame
 	};
 
 	/** @brief The list of groups. */
-	vector<RString> m_sGroups;
+	vector<std::string> m_sGroups;
 	/** @brief The list of Songs in a group. */
 	vector<Song*> m_pSongs;
 	vector<StepsType> m_StepsTypes;
@@ -266,7 +266,7 @@ class EditMenu : public ActorFrame
 
   public:
 	ThemeMetric<EditMode> EDIT_MODE;
-	ThemeMetric<RString> TEXT_BANNER_TYPE;
+	ThemeMetric<std::string> TEXT_BANNER_TYPE;
 };
 
 #endif
