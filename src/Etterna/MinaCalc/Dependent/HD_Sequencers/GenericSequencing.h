@@ -18,6 +18,7 @@
 constexpr float anchor_spacing_buffer_ms = 10.F;
 constexpr float anchor_speed_increase_cutoff_factor = 2.34F;
 static const int len_cap = 5;
+constexpr float jack_spacing_buffer_ms = 1000.F;
 
 enum anch_status
 {
@@ -144,9 +145,9 @@ struct Anchor_Sequencing
 			return _len_cap_ms;
 		}
 
-		static const auto avg_ms_mult = 1.0363214F;
-		static const auto anchor_time_buffer_ms = 24.336933F;
-		static const auto min_ms = 79.538712F;
+		static const auto avg_ms_mult = 1.075F;
+		static const auto anchor_time_buffer_ms = 25.F;
+		static const auto min_ms = 82.5F;
 
 		// get total ms
 		const auto total_ms = ms_from(_last, _start);
@@ -167,7 +168,7 @@ struct Anchor_Sequencing
 
 		// BAD TEMP HACK LUL
 		if (_len == 2) {
-			ms *= 1.1018715F;
+			ms *= 1.1F;
 			ms = ms < 155.F ? 155.F : ms;
 		}
 
@@ -250,10 +251,23 @@ struct AnchorSequencer
 		}
 	}
 
-	auto get_lowest_anchor_ms() -> float
+	auto get_lowest_anchor_ms(const float& row_time) -> float
 	{
-		return std::min(anch.at(col_left).get_ms(),
+		// require that the returned ms value is not extremely old
+		auto within_left =
+		  ms_from(row_time, anch.at(col_left)._last) <= jack_spacing_buffer_ms;
+		auto within_right =
+		  ms_from(row_time, anch.at(col_right)._last) <= jack_spacing_buffer_ms;
+		
+		if (within_left && within_right)
+			return std::min(anch.at(col_left).get_ms(),
 						anch.at(col_right).get_ms());
+		if (!within_left && !within_right)
+			return jack_spacing_buffer_ms;
+		if (within_left)
+			return anch.at(col_left).get_ms();
+		if (within_right)
+			return anch.at(col_right).get_ms();
 	}
 };
 

@@ -95,9 +95,3 @@ weighted_average(const float& a, const float& b, const float& x, const float& y)
 {
 	return (x * a + ((y - x) * b)) / y;
 }
-
-inline auto
-lerp(float t, float a, float b) -> float
-{
-	return (1.F - t)*a + t*b;
-}
