@@ -174,6 +174,9 @@ struct Anchor_Sequencing
 
 		ms = ms < min_ms ? min_ms : ms;
 
+		if (std::isnan(ms))
+			ms = _max_ms;
+
 		if (_len == len_cap) {
 			_len_cap_ms = ms;
 		}
@@ -214,12 +217,22 @@ struct AnchorSequencer
 	{
 		// update the one
 		if (ct == col_left || ct == col_right) {
+			auto opposite_col = ct == col_left ? col_right : col_left;
 			anch.at(ct)(ct, row_time);
 
 			// set max seen for this col for this interval
 			max_seen.at(ct) = anch.at(ct)._len > max_seen.at(ct)
 								? anch.at(ct)._len
 								: max_seen.at(ct);
+
+			// reset the other column if necessary
+			// this is particularly for jacks -- not resetting this breaks difficulty
+			if (ms_from(row_time, anch.at(opposite_col)._last) >
+				jack_spacing_buffer_ms) {
+				anch.at(opposite_col).full_reset();
+			}
+
+			
 		} else if (ct == col_ohjump) {
 
 			// update both
@@ -251,23 +264,10 @@ struct AnchorSequencer
 		}
 	}
 
-	auto get_lowest_anchor_ms(const float& row_time) -> float
+	auto get_lowest_anchor_ms() -> float
 	{
-		// require that the returned ms value is not extremely old
-		auto within_left =
-		  ms_from(row_time, anch.at(col_left)._last) <= jack_spacing_buffer_ms;
-		auto within_right =
-		  ms_from(row_time, anch.at(col_right)._last) <= jack_spacing_buffer_ms;
-		
-		if (within_left && within_right)
-			return std::min(anch.at(col_left).get_ms(),
+		return std::min(anch.at(col_left).get_ms(),
 						anch.at(col_right).get_ms());
-		if (!within_left && !within_right)
-			return jack_spacing_buffer_ms;
-		if (within_left)
-			return anch.at(col_left).get_ms();
-		if (within_right)
-			return anch.at(col_right).get_ms();
 	}
 };
 
@@ -353,7 +353,19 @@ struct SequencerGeneral
 	void advance_sequencing(const col_type& ct,
 							const float& row_time,
 							const float& ms_now)
-	{ // update sequencers
+	{
+		if (ct != col_ohjump) {
+			auto reset_sequencer =
+			  ms_from(row_time, _as.anch.at(ct)._last) > jack_spacing_buffer_ms;
+			if (reset_sequencer) {
+				_as.anch.at(ct).full_reset();
+				_mw_sc_ms.at(ct).fill(ms_init);
+				_mw_cc_ms.fill(ms_init);
+				_mw_any_ms.fill(ms_init);
+			}
+		}
+		
+		// update sequencers
 		_as(ct, row_time);
 
 		// i guess we keep track of ms sequencing here instead of mhi, or
