@@ -47,7 +47,7 @@ RageDisplay::GetCumFPS() const
 
 static int g_iFramesRenderedSinceLastCheck, g_iFramesRenderedSinceLastReset,
   g_iVertsRenderedSinceLastCheck, g_iNumChecksSinceLastReset;
-static RageTimer g_LastFrameEndedAtRage(RageZeroTimer);
+static std::chrono::time_point<std::chrono::microseconds> g_lastFrameEndTime;
 static auto g_LastFrameEndedAt = std::chrono::steady_clock::now();
 static auto g_FrameRenderTime = std::chrono::steady_clock::now();
 static std::chrono::nanoseconds g_LastFrameRenderTime;
@@ -1136,22 +1136,24 @@ RageDisplay::FrameLimitBeforeVsync()
 
 		g_LastFrameRenderTime = endTime;
 	} else if (!g_fPredictiveFrameLimit.Get() &&
-			   !g_LastFrameEndedAtRage.IsZero() &&
+			   g_LastFrameEndedAt != std::chrono::steady_clock::now() &&
 			   (g_fFrameLimit.Get() != 0 || g_fFrameLimitGameplay.Get() != 0)) {
-		auto expectedDelta = 0.0;
+		std::chrono::nanoseconds expectedDelta;
 		if ((SCREENMAN != nullptr) && (SCREENMAN->GetTopScreen() != nullptr)) {
 			if (SCREENMAN->GetTopScreen()->GetScreenType() == gameplay &&
 				g_fFrameLimitGameplay.Get() > 0)
-				expectedDelta = 1.0 / g_fFrameLimitGameplay.Get();
+				expectedDelta =
+				  std::chrono::duration_cast<std::chrono::nanoseconds>(
+					std::chrono::duration<double>(1.0 /
+												  g_fFrameLimitGameplay.Get()));
 			else if (SCREENMAN->GetTopScreen()->GetScreenType() != gameplay &&
 					 g_fFrameLimit.Get() > 0)
-				expectedDelta = 1.0 / g_fFrameLimit.Get();
+				expectedDelta = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(1.0 / g_fFrameLimit.Get()));
 		}
 
-		auto advanceDelay =
-		  expectedDelta - g_LastFrameEndedAtRage.GetDeltaTime();
-		while (advanceDelay > 0.0) {
-			advanceDelay -= g_LastFrameEndedAtRage.GetDeltaTime();
+		auto t = std::chrono::steady_clock::now() + expectedDelta;
+		while (t > std::chrono::steady_clock::now()) {
+			;
 		}
 	}
 
@@ -1172,7 +1174,7 @@ void
 RageDisplay::FrameLimitAfterVsync(int iFPS)
 {
 	if (!g_fPredictiveFrameLimit.Get()) {
-		g_LastFrameEndedAtRage.Touch();
+		g_LastFrameEndedAt = std::chrono::steady_clock::now();
 		return;
 	}
 	if (!PREFSMAN->m_bVsync.Get() && g_fFrameLimit.Get() == 0 &&
