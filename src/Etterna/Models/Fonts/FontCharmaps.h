@@ -4,8 +4,8 @@
 
 /** @brief Defines common frame to character mappings for Fonts. */
 namespace FontCharmaps {
-extern const wchar_t M_SKIP;
-const wchar_t*
+extern const unsigned M_SKIP;
+const unsigned*
 get_char_map(std::string name);
 };
 

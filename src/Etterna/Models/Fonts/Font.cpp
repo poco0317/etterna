@@ -345,7 +345,7 @@ Font::AddPage(FontPage* m_pPage)
 {
 	m_apPages.push_back(m_pPage);
 
-	for (map<wchar_t, int>::const_iterator it =
+	for (map<unsigned, int>::const_iterator it =
 		   m_pPage->m_iCharToGlyphNo.begin();
 		 it != m_pPage->m_iCharToGlyphNo.end();
 		 ++it) {
@@ -719,7 +719,7 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 std::string
 FontPageSettings::MapRange(const std::string& sMapping,
 						   int iMapOffset,
-						   int iGlyphNo,
+						   unsigned iGlyphNo,
 						   int iCount)
 {
 	if (!CompareNoCase(sMapping, "Unicode")) {
@@ -744,7 +744,7 @@ FontPageSettings::MapRange(const std::string& sMapping,
 		return std::string();
 	}
 
-	const wchar_t* pMapping = FontCharmaps::get_char_map(sMapping);
+	const unsigned* pMapping = FontCharmaps::get_char_map(sMapping);
 	if (pMapping == nullptr)
 		return "Unknown mapping";
 
@@ -909,7 +909,7 @@ Font::Load(const std::string& sIniPath, const std::string& sChars)
 		/* Expect at least as many frames as we have premapped characters. */
 		/* Make sure that we don't map characters to frames we don't actually
 		 * have.  This can happen if the font is too small for an sChars. */
-		for (map<wchar_t, int>::iterator it = pPage->m_iCharToGlyphNo.begin();
+		for (map<unsigned, int>::iterator it = pPage->m_iCharToGlyphNo.begin();
 			 it != pPage->m_iCharToGlyphNo.end();
 			 ++it) {
 			if (it->second <

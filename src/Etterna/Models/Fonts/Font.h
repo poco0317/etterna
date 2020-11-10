@@ -75,7 +75,7 @@ struct FontPageSettings
 	float m_fScaleAllWidthsBy{ 1 };
 	std::string m_sTextureHints;
 
-	std::map<wchar_t, int> CharToGlyphNo;
+	std::map<unsigned, int> CharToGlyphNo;
 	// If a value is missing, the width of the texture frame is used.
 	std::map<int, int> m_mapGlyphWidths;
 
@@ -98,7 +98,7 @@ struct FontPageSettings
 	 * @return the empty string on success, or an error message on failure. */
 	std::string MapRange(const std::string& sMapping,
 						 int iMapOffset,
-						 int iGlyphOffset,
+						 unsigned iGlyphOffset,
 						 int iCount);
 };
 
@@ -127,7 +127,7 @@ class FontPage
 	/** @brief All glyphs in this list will point to m_pTexture. */
 	std::vector<glyph> m_aGlyphs;
 
-	std::map<wchar_t, int> m_iCharToGlyphNo;
+	std::map<unsigned, int> m_iCharToGlyphNo;
 
   private:
 	void SetExtraPixels(int iDrawExtraPixelsLeft, int DrawExtraPixelsRight);
