@@ -619,10 +619,11 @@ FillInHighScore(const PlayerStageStats& pss,
 		}
 	}
 
+	hs.SetInputDataVector(pss.GetInputDataVector());
+	// Input data.
+
 	hs.GenerateValidationKeys();
 
-	if (!pss.InputData.empty())
-		hs.WriteInputData(pss.InputData);
 	return hs;
 }
 
@@ -724,6 +725,10 @@ StageStats::FinalizeScores(bool bSummary)
 			hs.UnloadReplayData();
 		}
 	}
+
+	// input data
+	hs.WriteInputData();
+
 	zzz->SetAnyAchievedGoals(GAMESTATE->m_pCurSteps->GetChartKey(),
 							 GAMESTATE->m_SongOptions.GetCurrent().m_fMusicRate,
 							 hs);

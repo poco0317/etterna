@@ -364,6 +364,11 @@ PlayerStageStats::GetTimingScale() const
 {
 	return m_fTimingScale;
 }
+vector<InputDataEvent>
+PlayerStageStats::GetInputDataVector() const
+{
+	return InputData;
+}
 vector<float>
 PlayerStageStats::GetOffsetVector() const
 {

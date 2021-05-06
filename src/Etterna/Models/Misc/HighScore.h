@@ -66,6 +66,7 @@ struct HighScore
 	  -> std::vector<HoldReplayResult>;
 	[[nodiscard]] auto GetCopyOfSetOnlineReplayTimestampVector() const
 	  -> std::vector<float>;
+	[[nodiscard]] auto GetInputDataVector() const -> const std::vector<InputDataEvent>&;
 	[[nodiscard]] auto GetScoreKey() const -> const std::string&;
 	[[nodiscard]] auto GetTopScore() const -> int;
 	[[nodiscard]] auto GetReplayType() const -> int;
@@ -112,6 +113,7 @@ struct HighScore
 	void SetChordCohesion(bool b);
 	void SetEtternaValid(bool b);
 	void AddUploadedServer(const std::string& s);
+	void SetInputDataVector(const std::vector<InputDataEvent>& v);
 	void SetOffsetVector(const std::vector<float>& v);
 	void SetNoteRowVector(const std::vector<int>& v);
 	void SetTrackVector(const std::vector<int>& v);
@@ -157,7 +159,8 @@ struct HighScore
 	void LoadFromEttNode(const XNode* pNode);
 
 	auto WriteReplayData() -> bool;
-	auto WriteInputData(const std::vector<float>& oop) -> bool;
+	auto WriteInputData() -> bool;
+	auto LoadInputData() -> bool;
 	auto LoadReplayData() -> bool;
 	auto LoadReplayDataBasic(const std::string& dir) -> bool;
 	auto LoadReplayDataFull(const std::string& dir) -> bool;
