@@ -720,14 +720,13 @@ StageStats::FinalizeScores(bool bSummary)
 	if (m_player.m_fWifeScore > 0.f) {
 
 		const auto writesuccess = hs.WriteReplayData();
+		// input data
+		hs.WriteInputData();
 		if (writesuccess) {
 			CHECKPOINT_M("Unloading ReplayData after successful write");
 			hs.UnloadReplayData();
 		}
 	}
-
-	// input data
-	hs.WriteInputData();
 
 	zzz->SetAnyAchievedGoals(GAMESTATE->m_pCurSteps->GetChartKey(),
 							 GAMESTATE->m_SongOptions.GetCurrent().m_fMusicRate,

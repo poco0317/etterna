@@ -466,6 +466,7 @@ HighScoreImpl::WriteInputData() -> bool
 		LOG->Warn(
 		  "Attempted to write input data for %s but there was nothing to write",
 		  path.c_str());
+		return false;
 	}
 
 	// check file
@@ -507,11 +508,13 @@ HighScoreImpl::WriteInputData() -> bool
 		LOG->Trace("Created compressed input data file at {}",
 									path_z.c_str());
 
+		/*
 		if (FILEMAN->Remove(path))
 			LOG->Trace("Deleted uncompressed input data");
 		else
 			LOG->Warn(
 			  "Failed to delete uncompressed input data");
+		*/
 		return true;
 	}
 	catch (std::runtime_error& e) {
@@ -630,12 +633,15 @@ HighScore::LoadInputData() -> bool
 		}
 
 		LOG->Trace("Loaded input data at {}", path.c_str());
-		
+
+		/*
 		if (FILEMAN->Remove(path))
 			LOG->Trace("Deleted uncompressed input data");
 		else
 			LOG->Warn(
 			  "Failed to delete uncompressed input data");
+		*/
+		return true;
 	}
 	catch (std::runtime_error& e) {
 		LOG->Warn(
