@@ -46,6 +46,8 @@
 
 #include <cmath>
 
+#include "Core/Services/Locator.hpp"
+
 /* I am ulbu, the great bazoinkazoink in the sky, and ulbu does everything, for
  * ulbu is all. Praise ulbu. */
 
@@ -113,12 +115,6 @@ struct TheGreatBazoinkazoinkInTheSky
 	explicit TheGreatBazoinkazoinkInTheSky(Calc& calc)
 	  : _calc(calc)
 	{
-#ifndef RELWITHDEBINFO
-#if NDEBUG
-		load_calc_params_from_disk();
-#endif
-#endif
-		
 		// setup our data pointers
 		_last_mri = std::make_unique<metaRowInfo>();
 		_mri = std::make_unique<metaRowInfo>();
@@ -501,23 +497,24 @@ struct TheGreatBazoinkazoinkInTheSky
 		}
 	}
 
-	void load_calc_params_from_disk(bool bForce = false) const
+	void load_calc_params_from_disk(bool recalcing = false, bool bForce = false) const
 	{
 		const auto fn = calc_params_xml;
 		int iError;
 
 		// Hold calc params program-global persistent info
 		static RageFileBasic* pFile;
-		static XNode params;
 		// Only ever try to load params once per thread unless forcing
+		thread_local XNode params;
 		thread_local bool paramsLoaded = false;
 
 		// Don't keep loading params if nothing to load/no reason to
 		// Allow a force to bypass
-		if (paramsLoaded && !bForce)
+		if (paramsLoaded && !bForce && !recalcing)
 			return;
 
 		// Load if missing or allow a force reload
+		// dont reload the file if recalcing
 		if (pFile == nullptr || bForce) {
 			delete pFile;
 			pFile = FILEMAN->Open(fn, RageFile::READ, iError);
@@ -528,7 +525,7 @@ struct TheGreatBazoinkazoinkInTheSky
 		}
 
 		// If it isn't loaded or we are forcing a load, load it
-		if (params.ChildrenEmpty() || bForce)
+		if (params.ChildrenEmpty() || bForce || recalcing)
 		{
 			if (!XmlFileUtil::LoadFromFileShowErrors(params, *pFile)) {
 				return;

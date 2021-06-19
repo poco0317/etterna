@@ -180,6 +180,7 @@ local function produceThisManySSRs(steps, rate)
     local output = {}
     for j = 1,8 do output[j] = {0,0,0,0,0,0,0,0} end
 
+    SONGMAN:ReloadMainCalcParams()
     for i = 1, count do
         local values = steps:GetSSRs(rate, ssrLowerBoundWife + ((ssrUpperBoundWife - ssrLowerBoundWife) / count) * i)
         for j = 1,8 do

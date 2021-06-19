@@ -698,7 +698,8 @@ ScoreManager::RecalculateSSRs(const string& profileID)
 		[&songVectorPtrMutex, &currentlyLockedSongs](
 		  std::pair<vectorIt<HighScore*>, vectorIt<HighScore*>> workload,
 		  ThreadData* data) {
-			const auto per_thread_calc = std::make_unique<Calc>();
+			thread_local const auto per_thread_calc = std::make_unique<Calc>();
+			per_thread_calc->recalcing = true;
 
 			auto scoreIndex = 0;
 			for (auto it = workload.first; it != workload.second; ++it) {

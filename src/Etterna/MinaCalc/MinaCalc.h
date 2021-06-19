@@ -65,6 +65,8 @@ class Calc
 
 	// for music select debug output, should only ever be true at music select
 	bool debugmode = false;
+	// for recalcing scores, forces param file to reload
+	bool recalcing = false;
 
 	// set to true for scores, false for cache
 	bool ssr = true;

@@ -463,8 +463,10 @@ Calc::InitializeHands(const std::vector<NoteInfo>& NoteInfo,
 	thread_local TheGreatBazoinkazoinkInTheSky ulbu_that_which_consumes_all(
 	  *this);
 	// if debug, force params to load
-	if (debugmode)
-		ulbu_that_which_consumes_all.load_calc_params_from_disk(true);
+	if (debugmode || recalcing) {
+		ulbu_that_which_consumes_all.load_calc_params_from_disk(recalcing, debugmode);
+		recalcing = false; // we want to force reload once only per thread
+	}
 	ulbu_that_which_consumes_all();
 
 	// main hand loop

@@ -1407,6 +1407,29 @@ SongManager::SaveCalcTestXmlToDir() const
 	XmlFileUtil::SaveToFile(xml.get(), f, "", false);
 }
 
+void
+SongManager::ReloadMainCalcParams()
+{
+	if (calc == nullptr)
+		return;
+	// the fattest hack
+	// the reason for this is that params are stored per thread and static
+	// so use this bool to reload it
+	// but the calc has to run completely valid for that to happen
+	calc->recalcing = true;
+	vector<NoteInfo> nothing;
+	NoteInfo a;
+	a.notes = 1;
+	a.rowTime = 1;
+	NoteInfo b;
+	b.notes = 2;
+	b.rowTime = 2;
+	nothing.push_back(a);
+	nothing.push_back(b);
+	MinaSDCalc(nothing, 1.F, 1.F, calc.get());
+	calc->recalcing = false;
+}
+
 // lua start
 #include "Etterna/Models/Lua/LuaBinding.h"
 
@@ -1588,6 +1611,12 @@ class LunaSongManager : public Luna<SongManager>
 		return 0;
 	}
 
+	static auto ReloadMainCalcParams(T* p, lua_State* L) -> int
+	{
+		p->ReloadMainCalcParams();
+		return 0;
+	}
+
 	LunaSongManager()
 	{
 		ADD_METHOD(GetAllSongs);
@@ -1613,6 +1642,7 @@ class LunaSongManager : public Luna<SongManager>
 		ADD_METHOD(NewPlaylistNoDialog);
 		ADD_METHOD(GetPlaylists);
 		ADD_METHOD(DeletePlaylist);
+		ADD_METHOD(ReloadMainCalcParams);
 	}
 };
 

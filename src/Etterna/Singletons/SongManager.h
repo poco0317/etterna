@@ -78,6 +78,7 @@ class SongManager
 	}
 
 	void ResetGroupColors();
+	void ReloadMainCalcParams();
 
 	static auto ShortenGroupName(const std::string& sLongGroupName)
 	  -> std::string;
