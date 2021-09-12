@@ -40,7 +40,7 @@ using std::vector;
 
 #include <fstream>
 #include "Etterna/Globals/zip_file.hpp"
-#include <Etterna\Models\NoteWriters\NotesWriterSSC.h>
+#include "Etterna/Models/NoteWriters/NotesWriterSSC.h"
 
 typedef std::string SongDir;
 struct Group
