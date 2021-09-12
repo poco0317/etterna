@@ -52,6 +52,7 @@ static Preference<std::string> packListURL(
   "https://api.etternaonline.com/v2/packs");
 static Preference<std::string> serverURL("BaseAPIURL",
 										 "https://api.etternaonline.com/v2");
+static Preference<RString> rankURL("RankURL", "");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -193,8 +194,21 @@ progressfunc(void* clientp,
 			 curl_off_t ulnow)
 {
 	auto ptr = static_cast<ProgressData*>(clientp);
-	ptr->total = dltotal;
+	ptr->dltotal = dltotal;
 	ptr->downloaded = dlnow;
+	return 0;
+}
+int
+pogressfunc(void* p,
+			curl_off_t dltotal,
+			curl_off_t dlnow,
+			curl_off_t ultotal,
+			curl_off_t ulnow)
+{
+	auto pogress = static_cast<ProgressData*>(p);
+	pogress->ultotal = ultotal;
+	pogress->uploaded = ulnow;
+	SCREENMAN->SystemMessage(ssprintf("Current upload progress: %ld / %ld", ulnow, ultotal));
 	return 0;
 }
 size_t
@@ -261,6 +275,23 @@ addFileToForm(curl_httppost*& form,
 		return false;
 	rFile.Read(contents, rFile.GetFileSize());
 	rFile.Close();
+
+	curl_formadd(&form,
+				 &lastPtr,
+				 CURLFORM_COPYNAME,
+				 "cache-control:",
+				 CURLFORM_COPYCONTENTS,
+				 "no-cache",
+				 CURLFORM_END);
+
+	curl_formadd(&form,
+				 &lastPtr,
+				 CURLFORM_COPYNAME,
+				 "content-type:",
+				 CURLFORM_COPYCONTENTS,
+				 "multipart/form-data",
+				 CURLFORM_END);
+
 	curl_formadd(&form,
 				 &lastPtr,
 				 CURLFORM_COPYNAME,
@@ -498,10 +529,84 @@ DownloadManager::Update(float fDeltaSeconds)
 {
 	if (!initialized)
 		init();
+	UpdateRanker();
 	if (gameplay)
 		return;
 	UpdatePacks(fDeltaSeconds);
 	UpdateHTTP(fDeltaSeconds);
+}
+void
+DownloadManager::UpdateRanker()
+{
+	if (rankRequests.size() == 0)
+		return;
+
+	timeval timeout;
+	int rc, maxfd = -1;
+	CURLMcode mc;
+	fd_set fdread, fdwrite, fdexcep;
+	long curl_timeo = -1;
+	FD_ZERO(&fdread);
+	FD_ZERO(&fdwrite);
+	FD_ZERO(&fdexcep);
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 1;
+	curl_multi_timeout(mUploadHandle, &curl_timeo);
+
+	mc = curl_multi_fdset(mUploadHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
+	if (mc != CURLM_OK) {
+		error = "curl_multi_fdset() failed, code " + to_string(mc);
+		return;
+	}
+	if (maxfd == -1) {
+		rc = 0;
+	} else {
+		rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
+	}
+	switch (rc) {
+		case -1:
+			error = "select error" + to_string(mc);
+			break;
+		case 0:	 /* timeout */
+		default: /* action */
+			curl_multi_perform(mUploadHandle, &uploadingPacks);
+			break;
+	}
+
+
+	CURLMsg* msg;
+	int msgs_left;
+	while ((msg = curl_multi_info_read(mUploadHandle, &msgs_left))) {
+		/* Find out which handle this message is about */
+		int idx_to_delete = -1;
+		for (size_t i = 0; i < rankRequests.size(); ++i) {
+			if (msg->easy_handle == rankRequests[i]->handle) {
+				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
+					rankRequests[i]->Failed(*(rankRequests[i]), msg);
+					LOG->Trace("CURL UNSUPPORTED PROTOCOL (Probably https)");
+				} else if (msg->msg == CURLMSG_DONE) {
+					rankRequests[i]->Done(*(rankRequests[i]), msg);
+				} else
+					rankRequests[i]->Failed(*(rankRequests[i]), msg);
+				if (rankRequests[i]->handle != nullptr)
+					curl_easy_cleanup(rankRequests[i]->handle);
+				rankRequests[i]->handle = nullptr;
+				if (rankRequests[i]->form != nullptr)
+					curl_formfree(rankRequests[i]->form);
+				rankRequests[i]->form = nullptr;
+				delete rankRequests[i];
+				idx_to_delete = i;
+				break;
+			}
+		}
+		// Delete this here instead of within the loop to avoid iterator
+		// invalidation
+		if (idx_to_delete != -1)
+			rankRequests.erase(rankRequests.begin() + idx_to_delete);
+	}
+	return;
+
+
 }
 void
 DownloadManager::UpdateHTTP(float fDeltaSeconds)
@@ -661,7 +766,7 @@ DownloadManager::UpdatePacks(float fDeltaSeconds)
 					if (i->second->p_RFWrapper.file.IsOpen())
 						i->second->p_RFWrapper.file.Close();
 					if (msg->data.result != CURLE_PARTIAL_FILE &&
-						i->second->progress.total <=
+						i->second->progress.dltotal <=
 						  i->second->progress.downloaded) {
 						timeSinceLastDownload = 0;
 						i->second->Done(i->second);
@@ -835,8 +940,7 @@ DownloadManager::RefreshFavourites()
 bool
 DownloadManager::ShouldUploadScores()
 {
-	return LoggedIn() && automaticSync &&
-		   GamePreferences::m_AutoPlay == PC_HUMAN;
+	return false;
 }
 inline void
 SetCURLPOSTScore(CURL*& curlHandle,
@@ -1151,8 +1255,7 @@ uploadSequentially()
 bool
 DownloadManager::UploadScores()
 {
-	if (!LoggedIn())
-		return false;
+	return false;
 
 	// First we accumulate scores that have not been uploaded and have
 	// replay data. There is no reason to upload updated calc versions to the
@@ -1210,6 +1313,7 @@ DownloadManager::UploadScores()
 void
 DownloadManager::ForceUploadScoresForChart(const std::string& ck, bool startnow)
 {
+	return;
 	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
 	auto cs = SCOREMAN->GetScoresForChart(ck);
 	if (cs) {
@@ -1244,6 +1348,7 @@ void
 DownloadManager::ForceUploadScoresForPack(const std::string& pack,
 										  bool startnow)
 {
+	return;
 	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
 	auto songs = SONGMAN->GetSongs(pack);
 	for (auto so : songs)
@@ -1261,6 +1366,7 @@ DownloadManager::ForceUploadScoresForPack(const std::string& pack,
 void
 DownloadManager::ForceUploadAllScores()
 {
+	return;
 	bool not_already_uploading = this->ScoreUploadSequentialQueue.empty();
 
 	auto songs = SONGMAN->GetSongs(GROUP_ALL);
@@ -1274,6 +1380,84 @@ DownloadManager::ForceUploadAllScores()
 		Locator::getLogger()->trace("Starting sequential upload of {} scores",
 				   this->ScoreUploadSequentialQueue.size());
 		uploadSequentially();
+	}
+}
+void
+DownloadManager::UploadPackForRanking(const RString& group)
+{
+	if (!LoggedIn())
+		return;
+
+	CURL* curl;
+	CURLcode res;
+
+	curl_mime* form = NULL;
+	curl_mimepart* field = NULL;
+	struct curl_slist* headerlist = NULL;
+
+	curl_global_init(CURL_GLOBAL_ALL);
+
+	curl = curl_easy_init();
+	if (curl) {
+		/* Create the form */
+		form = curl_mime_init(curl);
+
+		/* Fill in the file upload field */
+		field = curl_mime_addpart(form);
+		curl_mime_name(field, "zip");
+
+		// path gets normalized so starts with a /
+		// so we have to remove that /
+		string path = FILEMAN->ResolvePath("Cache/" + group + ".zip");
+#ifdef _WIN32
+		path.erase(0, 1);
+#endif
+		curl_mime_filedata(field, path.c_str());
+
+		headerlist = curl_slist_append(
+		  headerlist, ("Authorization: Bearer " + DLMAN->authToken).c_str());
+
+		/* what URL that receives this POST */
+		curl_easy_setopt(curl, CURLOPT_URL, rankURL.Get().c_str());
+
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headerlist);
+		curl_easy_setopt(curl, CURLOPT_MIMEPOST, form);
+		curl_easy_setopt(curl, CURLOPT_COOKIEFILE, "");
+		// curl_easy_setopt(curl, CURLOPT_COOKIE,
+		// "XDEBUG_SESSION=XDEBUG_ECLIPSE;");
+
+		// Progress Info.
+		ProgressData pogress;
+		curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, pogressfunc);
+		curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &pogress);
+		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+
+		if (mUploadHandle == nullptr)
+			mUploadHandle = curl_multi_init();
+
+		HTTPRequest* req = new HTTPRequest(curl);
+		req->Done = [](HTTPRequest& req, CURLMsg*) {
+			LOG->Trace("%s", req.result.c_str());
+		};
+
+		curl_multi_add_handle(mUploadHandle, req->handle);
+		rankRequests.push_back(req);
+
+		/*
+		res = curl_easy_perform(curl);
+
+		LOG->Trace("\nCURL RESPONSE NUMBER %d\n", res);
+
+		curl_easy_cleanup(curl);
+
+		curl_mime_free(form);
+		curl_slist_free_all(headerlist);
+		*/
+		SCREENMAN->SystemMessage(ssprintf("Sent request to rank %s", group.c_str()));
+	}
+	else
+	{
+		SCREENMAN->SystemMessage("Curl init failed");
 	}
 }
 void
@@ -2196,13 +2380,8 @@ DownloadManager::StartSession(
 			DLMAN->loggingIn = false;
 		}
 
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("accessToken") &&
-			d["data"]["attributes"]["accessToken"].IsString()) {
-			DLMAN->authToken =
-			  d["data"]["attributes"]["accessToken"].GetString();
+		if (d.HasMember("access_token") && d["access_token"].IsString()) {
+			DLMAN->authToken = d["access_token"].GetString();
 			DLMAN->sessionUser = user;
 			DLMAN->sessionPass = pass;
 		} else {
@@ -3015,7 +3194,7 @@ class LunaDownload : public Luna<Download>
 	}
 	static int GetTotalKB(T* p, lua_State* L)
 	{
-		lua_pushnumber(L, static_cast<int>(p->progress.total));
+		lua_pushnumber(L, static_cast<int>(p->progress.dltotal));
 		return 1;
 	}
 	static int Stop(T* p, lua_State* L)

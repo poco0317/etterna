@@ -490,6 +490,12 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 			AfterMusicChange();
 			SCREENMAN->SystemMessage("Current pack reloaded");
 			return true;
+		} else if (holding_shift && bHoldingCtrl && c == 'O' &&
+				   m_MusicWheel.IsSettled()) {
+			SONGMAN->GenerateCachefilesForGroup(
+			  GetMusicWheel()->GetSelectedSection());
+			AfterMusicChange();
+			return true;
 		} else if (bHoldingCtrl && c == 'F' && m_MusicWheel.IsSettled() &&
 				   input.type == IET_FIRST_PRESS) {
 			// Favorite the currently selected song. -Not Kyz

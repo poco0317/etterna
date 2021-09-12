@@ -18,6 +18,7 @@
 #include "Etterna/Models/Songs/Song.h"
 #include "Etterna/Models/Songs/SongCacheIndex.h"
 #include "SongManager.h"
+#include "Etterna/Models/NoteData/NoteData.h"
 #include "Etterna/Models/Songs/SongUtil.h"
 #include "Etterna/Globals/SpecialFiles.h"
 #include "Etterna/Models/StepsAndStyles/Steps.h"
@@ -37,6 +38,8 @@ using std::map;
 using std::string;
 using std::vector;
 
+#include <fstream>
+#include "Etterna/Globals/zip_file.hpp"
 typedef std::string SongDir;
 struct Group
 {
@@ -1113,6 +1116,91 @@ SongManager::ForceReloadSongGroup(const std::string& sGroupName) const
 		s->ReloadFromSongDir();
 		SONGMAN->ReconcileChartKeysForReloadedSong(s, oldChartkeys);
 	}
+}
+
+void
+SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
+{
+	SCREENMAN->SystemMessage(ssprintf("Generating cache files for %s", sGroupName.c_str()));
+	auto songs = GetSongs(sGroupName);
+	for (auto s : songs) {
+		auto sdir = s->GetSongDir();
+		// the starting '/' implies absolute path which breaks it
+		sdir.erase(0, 1);
+
+		// Save ssc/sm5 cache file
+		{
+			RString tmpOutPutPath = "Cache/tmp.ssc";
+			RString sscCacheFilePath = sdir + "songdata.cache";
+
+			NotesWriterSSC::Write(tmpOutPutPath, *s, s->GetAllSteps(), true);
+
+			RageFile f;
+			if (!f.Open(tmpOutPutPath)) {
+				RageException::Throw("SongManager failed to open \"%s\": %s",
+									 tmpOutPutPath.c_str(),
+									 f.GetError().c_str());
+			}
+			string p = f.GetPath();
+			f.Close();
+			std::ofstream dst(sscCacheFilePath, std::ios::binary);
+			std::ifstream src(p, std::ios::binary);
+			dst << src.rdbuf();
+			dst.close();
+			src.close();
+			FILEMAN->Remove(tmpOutPutPath);
+		}
+
+		FOREACH_CONST(Steps*, s->GetAllSteps(), is)
+		{
+			Steps* steps = (*is);
+			TimingData* td = steps->GetTimingData();
+			NoteData nd;
+			steps->GetNoteData(nd);
+			LOG->Trace("Writing cache file for chart %s (%s)",
+					   s->GetDisplayMainTitle().c_str(),
+					   steps->GetChartKey().c_str());
+
+			nd.LogNonEmptyRows(td);
+			auto& nerv = nd.GetNonEmptyRowVector();
+			auto& etaner = td->BuildAndGetEtaner(nerv);
+			auto& serializednd = nd.SerializeNoteData(etaner);
+
+			string path = sdir + steps->GetChartKey() + ".cache";
+			ofstream FILE(path, ios::binary);
+			if (!FILE) {
+				LOG->Warn("Failed to cache song %s (%s)",
+						  s->GetDisplayMainTitle().c_str(),
+						  steps->GetChartKey().c_str());
+				continue;
+			}
+
+			FILE.write((char*)&serializednd[0],
+					   serializednd.size() * sizeof(NoteInfo));
+
+			FILE.close();
+
+			td->UnsetEtaner();
+			nd.UnsetNerv();
+			nd.UnsetSerializedNoteData();
+			steps->Compress();
+		}
+	}
+	LOG->Trace("Finished generating cache files for %s", sGroupName.c_str());
+
+	SCREENMAN->SystemMessage("Zipping song directory...");
+	miniz_cpp::zip_file fi;
+	std::vector<RString> flist;
+	FILEMAN->FlushDirCache("Songs/" + sGroupName + "/");
+	GetDirListingRecursive("Songs/" + sGroupName + "/", "*", flist);
+	for (auto thing : flist) {
+		thing.erase(0, 1);
+		fi.write(thing);
+	}
+	fi.save("Cache/" + sGroupName + ".zip");
+	LOG->Trace("Finished zipping to Cache.");
+
+	// DLMAN->UploadPackForRanking(sGroupName);
 }
 
 void

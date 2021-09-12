@@ -17,8 +17,10 @@ class DownloadablePack;
 class ProgressData
 {
   public:
-	curl_off_t total{ 0 };		// total bytes
+	curl_off_t dltotal{ 0 };		// total bytes
 	curl_off_t downloaded{ 0 }; // bytes downloaded
+	curl_off_t ultotal{ 0 };
+	curl_off_t uploaded{ 0 };
 	float time{ 0 };			// seconds passed
 };
 
@@ -170,14 +172,17 @@ class DownloadManager
 	std::map<std::string, Download*> downloads; // Active downloads
 	std::vector<HTTPRequest*>
 	  HTTPRequests; // Active HTTP requests (async, curlMulti)
+	vector<HTTPRequest*> rankRequests;
 
 	std::map<std::string, Download*> finishedDownloads;
 	std::map<std::string, Download*> pendingInstallDownloads;
 	CURLM* mPackHandle{ nullptr }; // Curl multi handle for packs downloads
 	CURLM* mHTTPHandle{ nullptr }; // Curl multi handle for httpRequests
+	CURLM* mUploadHandle{ nullptr };
 	CURLMcode ret = CURLM_CALL_MULTI_PERFORM;
 	int downloadingPacks{ 0 };
 	int HTTPRunning{ 0 };
+	int uploadingPacks{ 0 };
 	bool loggingIn{
 		false
 	}; // Currently logging in (Since it's async, to not try twice)
@@ -243,6 +248,7 @@ class DownloadManager
 	Download* DownloadAndInstallPack(DownloadablePack* pack,
 									 bool mirror = false);
 	void Update(float fDeltaSeconds);
+	void UpdateRanker();
 	void UpdatePacks(float fDeltaSeconds);
 	void UpdateHTTP(float fDeltaSeconds);
 	bool InstallSmzip(const std::string& sZipFile);
@@ -261,6 +267,7 @@ class DownloadManager
 	void UploadScoreWithReplayDataFromDisk(
 	  HighScore* hs,
 	  std::function<void()> callback = []() {});
+	void UploadPackForRanking(const RString& group);
 
 	bool ShouldUploadScores();
 

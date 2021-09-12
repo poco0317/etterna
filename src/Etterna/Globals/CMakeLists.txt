@@ -14,6 +14,7 @@ list(APPEND GLOBAL_FILES_HPP
 	"SpecialFiles.h"
 	"rngthing.h"
 	"StepMania.h") # TODO: Refactor into separate main project.
+	"zip_file.hpp")
 
 if(NOT APPLE)
 	list(APPEND GLOBAL_FILES_SRC "Main.cpp")
