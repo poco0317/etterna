@@ -54,8 +54,8 @@ class Download
 			   std::to_string((progress.downloaded > 0 ? progress.downloaded
 													   : p_RFWrapper.bytes) /
 							  1024) +
-			   (progress.total > 0
-				  ? "/" + std::to_string(progress.total / 1024) + " (KB)"
+			   (progress.dltotal > 0
+				  ? "/" + std::to_string(progress.dltotal / 1024) + " (KB)"
 				  : "");
 	}
 	CURL* handle{ nullptr };
@@ -172,7 +172,7 @@ class DownloadManager
 	std::map<std::string, Download*> downloads; // Active downloads
 	std::vector<HTTPRequest*>
 	  HTTPRequests; // Active HTTP requests (async, curlMulti)
-	vector<HTTPRequest*> rankRequests;
+	std::vector<HTTPRequest*> rankRequests;
 
 	std::map<std::string, Download*> finishedDownloads;
 	std::map<std::string, Download*> pendingInstallDownloads;
@@ -267,7 +267,7 @@ class DownloadManager
 	void UploadScoreWithReplayDataFromDisk(
 	  HighScore* hs,
 	  std::function<void()> callback = []() {});
-	void UploadPackForRanking(const RString& group);
+	void UploadPackForRanking(const std::string& group);
 
 	bool ShouldUploadScores();
 

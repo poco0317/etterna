@@ -52,7 +52,7 @@ static Preference<std::string> packListURL(
   "https://api.etternaonline.com/v2/packs");
 static Preference<std::string> serverURL("BaseAPIURL",
 										 "https://api.etternaonline.com/v2");
-static Preference<RString> rankURL("RankURL", "");
+static Preference<std::string> rankURL("RankURL", "");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -583,7 +583,7 @@ DownloadManager::UpdateRanker()
 			if (msg->easy_handle == rankRequests[i]->handle) {
 				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
 					rankRequests[i]->Failed(*(rankRequests[i]), msg);
-					LOG->Trace("CURL UNSUPPORTED PROTOCOL (Probably https)");
+					Locator::getLogger()->trace("CURL UNSUPPORTED PROTOCOL (Probably https)");
 				} else if (msg->msg == CURLMSG_DONE) {
 					rankRequests[i]->Done(*(rankRequests[i]), msg);
 				} else
@@ -1383,7 +1383,7 @@ DownloadManager::ForceUploadAllScores()
 	}
 }
 void
-DownloadManager::UploadPackForRanking(const RString& group)
+DownloadManager::UploadPackForRanking(const std::string& group)
 {
 	if (!LoggedIn())
 		return;
@@ -1437,7 +1437,7 @@ DownloadManager::UploadPackForRanking(const RString& group)
 
 		HTTPRequest* req = new HTTPRequest(curl);
 		req->Done = [](HTTPRequest& req, CURLMsg*) {
-			LOG->Trace("%s", req.result.c_str());
+			Locator::getLogger()->trace("{}", req.result);
 		};
 
 		curl_multi_add_handle(mUploadHandle, req->handle);

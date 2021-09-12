@@ -90,7 +90,7 @@ class SongManager
 	auto GetSongs(const std::string& sGroupName) const
 	  -> const std::vector<Song*>&;
 	void ForceReloadSongGroup(const std::string& sGroupName) const;
-	void GenerateCachefilesForGroup(const RString& sGroupName) const;
+	void GenerateCachefilesForGroup(const std::string& sGroupName) const;
 	/**
 	 * @brief Retrieve all of the songs in the game.
 	 * @return all of the songs. */
@@ -157,14 +157,9 @@ class SongManager
 	auto SaveCalcTestCreateNode() const -> XNode*;
 	static void LoadCalcTestNode();
 	void SaveCalcTestXmlToDir() const;
-<<<<<<<
 	std::map<Skillset, CalcTestList> testChartList;
 	std::unique_ptr<Calc> calc;
 
-=======
-	map<Skillset, CalcTestList> testChartList;
-
->>>>>>>
   protected:
 	void LoadStepManiaSongDir(std::string sDir, LoadingWindow* ld);
 	static auto IsSongDir(const std::string& sDir) -> bool;
