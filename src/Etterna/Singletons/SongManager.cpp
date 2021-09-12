@@ -1181,6 +1181,8 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 			std::ifstream src(p, std::ios::binary);
 			dst << src.rdbuf();
 			dst.close();
+			src.close();
+			FILEMAN->Remove(tmpOutPutPath);
 		}
 
 		FOREACH_CONST(Steps*, s->GetAllSteps(), is)
@@ -1223,6 +1225,7 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 	SCREENMAN->SystemMessage("Zipping song directory...");
 	miniz_cpp::zip_file fi;
 	std::vector<RString> flist;
+	FILEMAN->FlushDirCache("Songs/" + sGroupName + "/");
 	GetDirListingRecursive("Songs/" + sGroupName + "/", "*", flist);
 	for (auto thing : flist) {
 		thing.erase(0, 1);
@@ -1231,7 +1234,7 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 	fi.save("Cache/" + sGroupName + ".zip");
 	LOG->Trace("Finished zipping to Cache.");
 
-	DLMAN->UploadPackForRanking(sGroupName);
+	// DLMAN->UploadPackForRanking(sGroupName);
 }
 
 void
