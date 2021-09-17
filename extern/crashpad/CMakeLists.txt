@@ -25,7 +25,7 @@ include(FetchContent)
 # modification to a minimum. Unlike ExternalProject, FetchContent will download the
 # git repository *during project generation*.
 FetchContent_Declare(depot_tools
-	GIT_REPOSITORY https://chromium.googlesource.com/chromium/tools/depot_tools.git
+	GIT_REPOSITORY https://chromium.googlesource.com/chromium/tools/depot_tools.git/+/refs/heads/main
 	GIT_PROGRESS TRUE
 	GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(depot_tools)
