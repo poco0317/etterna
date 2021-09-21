@@ -38,7 +38,7 @@ CreatePointFont(int nPointSize, LPCTSTR lpszFaceName)
 	memset(&logFont, 0, sizeof(LOGFONT));
 	logFont.lfCharSet = DEFAULT_CHARSET;
 	logFont.lfHeight = nPointSize;
-	lstrcpyn(logFont.lfFaceName, lpszFaceName, strlen(logFont.lfFaceName));
+	lstrcpyn(logFont.lfFaceName, lpszFaceName, strlen(reinterpret_cast<const char*>(logFont.lfFaceName)));
 
 	return ::CreatePointFontIndirect(&logFont);
 }
@@ -53,7 +53,7 @@ DialogUtil::SetHeaderFont(HWND hdlg, int nID)
 
 	// TODO: Fix font leak
 	const int FONT_POINTS = 16;
-	HFONT hfont = CreatePointFont(FONT_POINTS * 10, "Arial Black");
+	HFONT hfont = CreatePointFont(FONT_POINTS * 10, L"Arial Black");
 	::SendMessage(hControl, WM_SETFONT, (WPARAM)hfont, TRUE);
 }
 
@@ -67,21 +67,23 @@ DialogUtil::LocalizeDialogAndContents(HWND hdlg)
 	std::string sGroup;
 
 	{
-		::GetWindowText(hdlg, szTemp, ARRAYLEN(szTemp));
+		::GetWindowText(hdlg, reinterpret_cast<LPWSTR>(szTemp), ARRAYLEN(szTemp));
 		std::string s = szTemp;
 		sGroup = "Dialog-" + s;
 		s = THEME->GetString(sGroup, s);
-		::SetWindowText(hdlg, ConvertUTF8ToACP(s).c_str());
+		::SetWindowText(hdlg,
+						reinterpret_cast<LPCWSTR>(ConvertUTF8ToACP(s).c_str()));
 	}
 
 	for (HWND hwndChild = ::GetTopWindow(hdlg); hwndChild != NULL;
 		 hwndChild = ::GetNextWindow(hwndChild, GW_HWNDNEXT)) {
-		::GetWindowText(hwndChild, szTemp, ARRAYLEN(szTemp));
+		::GetWindowText(hwndChild, reinterpret_cast<LPWSTR>(szTemp), ARRAYLEN(szTemp));
 		std::string s = szTemp;
 		if (s.empty())
 			continue;
 		s = THEME->GetString(sGroup, s);
-		::SetWindowText(hwndChild, ConvertUTF8ToACP(s).c_str());
+		::SetWindowText(hwndChild,
+						reinterpret_cast<LPCWSTR>(ConvertUTF8ToACP(s).c_str()));
 	}
 }
 

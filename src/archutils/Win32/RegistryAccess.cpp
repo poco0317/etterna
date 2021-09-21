@@ -56,7 +56,7 @@ OpenRegKey(const std::string& sKey, RegKeyMode mode, bool bWarnOnError = true)
 
 	HKEY hRetKey;
 	LONG retval = RegOpenKeyEx(hType,
-							   sSubkey.c_str(),
+							   reinterpret_cast<LPCWSTR>(sSubkey.c_str()),
 							   0,
 							   (mode == READ) ? KEY_READ : KEY_WRITE,
 							   &hRetKey);
@@ -82,7 +82,8 @@ RegistryAccess::GetRegValue(const std::string& sKey,
 	DWORD iSize = sizeof(sBuffer);
 	DWORD iType;
 	LONG iRet = RegQueryValueEx(
-	  hKey, sName.c_str(), nullptr, &iType, (LPBYTE)sBuffer, &iSize);
+	  hKey,
+								reinterpret_cast<LPCWSTR>(sName.c_str()), nullptr, &iType, (LPBYTE)sBuffer, &iSize);
 	RegCloseKey(hKey);
 	if (iRet != ERROR_SUCCESS)
 		return false;
@@ -115,7 +116,8 @@ RegistryAccess::GetRegValue(const std::string& sKey,
 	DWORD iSize = sizeof(iValue);
 	DWORD iType;
 	LONG iRet = RegQueryValueEx(
-	  hKey, sName.c_str(), nullptr, &iType, (LPBYTE)&iValue, &iSize);
+	  hKey,
+								reinterpret_cast<LPCWSTR>(sName.c_str()), nullptr, &iType, (LPBYTE)&iValue, &iSize);
 	RegCloseKey(hKey);
 	if (iRet != ERROR_SUCCESS)
 		return false;
@@ -156,7 +158,8 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 		char szBuffer[MAX_PATH];
 		DWORD iSize = sizeof(szBuffer);
 		LONG iRet = RegEnumKeyEx(
-		  hKey, index, szBuffer, &iSize, nullptr, nullptr, nullptr, &ft);
+		  hKey, index,
+								 reinterpret_cast<LPWSTR>(szBuffer), &iSize, nullptr, nullptr, nullptr, &ft);
 		if (iRet == ERROR_NO_MORE_ITEMS)
 			break;
 
@@ -195,10 +198,10 @@ RegistryAccess::SetRegValue(const std::string& sKey,
 	if (sVal.size() > 254)
 		return false;
 
-	strcpy(sz, sVal.c_str());
+	strcpy(reinterpret_cast<char*>(sz), sVal.c_str());
 
 	LONG lResult = ::RegSetValueEx(
-	  hKey, LPCTSTR(sName.c_str()), 0, REG_SZ, (LPBYTE)sz, strlen(sz) + 1);
+	  hKey, LPCTSTR(sName.c_str()), 0, REG_SZ, (LPBYTE)sz, strlen(reinterpret_cast<const char*>(sz)) + 1);
 	if (lResult != ERROR_SUCCESS)
 		bSuccess = false;
 
@@ -240,7 +243,7 @@ RegistryAccess::CreateKey(const std::string& sKey)
 	HKEY hKey;
 	DWORD dwDisposition = 0;
 	if (::RegCreateKeyEx(hType,
-						 sSubkey.c_str(),
+						 reinterpret_cast<LPCWSTR>(sSubkey.c_str()),
 						 0,
 						 nullptr,
 						 REG_OPTION_NON_VOLATILE,

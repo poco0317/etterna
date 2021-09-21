@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <mmsystem.h>
+#include <nowide/convert.hpp>
 
 #pragma comment(lib, "winmm.lib")
 
@@ -21,9 +22,9 @@ midiCallback(HMIDIIN g_device,
 static std::string
 GetMidiError(MMRESULT result)
 {
-	char szError[256];
+	LPWSTR szError;
 	midiOutGetErrorText(result, szError, 256);
-	return szError;
+	return nowide::narrow(szError);
 }
 
 InputHandler_Win32_MIDI::InputHandler_Win32_MIDI()

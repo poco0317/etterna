@@ -76,36 +76,6 @@ class ReadThis
 	RageFile file;
 };
 
-string
-ComputerIdentity()
-{
-	string computerName = "";
-	string userName = "";
-#ifdef _WIN32
-
-	int cpuinfo[4] = { 0, 0, 0, 0 };
-	__cpuid(cpuinfo, 0);
-	uint16_t cpuHash = 0;
-	uint16_t* ptr = (uint16_t*)(&cpuinfo[0]);
-	for (uint32_t i = 0; i < 8; i++)
-		cpuHash += ptr[i];
-
-	TCHAR infoBuf[1024];
-	DWORD bufCharCount = 1024;
-	if (GetComputerName(infoBuf, &bufCharCount))
-		computerName = infoBuf;
-	if (GetUserName(infoBuf, &bufCharCount))
-		userName = infoBuf;
-#else
-	char hostname[1024];
-	char username[1024];
-	gethostname(hostname, 1024);
-	getlogin_r(username, 1024);
-	computerName = hostname;
-	userName = username;
-#endif
-	return computerName + ":_:" + userName;
-}
 size_t
 ReadThisReadCallback(void* dest, size_t size, size_t nmemb, void* userp)
 {

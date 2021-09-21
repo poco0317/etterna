@@ -26,6 +26,7 @@
 #include <iphlpapi.h>
 #include <windows.h>
 #include <winsock2.h>
+#include <nowide/args.hpp>
 #pragma comment(lib, "IPHLPAPI.lib")
 
 #include <algorithm>
@@ -86,10 +87,10 @@ getCpuHash() -> uint16_t
 auto
 getMachineName() -> string
 {
-	static char computerName[128];
+	LPWSTR computerName;
 	DWORD size = 128;
 	GetComputerName(computerName, &size);
-	return string(computerName);
+	return nowide::narrow(computerName);
 }
 
 #else

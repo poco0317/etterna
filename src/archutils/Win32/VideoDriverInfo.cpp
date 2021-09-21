@@ -14,7 +14,7 @@ GetPrimaryVideoName()
 	pfnEnumDisplayDevices EnumDisplayDevices;
 	HINSTANCE hInstUser32;
 
-	hInstUser32 = LoadLibrary("User32.DLL");
+	hInstUser32 = LoadLibrary(L"User32.DLL");
 	if (!hInstUser32)
 		return std::string();
 

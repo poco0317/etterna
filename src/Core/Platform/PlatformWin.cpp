@@ -24,7 +24,7 @@ std::string RegistryGetString(HKEY hKey, const std::string& subKey, const std::s
     std::string result; // result for registry value
 
     // Get size of registry key
-    retCode = ::RegGetValue(hKey, subKey.c_str(), value.c_str(), RRF_RT_REG_SZ, nullptr,nullptr, &bufferSize);
+    retCode = ::RegGetValue(hKey, nowide::widen(subKey).c_str(), nowide::widen(value).c_str(), RRF_RT_REG_SZ, nullptr,nullptr, &bufferSize);
 
     // Notify if we can't read the key
     if (retCode != ERROR_SUCCESS) {
@@ -56,7 +56,7 @@ unsigned RegistryGetDWORD(HKEY hKey, const std::string& subKey, const std::strin
     DWORD bufferSize(sizeof(result)); // size of DWORD
 
     // Get size of registry key
-    retCode = ::RegGetValue(hKey, subKey.c_str(), value.c_str(), RRF_RT_REG_DWORD, nullptr, &result, &bufferSize);
+    retCode = ::RegGetValue(hKey, nowide::widen(subKey).c_str(), nowide::widen(value).c_str(), RRF_RT_REG_DWORD, nullptr, &result, &bufferSize);
 
     // Notify if we can't read the key
     if (retCode != ERROR_SUCCESS) {
@@ -328,9 +328,9 @@ namespace Core::Platform {
          * less likely to have a false match, and will match the gameplay window.
          * If that fails, try the window name, which should match the loading
          * window. */
-        HWND hWnd = FindWindow(Core::AppInfo::APP_TITLE, nullptr);
+        HWND hWnd = FindWindow(nowide::widen(Core::AppInfo::APP_TITLE).c_str(), nullptr);
         if (hWnd == nullptr)
-            hWnd = FindWindow(nullptr, Core::AppInfo::APP_TITLE);
+            hWnd = FindWindow(nullptr, nowide::widen(Core::AppInfo::APP_TITLE).c_str());
 
         // If after two find window attempts, the pointer is still null,
         // then no other game instance was found.

@@ -7,6 +7,7 @@
 #include <dxerr9.h>
 #else
 #include <dxerr.h>
+#include <nowide/convert.hpp>
 #endif
 #if defined(_MSC_VER)
 #pragma comment(lib, "dxerr.lib")
@@ -23,7 +24,7 @@ hr_ssprintf(int hr, const char* fmt, ...)
 #if defined(USE_DXERR9)
 	const char* szError = DXGetErrorString9(hr);
 #else
-	const char* szError = DXGetErrorString(hr);
+	auto szError = DXGetErrorString(hr);
 #endif
 	return s + ssprintf(" (%s)", szError);
 }

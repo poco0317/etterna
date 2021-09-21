@@ -10,6 +10,7 @@
 
 #ifdef _WIN32
 #include <mmsystem.h>
+#include <nowide/convert.hpp>
 #endif
 #define DIRECTSOUND_VERSION 0x0700
 #include <dsound.h>
@@ -20,15 +21,15 @@
 
 BOOL CALLBACK
 DSound::EnumCallback(LPGUID lpGuid,
-					 LPCSTR lpcstrDescription,
-					 LPCSTR lpcstrModule,
+					 LPCWSTR lpcstrDescription,
+					 LPCWSTR lpcstrModule,
 					 LPVOID lpContext)
 {
 	std::string sLine = ssprintf("DirectSound Driver: %s", lpcstrDescription);
 	if (lpcstrModule[0]) {
 		sLine += ssprintf(" %s", lpcstrModule);
 
-		std::string sPath = FindSystemFile(lpcstrModule);
+		std::string sPath = FindSystemFile(nowide::narrow(lpcstrModule));
 		if (sPath != "") {
 			std::string sVersion;
 			if (GetFileVersion(sPath, sVersion))

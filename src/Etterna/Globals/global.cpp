@@ -10,6 +10,7 @@
 #define _WIN32_WINDOWS 0x0410 // include Win98 stuff
 #include "windows.h"
 #include <fmt/format.h>
+#include <nowide/args.hpp>
 #elif defined(__APPLE__)
 #include "archutils/Darwin/Crash.h"
 #include <stdlib.h>
@@ -25,7 +26,7 @@ void showCrashDialog(const char* message){
             "Please send that file to the developers, and they can find out what happened!\n\n"
             "Crash Reason: {}";
 
-    MessageBox(nullptr, fmt::format(error_message, message).c_str(), "Crash Message", MB_OK | MB_ICONERROR | MB_TASKMODAL);
+    MessageBoxW(nullptr, nowide::widen(fmt::format(error_message, message)).c_str(), L"Crash Message", MB_OK | MB_ICONERROR | MB_TASKMODAL);
 }
 
 #endif

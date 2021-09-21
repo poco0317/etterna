@@ -230,7 +230,7 @@ GetDirOfExecutable(std::string argv0)
 	std::string sPath;
 #ifdef _WIN32
 	char szBuf[MAX_PATH];
-	GetModuleFileName(nullptr, szBuf, sizeof(szBuf));
+	GetModuleFileName(nullptr, reinterpret_cast<LPWSTR>(szBuf), sizeof(szBuf));
 	sPath = szBuf;
 #else
 	sPath = argv0;

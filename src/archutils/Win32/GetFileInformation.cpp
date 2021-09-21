@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <windows.h>
 #include <tlhelp32.h>
+#include <nowide/convert.hpp>
 
 #if defined(_MSC_VER)
 #pragma comment(lib, "version.lib")
@@ -18,13 +19,15 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		// Cast away const to work around header bug in VC6.
 		DWORD ignore;
 		DWORD iSize =
-		  GetFileVersionInfoSize(const_cast<char*>(sFile.c_str()), &ignore);
+		  GetFileVersionInfoSize(
+		  reinterpret_cast<LPCWSTR>(const_cast<char*>(sFile.c_str())), &ignore);
 		if (!iSize)
 			break;
 
 		std::string VersionBuffer(iSize, ' ');
 		// Also VC6:
-		if (!GetFileVersionInfo(const_cast<char*>(sFile.c_str()),
+		if (!GetFileVersionInfo(
+			  reinterpret_cast<LPCWSTR>(const_cast<char*>(sFile.c_str())),
 								NULL,
 								iSize,
 								const_cast<char*>(VersionBuffer.c_str())))
@@ -34,7 +37,7 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		UINT iTransCnt;
 
 		if (!VerQueryValue((void*)VersionBuffer.c_str(),
-						   "\\VarFileInfo\\Translation",
+			  reinterpret_cast<LPCWSTR>("\\VarFileInfo\\Translation"),
 						   (void**)&iTrans,
 						   &iTransCnt))
 			break;
@@ -48,7 +51,7 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		std::string sRes = ssprintf(
 		  "\\StringFileInfo\\%04x%04x\\FileVersion", iTrans[0], iTrans[1]);
 		if (!VerQueryValue((void*)VersionBuffer.c_str(),
-						   (char*)sRes.c_str(),
+						   reinterpret_cast<LPCWSTR>((char*)sRes.c_str()),
 						   (void**)&str,
 						   &len) ||
 			len < 1)
@@ -78,7 +81,7 @@ std::string
 FindSystemFile(const std::string& sFile)
 {
 	char szWindowsPath[MAX_PATH];
-	GetWindowsDirectory(szWindowsPath, MAX_PATH);
+	GetWindowsDirectory(reinterpret_cast<LPWSTR>(szWindowsPath), MAX_PATH);
 
 	const char* szPaths[] = { "/system32/", "/system32/drivers/",
 							  "/system/",	"/system/drivers/",
@@ -116,7 +119,7 @@ GetProcessFileName(uint32_t iProcessID, std::string& sName)
 		CloseHandle(hSnap);
 
 		if (bRet) {
-			sName = me.szExePath;
+			sName = nowide::narrow(me.szExePath).c_str();
 			return true;
 		}
 
@@ -134,7 +137,7 @@ GetProcessFileName(uint32_t iProcessID, std::string& sName)
 		if (!bTried) {
 			bTried = true;
 
-			hPSApi = LoadLibrary("psapi.dll");
+			hPSApi = LoadLibrary(L"psapi.dll");
 			if (hPSApi == nullptr) {
 				sName = werr_ssprintf(GetLastError(), "LoadLibrary");
 				break;

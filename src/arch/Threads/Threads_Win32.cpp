@@ -79,7 +79,7 @@ typedef struct tagTHREADNAME_INFO
 } THREADNAME_INFO;
 
 static void
-SetThreadName(DWORD dwThreadID, LPCTSTR szThreadName)
+SetThreadName(DWORD dwThreadID, LPCSTR szThreadName)
 {
 	THREADNAME_INFO info;
 	info.dwType = 0x1000;

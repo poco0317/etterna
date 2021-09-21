@@ -8,7 +8,7 @@
 int
 GetWin32CmdLine(char**& argv)
 {
-	char* pCmdLine = GetCommandLine();
+	char* pCmdLine = reinterpret_cast<char*>(GetCommandLine());
 	int argc = 0;
 	argv = NULL;
 

@@ -9,6 +9,7 @@
 #include <wchar.h>
 #include <Commdlg.h>
 #include <tchar.h>
+#include <nowide/convert.hpp>
 #include "Dwmapi.h"
 #include "RageUtil/Graphics/RageSurface_Load.h"
 #include "RageUtil/Graphics/RageSurface.h"
@@ -181,7 +182,7 @@ LoadingWindow_Win32::LoadingWindow_Win32()
 	  RageFileManagerUtil::sDirOfExecutable.substr(
 		0, RageFileManagerUtil::sDirOfExecutable.length() - 7) +
 	  FONT_FILE;
-	int nResults = AddFontResourceEx(szFontFile.c_str(), // font file name
+	int nResults = AddFontResourceEx(nowide::widen(szFontFile).c_str(), // font file name
 									 FR_PRIVATE,		 // font flags
 									 nullptr);
 
@@ -199,7 +200,7 @@ LoadingWindow_Win32::LoadingWindow_Win32()
 	  static_cast<int>(FONT_HEIGHT), GetDeviceCaps(wdc, LOGPIXELSY), 72);
 	lf.lfQuality = NONANTIALIASED_QUALITY;
 	lf.lfClipPrecision = CLIP_TT_ALWAYS;
-	_tcscpy(lf.lfFaceName, FONT_NAME.c_str()); // we must include tchar.h
+	_tcscpy(lf.lfFaceName, nowide::widen(FONT_NAME).c_str()); // we must include tchar.h
 	f = CreateFontIndirect(&lf);
 	SendMessage(hwnd, WM_SETFONT, (WPARAM)f, MAKELPARAM(FALSE, 0));
 	SelectObject(wdc, f);
@@ -250,8 +251,8 @@ LoadingWindow_Win32::InternalPaint()
 		TextOut(hDCMem,
 				textRect.left,
 				textRect.top,
-				text[i].c_str(),
-				text[i].length());
+				nowide::widen(text[i]).c_str(),
+				nowide::widen(text[i]).length());
 		//::SetWindowText( hwndItem, ConvertUTF8ToACP(asMessageLines[i]).c_str()
 		//);
 	}

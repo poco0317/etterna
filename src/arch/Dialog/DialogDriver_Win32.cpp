@@ -1,6 +1,7 @@
 #include "Etterna/Globals/global.h"
 #include "DialogDriver_Win32.h"
 #include "RageUtil/Utils/RageUtil.h"
+#include <nowide/args.hpp>
 #if !defined(SMPACKAGE)
 #include "Etterna/Models/Misc/LocalizedString.h"
 #endif
@@ -50,7 +51,7 @@ OKWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			// Set static text.
 			std::string sMessage = g_sMessage;
 			s_replace(sMessage, "\n", "\r\n");
-			SetWindowText(GetDlgItem(hWnd, IDC_MESSAGE), sMessage.c_str());
+			SetWindowTextW(GetDlgItem(hWnd, IDC_MESSAGE), nowide::widen(sMessage).c_str());
 
 			// Focus is on any of the controls in the dialog by default.
 			// I'm not sure why. Set focus to the button manually. -Chris
@@ -121,7 +122,7 @@ DialogDriver_Win32::OKCancel(const std::string& sMessage,
 	// DialogBox( handle.Get(), MAKEINTRESOURCE(IDD_OK), ::GetHwnd(), OKWndProc
 	// );
 	int result = ::MessageBox(
-	  nullptr, sMessage.c_str(), GetWindowTitle().c_str(), MB_OKCANCEL);
+	  nullptr, nowide::widen(sMessage).c_str(), nowide::widen(GetWindowTitle()).c_str(), MB_OKCANCEL);
 #else
 	int result =
 	  ::AfxMessageBox(ConvertUTF8ToACP(sMessage).c_str(), MB_OKCANCEL, 0);
@@ -150,7 +151,7 @@ ErrorWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			// Set static text
 			std::string sMessage = g_sErrorString;
 			s_replace(sMessage, "\n", "\r\n");
-			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ERROR), sMessage.c_str());
+			SetWindowText(GetDlgItem(hWnd, IDC_EDIT_ERROR), nowide::widen(sMessage).c_str());
 		} break;
 		case WM_COMMAND:
 			switch (LOWORD(wParam)) {
@@ -221,8 +222,8 @@ DialogDriver_Win32::AbortRetryIgnore(const std::string& sMessage,
 	int iRet = 0;
 #if !defined(SMPACKAGE)
 	iRet = ::MessageBox(::GetHwnd(),
-						ConvertUTF8ToACP(sMessage).c_str(),
-						ConvertUTF8ToACP(::GetWindowTitle()).c_str(),
+						nowide::widen(ConvertUTF8ToACP(sMessage)).c_str(),
+						nowide::widen(ConvertUTF8ToACP(::GetWindowTitle())).c_str(),
 						MB_ABORTRETRYIGNORE | MB_DEFBUTTON3);
 #else
 	iRet = ::AfxMessageBox(ConvertUTF8ToACP(sMessage).c_str(),
@@ -249,8 +250,8 @@ DialogDriver_Win32::AbortRetry(const std::string& sMessage,
 	int iRet = 0;
 #if !defined(SMPACKAGE)
 	iRet = ::MessageBox(::GetHwnd(),
-						ConvertUTF8ToACP(sMessage).c_str(),
-						ConvertUTF8ToACP(::GetWindowTitle()).c_str(),
+						nowide::widen(ConvertUTF8ToACP(sMessage)).c_str(),
+						nowide::widen(ConvertUTF8ToACP(::GetWindowTitle())).c_str(),
 						MB_RETRYCANCEL);
 #else
 	iRet =
@@ -273,8 +274,8 @@ DialogDriver_Win32::YesNo(const std::string& sMessage, const std::string& sID)
 	int iRet = 0;
 #if !defined(SMPACKAGE)
 	iRet = ::MessageBox(::GetHwnd(),
-						ConvertUTF8ToACP(sMessage).c_str(),
-						ConvertUTF8ToACP(::GetWindowTitle()).c_str(),
+						nowide::widen(ConvertUTF8ToACP(sMessage)).c_str(),
+						nowide::widen(ConvertUTF8ToACP(::GetWindowTitle())).c_str(),
 						MB_YESNO);
 #else
 	iRet =

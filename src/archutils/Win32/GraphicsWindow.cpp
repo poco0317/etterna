@@ -302,8 +302,8 @@ GraphicsWindow::CreateGraphicsWindow(const VideoModeParams& p,
 		  GetWindowStyle(p.windowed, p.bWindowIsFullscreenBorderless);
 
 		AppInstance inst;
-		HWND hWnd = CreateWindow(g_sClassName.c_str(),
-								 "app",
+		HWND hWnd = CreateWindow(reinterpret_cast<LPCWSTR>(g_sClassName.c_str()),
+								 L"app",
 								 iWindowStyle,
 								 0,
 								 0,
@@ -339,7 +339,8 @@ GraphicsWindow::CreateGraphicsWindow(const VideoModeParams& p,
 	do {
 		if (m_bWideWindowClass) {
 			if (SetWindowText(g_hWndMain,
-							  ConvertUTF8ToACP(p.sWindowTitle).c_str()))
+							  reinterpret_cast<LPCWSTR>(
+								ConvertUTF8ToACP(p.sWindowTitle).c_str())))
 				break;
 		}
 
@@ -477,17 +478,17 @@ GraphicsWindow::Initialize(bool bD3D)
 			LoadCursor(nullptr, IDC_ARROW), /* default cursor */
 			nullptr,						/* hbrBackground */
 			nullptr,						/* lpszMenuName */
-			g_sClassName.c_str()			/* lpszClassName */
+			reinterpret_cast<LPCWSTR>(g_sClassName.c_str()) /* lpszClassName */
 		};
 
 		m_bWideWindowClass = false;
-		if (!RegisterClassA(&WindowClassA))
+		if (!RegisterClassA(reinterpret_cast<const WNDCLASSA*>(&WindowClassA)))
 			RageException::Throw(
 			  "%s", werr_ssprintf(GetLastError(), "RegisterClass").c_str());
 	} while (0);
 
 	g_iQueryCancelAutoPlayMessage =
-	  RegisterWindowMessage("QueryCancelAutoPlay");
+	  RegisterWindowMessage(reinterpret_cast<LPCWSTR>("QueryCancelAutoPlay"));
 }
 
 void
@@ -502,7 +503,7 @@ GraphicsWindow::Shutdown()
 	ChangeDisplaySettings(nullptr, 0);
 
 	AppInstance inst;
-	UnregisterClass(g_sClassName.c_str(), inst);
+	UnregisterClass(reinterpret_cast<LPCWSTR>(g_sClassName.c_str()), inst);
 }
 
 HDC

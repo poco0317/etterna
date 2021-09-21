@@ -24,8 +24,8 @@ const int chunksize = buffersize / num_chunks; /* in bytes */
 static std::string
 wo_ssprintf(MMRESULT err, const char* szFmt, ...)
 {
-	char szBuf[MAXERRORLENGTH];
-	waveOutGetErrorText(err, szBuf, MAXERRORLENGTH);
+	LPWSTR szBuf[MAXERRORLENGTH];
+	waveOutGetErrorText(err, reinterpret_cast<LPWSTR>(szBuf), MAXERRORLENGTH);
 
 	va_list va;
 	va_start(va, szFmt);

@@ -6,6 +6,8 @@
 #include "Etterna/Singletons/PrefsManager.h"
 #include "archutils/Win32/ErrorStrings.h"
 
+#include <nowide/convert.hpp>
+
 #define _INC_MMREG
 #define _NTRTL_ /* Turn off default definition of DEFINE_GUIDEX */
 #if !defined(DEFINE_WAVEFORMATEX_GUID)
@@ -707,7 +709,7 @@ WinWdmFilter::Use(std::string& sError)
 {
 	if (m_hHandle == nullptr) {
 		/* Open the filter */
-		m_hHandle = CreateFile(m_sFilterName.c_str(),
+		m_hHandle = CreateFile(nowide::widen(m_sFilterName).c_str(),
 							   GENERIC_READ | GENERIC_WRITE,
 							   0,
 							   nullptr,
@@ -972,7 +974,7 @@ GetDevicePath(HANDLE hHandle,
 										 nullptr,
 										 &devInfoData))
 		return false;
-	sPath = devInterfaceDetails->DevicePath;
+	sPath = nowide::narrow(devInterfaceDetails->DevicePath);
 	return true;
 }
 
@@ -1015,7 +1017,7 @@ BuildFilterList(std::vector<WinWdmFilter*>& aFilters, std::string& sError)
 		if (hKey != INVALID_HANDLE_VALUE) {
 			DWORD type;
 			if (RegQueryValueEx(hKey,
-								"FriendlyName",
+								L"FriendlyName",
 								nullptr,
 								&type,
 								(BYTE*)szFriendlyName,
@@ -1044,7 +1046,7 @@ static bool
 PaWinWdm_Initialize(std::string& sError)
 {
 	if (DllKsUser == nullptr) {
-		DllKsUser = LoadLibrary("ksuser.dll");
+		DllKsUser = LoadLibrary(L"ksuser.dll");
 		if (DllKsUser == nullptr) {
 			sError = werr_ssprintf(GetLastError(), "LoadLibrary(ksuser.dll)");
 			return false;

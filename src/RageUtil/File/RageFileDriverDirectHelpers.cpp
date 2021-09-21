@@ -15,6 +15,7 @@
 
 #else
 #include <windows.h>
+#include <nowide/convert.hpp>
 #endif
 
 std::string
@@ -36,8 +37,8 @@ WinMoveFileInternal(const std::string& sOldPath, const std::string& sNewPath)
 	 * 9x, we're screwed, so just delete any existing file (we aren't going
 	 * to be robust on 9x anyway). */
 	if (!Win9x) {
-		if (MoveFileEx(
-			  sOldPath.c_str(), sNewPath.c_str(), MOVEFILE_REPLACE_EXISTING))
+		if (MoveFileEx(reinterpret_cast<LPCWSTR>(sOldPath.c_str()),
+					   reinterpret_cast<LPCWSTR>(sNewPath.c_str()), MOVEFILE_REPLACE_EXISTING))
 			return true;
 
 		// On Win9x, MoveFileEx is expected to fail (returns
@@ -49,16 +50,18 @@ WinMoveFileInternal(const std::string& sOldPath, const std::string& sNewPath)
 			return false;
 	}
 
-	if (MoveFile(sOldPath.c_str(), sNewPath.c_str()))
+	if (MoveFile(reinterpret_cast<LPCWSTR>(sOldPath.c_str()),
+				 reinterpret_cast<LPCWSTR>(sNewPath.c_str())))
 		return true;
 
 	if (GetLastError() != ERROR_ALREADY_EXISTS)
 		return false;
 
-	if (!DeleteFile(sNewPath.c_str()))
+	if (!DeleteFile(reinterpret_cast<LPCWSTR>(sNewPath.c_str())))
 		return false;
 
-	return !!MoveFile(sOldPath.c_str(), sNewPath.c_str());
+	return !!MoveFile(reinterpret_cast<LPCWSTR>(sOldPath.c_str()),
+					  reinterpret_cast<LPCWSTR>(sNewPath.c_str()));
 }
 
 bool
@@ -69,7 +72,8 @@ WinMoveFile(const std::string& sOldPath, const std::string& sNewPath)
 	if (GetLastError() != ERROR_ACCESS_DENIED)
 		return false;
 	/* Try turning off the read-only bit on the file we're overwriting. */
-	SetFileAttributes(DoPathReplace(sNewPath).c_str(), FILE_ATTRIBUTE_NORMAL);
+	SetFileAttributes(
+	  reinterpret_cast<LPCWSTR>(DoPathReplace(sNewPath).c_str()), FILE_ATTRIBUTE_NORMAL);
 
 	return WinMoveFileInternal(DoPathReplace(sOldPath),
 							   DoPathReplace(sNewPath));
@@ -174,12 +178,13 @@ DirectFilenameDB::CacheFile(const std::string& sPath)
 #ifdef _WIN32
 	// There is almost surely a better way to do this
 	WIN32_FIND_DATA fd;
-	HANDLE hFind = DoFindFirstFile(std::string(root + sPath).c_str(), &fd);
+	HANDLE hFind = DoFindFirstFile(
+	  reinterpret_cast<LPCWSTR>(std::string(root + sPath).c_str()), &fd);
 	if (hFind == INVALID_HANDLE_VALUE) {
 		m_Mutex.Unlock(); // Locked by GetFileSet()
 		return;
 	}
-	File f(fd.cFileName);
+	File f(nowide::narrow(fd.cFileName));
 	f.dir = !!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 	f.size = fd.nFileSizeLow;
 	f.hash = fd.ftLastWriteTime.dwLowDateTime;
@@ -224,7 +229,8 @@ DirectFilenameDB::PopulateFileSet(FileSet& fs, const std::string& path)
 		sPath.erase(sPath.size() - 1);
 
 	HANDLE hFind =
-	  DoFindFirstFile(std::string(root + sPath + "/*").c_str(), &fd);
+	  DoFindFirstFile(
+	  reinterpret_cast<LPCWSTR>(std::string(root + sPath + "/*").c_str()), &fd);
 	// This crashes on multithreaded startup occasionally. -poco
 	// CHECKPOINT_M(root + sPath + "/*");
 
@@ -232,11 +238,11 @@ DirectFilenameDB::PopulateFileSet(FileSet& fs, const std::string& path)
 		return;
 
 	do {
-		if (!strcmp(fd.cFileName, ".") || !strcmp(fd.cFileName, ".."))
+		if (!strcmp(reinterpret_cast<const char*>(fd.cFileName), ".") || !strcmp(reinterpret_cast<const char*>(fd.cFileName), ".."))
 			continue;
 
 		File f;
-		f.SetName(fd.cFileName);
+		f.SetName(nowide::narrow(fd.cFileName));
 		f.dir = !!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 		f.size = fd.nFileSizeLow;
 		f.hash = fd.ftLastWriteTime.dwLowDateTime;

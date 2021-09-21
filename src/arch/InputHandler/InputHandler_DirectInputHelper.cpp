@@ -7,6 +7,7 @@
 #include "archutils/Win32/GraphicsWindow.h"
 
 #include <algorithm>
+#include <nowide/args.hpp>
 
 #if defined(_MSC_VER)
 #pragma comment(lib, "dinput8.lib")
@@ -35,7 +36,7 @@ DIDevice::DIDevice()
 bool
 DIDevice::Open()
 {
-	m_sName = ConvertACPToUTF8(JoystickInst.tszProductName);
+	m_sName = ConvertACPToUTF8(nowide::narrow(JoystickInst.tszProductName));
 
 	if (PREFSMAN->m_verbose_log > 1)
 		Locator::getLogger()->trace("Opening device '{}'", m_sName.c_str());

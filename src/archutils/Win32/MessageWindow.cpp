@@ -17,17 +17,17 @@ MessageWindow::MessageWindow(const std::string& sClassName)
 		LoadCursor(NULL, IDC_ARROW), /* default cursor */
 		NULL,						 /* hbrBackground */
 		NULL,						 /* lpszMenuName */
-		sClassName.c_str()			 /* lpszClassName */
+		reinterpret_cast<LPCWSTR>(sClassName.c_str()) /* lpszClassName */
 	};
 
-	if (!RegisterClassA(&WindowClass) &&
+	if (!RegisterClassA(reinterpret_cast<const WNDCLASSA*>(&WindowClass)) &&
 		GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
 		RageException::Throw(
 		  "%s", werr_ssprintf(GetLastError(), "RegisterClass").c_str());
 
 	// XXX: on 2k/XP, use HWND_MESSAGE as parent
-	m_hWnd = CreateWindow(sClassName.c_str(),
-						  sClassName.c_str(),
+	m_hWnd = CreateWindow(reinterpret_cast<LPCWSTR>(sClassName.c_str()),
+						  reinterpret_cast<LPCWSTR>(sClassName.c_str()),
 						  WS_DISABLED,
 						  0,
 						  0,
@@ -39,12 +39,12 @@ MessageWindow::MessageWindow(const std::string& sClassName)
 						  NULL);
 	ASSERT(m_hWnd != NULL);
 
-	SetProp(m_hWnd, "MessageWindow", this);
+	SetProp(m_hWnd, L"MessageWindow", this);
 }
 
 MessageWindow::~MessageWindow()
 {
-	RemoveProp(m_hWnd, "MessageWindow");
+	RemoveProp(m_hWnd, L"MessageWindow");
 	DestroyWindow(m_hWnd);
 }
 
@@ -72,7 +72,7 @@ MessageWindow::StopRunning()
 LRESULT CALLBACK
 MessageWindow::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-	MessageWindow* pThis = (MessageWindow*)GetProp(hWnd, "MessageWindow");
+	MessageWindow* pThis = (MessageWindow*)GetProp(hWnd, L"MessageWindow");
 	if (pThis != NULL && pThis->HandleMessage(msg, wParam, lParam))
 		return 0;
 

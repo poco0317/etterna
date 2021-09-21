@@ -22,8 +22,8 @@ class DSound
   private:
 	IDirectSound* m_pDS;
 	static BOOL CALLBACK EnumCallback(LPGUID lpGuid,
-									  LPCSTR lpcstrDescription,
-									  LPCSTR lpcstrModule,
+									  LPCWSTR lpcstrDescription,
+									  LPCWSTR lpcstrModule,
 									  LPVOID lpContext);
 
 	void SetPrimaryBufferMode();

@@ -10,8 +10,8 @@ void
 WindowsDialogBox::Run(int iDialog)
 {
 	char szFullAppPath[MAX_PATH];
-	GetModuleFileName(NULL, szFullAppPath, MAX_PATH);
-	HINSTANCE hHandle = LoadLibrary(szFullAppPath);
+	GetModuleFileName(NULL, reinterpret_cast<LPWSTR>(szFullAppPath), MAX_PATH);
+	HINSTANCE hHandle = LoadLibrary(reinterpret_cast<LPCWSTR>(szFullAppPath));
 
 	DialogBoxParam(
 	  hHandle, MAKEINTRESOURCE(iDialog), NULL, DlgProc, (LPARAM)this);
@@ -21,10 +21,10 @@ INT_PTR APIENTRY
 WindowsDialogBox::DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	if (msg == WM_INITDIALOG)
-		SetProp(hDlg, "WindowsDialogBox", (HANDLE)lParam);
+		SetProp(hDlg, L"WindowsDialogBox", (HANDLE)lParam);
 
 	WindowsDialogBox* pThis =
-	  static_cast<WindowsDialogBox*>(GetProp(hDlg, "WindowsDialogBox"));
+	  static_cast<WindowsDialogBox*>(GetProp(hDlg, L"WindowsDialogBox"));
 	if (pThis == NULL)
 		return FALSE;
 

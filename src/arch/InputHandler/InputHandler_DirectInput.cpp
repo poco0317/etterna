@@ -11,6 +11,7 @@
 #include "Etterna/Singletons/PrefsManager.h"
 #include "Core/Services/Locator.hpp"
 #include "RageUtil/Utils/RageUtil.h"
+#include <nowide/args.hpp>
 
 #include <algorithm>
 
@@ -32,10 +33,12 @@ EnumDevicesCallback(const DIDEVICEINSTANCE* pdidInstance, void* pContext)
 {
 	DIDevice device;
 
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->info("DInput: Enumerating device - Type: 0x%08X Instance Name: \"{}\" "
-		  "Product Name: \"{}\"",
-		  pdidInstance->dwDevType, pdidInstance->tszInstanceName, pdidInstance->tszProductName);
+//	if (PREFSMAN->m_verbose_log > 1)
+//		Locator::getLogger()->info("DInput: Enumerating device - Type: {} Instance Name: \"{}\" "
+//			"Product Name: \"{}\"",
+//			pdidInstance->dwDevType,
+//			pdidInstance->tszInstanceName,
+//			nowide::narrow(pdidInstance->tszProductName).c_str());
 
 	switch (GET_DIDEVICE_TYPE(pdidInstance->dwDevType)) {
 		case DI8DEVTYPE_JOYSTICK:
@@ -894,7 +897,7 @@ ScancodeAndKeysToChar(DWORD scancode, unsigned char keys[256])
 
 	if (!bInitialized) {
 		bInitialized = true;
-		HMODULE hModule = GetModuleHandle("user32.dll");
+		HMODULE hModule = GetModuleHandle(L"user32.dll");
 		pToUnicodeEx = (TOUNICODEEX*)GetProcAddress(hModule, "ToUnicodeEx");
 	}
 
