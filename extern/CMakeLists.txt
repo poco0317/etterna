@@ -30,6 +30,7 @@ add_subdirectory(discord-rpc)
 
 # Poco Libraries
 set(FORCE_OPENSSL ON CACHE BOOL "" FORCE)      # Require OpenSSL
+set(ENABLE_NETSSL ON CACHE BOOL "" FORCE)      # For HTTPS
 set(ENABLE_JWT ON CACHE BOOL "" FORCE)         # Need JWT
 set(ENABLE_MONGODB OFF CACHE BOOL "" FORCE)    # Dont need MongoDB
 set(ENABLE_REDIS OFF CACHE BOOL "" FORCE)      # Dont need Redis
