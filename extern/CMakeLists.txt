@@ -34,11 +34,16 @@ set(CLANG_FORMAT_CMD OFF CACHE BOOL "" FORCE)   # Disable discord clang-format
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)     # Disable discord examples
 add_subdirectory(discord-rpc)
 
-# Poco Networking
-set(FORCE_OPENSSL ON CACHE BOOL "" FORCE)    # Require OpenSSL
+# Poco Libraries
+set(FORCE_OPENSSL ON CACHE BOOL "" FORCE)      # Require OpenSSL
 set(ENABLE_JWT ON CACHE BOOL "" FORCE)         # Need JWT
 set(ENABLE_MONGODB OFF CACHE BOOL "" FORCE)    # Dont need MongoDB
-set(ENABLE_REDIS OFF CACHE BOOL "" FORCE)    # Dont need Redis
+set(ENABLE_REDIS OFF CACHE BOOL "" FORCE)      # Dont need Redis
+set(ENABLE_XML OFF CACHE BOOL "" FORCE)        # Dont need XML for now
+set(ENABLE_DATA_MYSQL OFF CACHE BOOL "" FORCE) # Dont need MySQL
+set(ENABLE_DATA_POSTGRESQL OFF CACHE BOOL "" FORCE) # Dont need PostgreSQL
+set(ENABLE_DATA_ODBC OFF CACHE BOOL "" FORCE)
+set(ENABLE_APACHECONNECTOR OFF CACHE BOOL "" FORCE) # Dont need ApacheConnector
 set(CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/extern/poco)
 add_subdirectory(poco)
 
