@@ -7,7 +7,6 @@
 #include "Etterna/Models/Misc/HighScore.h"
 #include "ScreenManager.h"
 #include "RageUtil/File/RageFileManager.h"
-#include "curl/curl.h"
 #include "Etterna/Models/Misc/Difficulty.h"
 
 #include <deque>
@@ -17,8 +16,10 @@ class DownloadablePack;
 class ProgressData
 {
   public:
-	curl_off_t total{ 0 };		// total bytes
-	curl_off_t downloaded{ 0 }; // bytes downloaded
+	size_t dltotal{ 0 };		// total bytes
+	size_t downloaded{ 0 }; // bytes downloaded
+	size_t ultotal{ 0 };
+	size_t uploaded{ 0 };
 	float time{ 0 };			// seconds passed
 };
 
@@ -52,16 +53,15 @@ class Download
 			   std::to_string((progress.downloaded > 0 ? progress.downloaded
 													   : p_RFWrapper.bytes) /
 							  1024) +
-			   (progress.total > 0
-				  ? "/" + std::to_string(progress.total / 1024) + " (KB)"
+			   (progress.dltotal > 0
+				  ? "/" + std::to_string(progress.dltotal / 1024) + " (KB)"
 				  : "");
 	}
-	CURL* handle{ nullptr };
 	int running{ 1 };
 	ProgressData progress;
 	std::string speed{ "" };
-	curl_off_t downloadedAtLastUpdate{ 0 };
-	curl_off_t lastUpdateDone{ 0 };
+	size_t downloadedAtLastUpdate{ 0 };
+	size_t lastUpdateDone{ 0 };
 	std::string m_Url{ "" };
 	RageFileWrapper p_RFWrapper;
 	DownloadablePack* p_Pack{ nullptr };
@@ -91,21 +91,13 @@ class HTTPRequest
 {
   public:
 	HTTPRequest(
-	  CURL* h,
-	  std::function<void(HTTPRequest&, CURLMsg*)> done = [](HTTPRequest& req,
-															CURLMsg*) {},
-	  curl_httppost* postform = nullptr,
-	  std::function<void(HTTPRequest&, CURLMsg*)> fail = [](HTTPRequest& req,
-															CURLMsg*) {})
-	  : handle(h)
-	  , form(postform)
-	  , Done(done)
+	  std::function<void(HTTPRequest&)> done = [](HTTPRequest& req) {},
+	  std::function<void(HTTPRequest&)> fail = [](HTTPRequest& req) {})
+	  : Done(done)
 	  , Failed(fail){};
-	CURL* handle{ nullptr };
-	curl_httppost* form{ nullptr };
 	std::string result;
-	std::function<void(HTTPRequest&, CURLMsg*)> Done;
-	std::function<void(HTTPRequest&, CURLMsg*)> Failed;
+	std::function<void(HTTPRequest&)> Done;
+	std::function<void(HTTPRequest&)> Failed;
 };
 class OnlineTopScore
 {
@@ -167,84 +159,56 @@ class DownloadManager
 	static LuaReference EMPTY_REFERENCE;
 	DownloadManager();
 	~DownloadManager();
-	std::map<std::string, Download*> downloads; // Active downloads
-	std::vector<HTTPRequest*>
-	  HTTPRequests; // Active HTTP requests (async, curlMulti)
+	/// Active HTTP requests (async, curlMulti)
+	std::vector<HTTPRequest*> HTTPRequests;
 
-	std::map<std::string, Download*> finishedDownloads;
-	std::map<std::string, Download*> pendingInstallDownloads;
-	CURLM* mPackHandle{ nullptr }; // Curl multi handle for packs downloads
-	CURLM* mHTTPHandle{ nullptr }; // Curl multi handle for httpRequests
-	CURLMcode ret = CURLM_CALL_MULTI_PERFORM;
-	int downloadingPacks{ 0 };
 	int HTTPRunning{ 0 };
-	bool loggingIn{
-		false
-	}; // Currently logging in (Since it's async, to not try twice)
-	bool gameplay{ false }; // Currently in gameplay
+	/// Currently logging in (Since it's async, to not try twice)
+	bool loggingIn{ false };
+	/// Currently in gameplay
+	bool gameplay{ false };
 	bool initialized{ false };
 	std::string error{ "" };
 	std::vector<DownloadablePack> downloadablePacks;
-	std::string authToken{ "" };   // Session cookie content
-	std::string sessionUser{ "" }; // Currently logged in username
-	std::string sessionPass{ "" }; // Currently logged in password
-	std::string lastVersion{
-		""
-	}; // Last version according to server (Or current if non was obtained)
-	std::string registerPage{
-		""
-	}; // Register page from server (Or empty if non was obtained)
+	/// Session cookie content
+	std::string authToken{ "" };
+	/// Currently logged in username
+	std::string sessionUser{ "" };
+	/// Currently logged in password
+	std::string sessionPass{ "" };
+	/// Last version according to server (Or current if non was obtained)
+	std::string lastVersion{ "" };
+	/// Register page from server (Or empty if non was obtained)
+	std::string registerPage{ "" };
 	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
 	std::set<std::string> unrankedCharts;
 	std::vector<std::string> countryCodes;
-	std::map<Skillset, int>
-	  sessionRanks; // Leaderboard ranks for logged in user by skillset
+	/// Leaderboard ranks for logged in user by skillset
+	std::map<Skillset, int> sessionRanks;
 	std::map<Skillset, double> sessionRatings;
 	std::map<Skillset, std::vector<OnlineTopScore>> topScores;
 	bool LoggedIn();
 
-	void AddFavorite(const std::string& chartkey);
-	void RemoveFavorite(const std::string& chartkey);
-	void RefreshFavourites();
-	std::vector<std::string> favorites;
-
-	void AddGoal(const std::string& chartkey,
-				 float wife,
-				 float rate,
-				 DateTime& timeAssigned);
-	void UpdateGoal(const std::string& chartkey,
-					float wife,
-					float rate,
-					bool achieved,
-					DateTime& timeAssigned,
-					DateTime& timeAchieved);
-	void RemoveGoal(const std::string& chartkey, float wife, float rate);
-
-	void EndSessionIfExists(); // Calls EndSession if logged in
-	void EndSession();		   // Sends session destroy request
+	/// Calls EndSession if logged in
+	void EndSessionIfExists();
+	/// Sends session destroy request
+	void EndSession();
+	/// Sends login request if not already logging in
 	void StartSession(std::string user,
 					  std::string pass,
-					  std::function<void(bool loggedIn)>
-						done); // Sends login request if not already logging in
+					  std::function<void(bool loggedIn)> done);
 	void OnLogin();
-	bool UploadScores(); // Uploads all scores not yet uploaded to current
-	void ForceUploadScoresForChart(
-	  const std::string& ck,
-	  bool startnow = true); // forced upload wrapper for charts
-	void ForceUploadScoresForPack(
-	  const std::string& pack,
-	  bool startnow = true); // forced upload wrapper for packs
+	/// Uploads all scores not yet uploaded to current
+	bool UploadScores();
+	/// forced upload wrapper for charts
+	void ForceUploadScoresForChart(const std::string& ck, bool startnow = true);
+	/// forced upload wrapper for packs
+	void ForceUploadScoresForPack(const std::string& pack,
+								  bool startnow = true);
 	void ForceUploadAllScores();
-	void RefreshPackList(const std::string& url);
 
 	void init();
-	Download* DownloadAndInstallPack(const std::string& url,
-									 std::string filename = "");
-	Download* DownloadAndInstallPack(DownloadablePack* pack,
-									 bool mirror = false);
 	void Update(float fDeltaSeconds);
-	void UpdatePacks(float fDeltaSeconds);
-	void UpdateHTTP(float fDeltaSeconds);
 	bool InstallSmzip(const std::string& sZipFile);
 
 	void UpdateDLSpeed();
@@ -263,58 +227,19 @@ class DownloadManager
 	  std::function<void()> callback = []() {});
 
 	bool ShouldUploadScores();
-
-	inline void AddSessionCookieToCURL(CURL* curlHandle);
-	inline void SetCURLPostToURL(CURL* curlHandle, std::string url);
-	inline void SetCURLURL(CURL* curlHandle, std::string url);
-
-	HTTPRequest* SendRequest(
-	  std::string requestName,
-	  std::vector<std::pair<std::string, std::string>> params,
-	  std::function<void(HTTPRequest&, CURLMsg*)> done,
-	  bool requireLogin = true,
-	  bool post = false,
-	  bool async = true,
-	  bool withBearer = true);
-	HTTPRequest* SendRequestToURL(
-	  std::string url,
-	  std::vector<std::pair<std::string, std::string>> params,
-	  std::function<void(HTTPRequest&, CURLMsg*)> done,
-	  bool requireLogin,
-	  bool post,
-	  bool async,
-	  bool withBearer);
-	void RefreshLastVersion();
-	void RefreshRegisterPage();
 	bool currentrateonly = false;
 	bool topscoresonly = true;
 	bool ccoffonly = false;
-	void RefreshCountryCodes();
-	void RequestReplayData(const std::string& scorekey,
-						   int userid,
-						   const std::string& username,
-						   const std::string& chartkey,
-						   LuaReference& callback = EMPTY_REFERENCE);
-	void RequestChartLeaderBoard(const std::string& chartkey,
-								 LuaReference& ref = EMPTY_REFERENCE);
-	void RefreshUserData();
-	std::string countryCode;
-	void RefreshUserRank();
-	void RefreshTop25(Skillset ss);
-	void DownloadCoreBundle(const std::string& whichoneyo, bool mirror = false);
-	std::map<std::string, std::vector<DownloadablePack*>> bundles;
-	void RefreshCoreBundles();
-	std::vector<DownloadablePack*> GetCoreBundle(const std::string& whichoneyo);
 	OnlineTopScore GetTopSkillsetScore(unsigned int rank,
 									   Skillset ss,
 									   bool& result);
 	float GetSkillsetRating(Skillset ss);
 	int GetSkillsetRank(Skillset ss);
 
-	// most recent single score upload result -mina
+	/// most recent single score upload result
 	std::string mostrecentresult = "";
-	std::deque<std::pair<DownloadablePack*, bool>>
-	  DownloadQueue; // (pack,isMirror)
+	/// (pack,isMirror)
+	std::deque<std::pair<DownloadablePack*, bool>> DownloadQueue;
 	std::deque<HighScore*> ScoreUploadSequentialQueue;
 	unsigned int sequentialScoreUploadTotalWorkload{ 0 };
 	const int maxPacksToDownloadAtOnce = 1;

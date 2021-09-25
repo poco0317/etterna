@@ -502,7 +502,7 @@ Profile::AddGoal(const string& ck)
 
 	goal.CheckVacuity();
 	goalmap[ck].Add(goal);
-	DLMAN->AddGoal(ck, goal.percent, goal.rate, goal.timeassigned);
+	//DLMAN->AddGoal(ck, goal.percent, goal.rate, goal.timeassigned);
 	FillGoalTable();
 	MESSAGEMAN->Broadcast("GoalTableRefresh");
 	return true;
@@ -587,9 +587,11 @@ ScoreGoal::CheckVacuity()
 void
 ScoreGoal::UploadIfNotVacuous()
 {
+	/*
 	if (!vacuous || !timeachieved.GetString().empty())
 		DLMAN->UpdateGoal(
 		  chartkey, percent, rate, achieved, timeassigned, timeachieved);
+	*/
 }
 
 // aaa too lazy to write comparators rn -mina
@@ -628,12 +630,14 @@ Profile::SetAnyAchievedGoals(const string& ck,
 			tmp.achieved = true;
 			tmp.timeachieved = pscore.GetDateTime();
 			tmp.scorekey = pscore.GetScoreKey();
+			/*
 			DLMAN->UpdateGoal(tmp.chartkey,
 							  tmp.percent,
 							  tmp.rate,
 							  tmp.achieved,
 							  tmp.timeassigned,
 							  tmp.timeachieved);
+			*/
 		}
 	}
 }
@@ -644,7 +648,7 @@ Profile::RemoveGoal(const string& ck, DateTime assigned)
 	auto& sgv = goalmap.at(ck).Get();
 	for (size_t i = 0; i < sgv.size(); ++i) {
 		if (sgv[i].timeassigned == assigned) {
-			DLMAN->RemoveGoal(ck, sgv[i].percent, sgv[i].rate);
+			//DLMAN->RemoveGoal(ck, sgv[i].percent, sgv[i].rate);
 			sgv.erase(sgv.begin() + i);
 		}
 	}

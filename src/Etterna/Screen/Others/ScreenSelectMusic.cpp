@@ -248,7 +248,7 @@ ScreenSelectMusic::BeginScreen()
 	if (GAMESTATE->m_pCurSteps != nullptr &&
 		DLMAN->chartLeaderboards.count(GAMESTATE->m_pCurSteps->GetChartKey()) !=
 		  0)
-		DLMAN->RequestChartLeaderBoard(GAMESTATE->m_pCurSteps->GetChartKey());
+		//DLMAN->RequestChartLeaderBoard(GAMESTATE->m_pCurSteps->GetChartKey());
 
 	GAMESTATE->m_bRestartedGameplay = false;
 
@@ -501,7 +501,7 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 					fav_me_biatch->SetFavorited(true);
 					pProfile->AddToFavorites(
 					  GAMESTATE->m_pCurSteps->GetChartKey());
-					DLMAN->AddFavorite(GAMESTATE->m_pCurSteps->GetChartKey());
+					//DLMAN->AddFavorite(GAMESTATE->m_pCurSteps->GetChartKey());
 
 					// now update favorites playlist
 					// we have to do this here or it won't work for ??? reasons
@@ -512,15 +512,14 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 					fav_me_biatch->SetFavorited(false);
 					pProfile->RemoveFromFavorites(
 					  GAMESTATE->m_pCurSteps->GetChartKey());
-					DLMAN->RemoveFavorite(
-					  GAMESTATE->m_pCurSteps->GetChartKey());
+					//DLMAN->RemoveFavorite(GAMESTATE->m_pCurSteps->GetChartKey());
 
 					// we have to do this here or it won't work for ??? reasons
 					pProfile->allplaylists.erase("Favorites");
 					SONGMAN->MakePlaylistFromFavorites(
 					  pProfile->FavoritedCharts, pProfile->allplaylists);
 				}
-				DLMAN->RefreshFavourites();
+				//DLMAN->RefreshFavourites();
 				MESSAGEMAN->Broadcast("FavoritesUpdated");
 
 				// update favorites playlist _display_

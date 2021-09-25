@@ -16,7 +16,6 @@
 #include "Etterna/Globals/SpecialFiles.h"
 #include "Etterna/Models/Songs/Song.h"
 #include "Etterna/Models/Misc/PlayerStageStats.h"
-#include "curl/curl.h"
 #include "Etterna/Models/Songs/SongOptions.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -86,7 +85,7 @@ ReadThisReadCallback(void* dest, size_t size, size_t nmemb, void* userp)
 }
 
 int
-ReadThisSeekCallback(void* arg, curl_off_t offset, int origin)
+ReadThisSeekCallback(void* arg, size_t offset, int origin)
 {
 	return static_cast<ReadThis*>(arg)->file.Seek(static_cast<int>(offset),
 												  origin);
@@ -157,14 +156,26 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 // Functions used to read/write data
 int
 progressfunc(void* clientp,
-			 curl_off_t dltotal,
-			 curl_off_t dlnow,
-			 curl_off_t ultotal,
-			 curl_off_t ulnow)
+			 size_t dltotal,
+			 size_t dlnow,
+			 size_t ultotal,
+			 size_t ulnow)
 {
 	auto ptr = static_cast<ProgressData*>(clientp);
-	ptr->total = dltotal;
+	ptr->dltotal = dltotal;
 	ptr->downloaded = dlnow;
+	return 0;
+}
+int
+pogressfunc(void* p,
+			size_t dltotal,
+			size_t dlnow,
+			size_t ultotal, size_t ulnow)
+{
+	auto pogress = static_cast<ProgressData*>(p);
+	pogress->ultotal = ultotal;
+	pogress->uploaded = ulnow;
+	SCREENMAN->SystemMessage(ssprintf("Current upload progress: %ld / %ld", ulnow, ultotal));
 	return 0;
 }
 size_t
@@ -183,138 +194,11 @@ ends_with(std::string const& value, std::string const& ending)
 		return false;
 	return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
 }
-
 inline void
 checkProtocol(string& url)
 {
 	if (!(starts_with(url, "https://") || starts_with(url, "http://")))
 		url = string("http://").append(url);
-}
-inline CURL*
-initBasicCURLHandle()
-{
-	CURL* curlHandle = curl_easy_init();
-	curl_easy_setopt(curlHandle,
-					 CURLOPT_USERAGENT,
-					 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-					 "AppleWebKit/537.36 (KHTML, like Gecko) "
-					 "Chrome/60.0.3112.113 Safari/537.36");
-	curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "");
-	curl_easy_setopt(curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
-	curl_easy_setopt(curlHandle, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
-	return curlHandle;
-}
-// Utility inline functions to deal with CURL
-inline CURL*
-initCURLHandle(bool withBearer)
-{
-	CURL* curlHandle = initBasicCURLHandle();
-	struct curl_slist* list = nullptr;
-	if (withBearer)
-		list = curl_slist_append(
-		  list, ("Authorization: Bearer " + DLMAN->authToken).c_str());
-	curl_easy_setopt(curlHandle, CURLOPT_HTTPHEADER, list);
-	curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 120); // Seconds
-	return curlHandle;
-}
-inline bool
-addFileToForm(curl_httppost*& form,
-			  curl_httppost*& lastPtr,
-			  string field,
-			  string fileName,
-			  string filePath,
-			  std::string& contents)
-{
-	RageFile rFile;
-	if (!rFile.Open(filePath))
-		return false;
-	rFile.Read(contents, rFile.GetFileSize());
-	rFile.Close();
-	curl_formadd(&form,
-				 &lastPtr,
-				 CURLFORM_COPYNAME,
-				 field.c_str(),
-				 CURLFORM_BUFFER,
-				 fileName.c_str(),
-				 CURLFORM_BUFFERPTR,
-				 contents.c_str(),
-				 CURLFORM_BUFFERLENGTH,
-				 0,
-				 CURLFORM_END);
-	return true;
-}
-inline void
-SetCURLResultsString(CURL* curlHandle, string* str)
-{
-	curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, str);
-	curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_memory_buffer);
-}
-inline void
-DownloadManager::SetCURLURL(CURL* curlHandle, string url)
-{
-	checkProtocol(url);
-	EncodeSpaces(url);
-	curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
-}
-inline void
-DownloadManager::SetCURLPostToURL(CURL* curlHandle, string url)
-{
-	SetCURLURL(curlHandle, url);
-	curl_easy_setopt(curlHandle, CURLOPT_POST, 1L);
-}
-void
-CURLFormPostField(CURL* curlHandle,
-				  curl_httppost*& form,
-				  curl_httppost*& lastPtr,
-				  const char* field,
-				  const char* value)
-{
-	curl_formadd(&form,
-				 &lastPtr,
-				 CURLFORM_COPYNAME,
-				 field,
-				 CURLFORM_COPYCONTENTS,
-				 value,
-				 CURLFORM_END);
-}
-inline void
-SetCURLFormPostField(CURL* curlHandle,
-					 curl_httppost*& form,
-					 curl_httppost*& lastPtr,
-					 char* field,
-					 char* value)
-{
-	CURLFormPostField(curlHandle, form, lastPtr, field, value);
-}
-inline void
-SetCURLFormPostField(CURL* curlHandle,
-					 curl_httppost*& form,
-					 curl_httppost*& lastPtr,
-					 const char* field,
-					 string value)
-{
-	CURLFormPostField(curlHandle, form, lastPtr, field, value.c_str());
-}
-inline void
-SetCURLFormPostField(CURL* curlHandle,
-					 curl_httppost*& form,
-					 curl_httppost*& lastPtr,
-					 string field,
-					 string value)
-{
-	CURLFormPostField(curlHandle, form, lastPtr, field.c_str(), value.c_str());
-}
-template<typename T>
-inline void
-SetCURLFormPostField(CURL* curlHandle,
-					 curl_httppost*& form,
-					 curl_httppost*& lastPtr,
-					 string field,
-					 T value)
-{
-	CURLFormPostField(
-	  curlHandle, form, lastPtr, field.c_str(), to_string(value).c_str());
 }
 inline void
 EmptyTempDLFileDir()
@@ -329,7 +213,6 @@ EmptyTempDLFileDir()
 DownloadManager::DownloadManager()
 {
 	EmptyTempDLFileDir();
-	curl_global_init(CURL_GLOBAL_ALL);
 	// Register with Lua.
 	{
 		Lua* L = LUA->Get();
@@ -342,41 +225,9 @@ DownloadManager::DownloadManager()
 
 DownloadManager::~DownloadManager()
 {
-	if (mPackHandle != nullptr)
-		curl_multi_cleanup(mPackHandle);
-	mPackHandle = nullptr;
-	if (mHTTPHandle != nullptr)
-		curl_multi_cleanup(mHTTPHandle);
-	mHTTPHandle = nullptr;
 	EmptyTempDLFileDir();
-	for (auto& dl : downloads) {
-		if (dl.second->handle != nullptr) {
-			curl_easy_cleanup(dl.second->handle);
-			dl.second->handle = nullptr;
-		}
-		delete dl.second;
-	}
 	if (LoggedIn())
 		EndSession();
-	curl_global_cleanup();
-}
-
-Download*
-DownloadManager::DownloadAndInstallPack(const string& url, string filename)
-{
-	Download* dl = new Download(url, filename);
-
-	if (mPackHandle == nullptr)
-		mPackHandle = curl_multi_init();
-	curl_multi_add_handle(mPackHandle, dl->handle);
-	downloads[url] = dl;
-
-	UpdateDLSpeed();
-
-	ret = curl_multi_perform(mPackHandle, &downloadingPacks);
-	SCREENMAN->SystemMessage(dl->StartMessage());
-
-	return dl;
 }
 
 void
@@ -388,11 +239,13 @@ DownloadManager::UpdateDLSpeed()
 	} else {
 		maxDLSpeed = maxDLPerSecond;
 	}
+	/*
 	for (auto& x : downloads)
 		curl_easy_setopt(
 		  x.second->handle,
 		  CURLOPT_MAX_RECV_SPEED_LARGE,
 		  static_cast<curl_off_t>(maxDLSpeed / downloads.size()));
+		  */
 }
 
 void
@@ -434,33 +287,9 @@ Download::Update(float fDeltaSeconds)
 		downloadedAtLastUpdate = progress.downloaded / 1024;
 	}
 }
-Download*
-DownloadManager::DownloadAndInstallPack(DownloadablePack* pack, bool mirror)
-{
-	std::vector<std::string> packs;
-	SONGMAN->GetSongGroupNames(packs);
-	for (auto packName : packs) {
-		if (packName == pack->name) {
-			SCREENMAN->SystemMessage("Already have pack " + packName +
-									 ", not downloading");
-			return nullptr;
-		}
-	}
-	if (downloadingPacks >= maxPacksToDownloadAtOnce) {
-		DLMAN->DownloadQueue.push_back(std::make_pair(pack, mirror));
-		return nullptr;
-	}
-	Download* dl = DownloadAndInstallPack(mirror ? pack->mirror : pack->url,
-										  pack->name + ".zip");
-	dl->p_Pack = pack;
-	return dl;
-}
 void
 DownloadManager::init()
 {
-	RefreshPackList(packListURL);
-	RefreshLastVersion();
-	RefreshRegisterPage();
 	initialized = true;
 }
 void
@@ -470,217 +299,6 @@ DownloadManager::Update(float fDeltaSeconds)
 		init();
 	if (gameplay)
 		return;
-	UpdatePacks(fDeltaSeconds);
-	UpdateHTTP(fDeltaSeconds);
-}
-void
-DownloadManager::UpdateHTTP(float fDeltaSeconds)
-{
-	if (HTTPRequests.empty() || gameplay)
-		return;
-	timeval timeout;
-	int rc, maxfd = -1;
-	CURLMcode mc;
-	fd_set fdread, fdwrite, fdexcep;
-	long curl_timeo = -1;
-	FD_ZERO(&fdread);
-	FD_ZERO(&fdwrite);
-	FD_ZERO(&fdexcep);
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 1;
-	curl_multi_timeout(mHTTPHandle, &curl_timeo);
-
-	mc = curl_multi_fdset(mHTTPHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
-	if (mc != CURLM_OK) {
-		error = "curl_multi_fdset() failed, code " + to_string(mc);
-		return;
-	}
-	if (maxfd == -1) {
-		rc = 0;
-	} else {
-		rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
-	}
-	switch (rc) {
-		case -1:
-			error = "select error" + to_string(mc);
-			break;
-		case 0:	 /* timeout */
-		default: /* action */
-			curl_multi_perform(mHTTPHandle, &HTTPRunning);
-			break;
-	}
-
-	// Check for finished http requests
-	CURLMsg* msg;
-	int msgs_left;
-	while ((msg = curl_multi_info_read(mHTTPHandle, &msgs_left))) {
-		/* Find out which handle this message is about */
-		int idx_to_delete = -1;
-		for (size_t i = 0; i < HTTPRequests.size(); ++i) {
-			if (msg->easy_handle == HTTPRequests[i]->handle) {
-				if (msg->data.result == CURLE_UNSUPPORTED_PROTOCOL) {
-					HTTPRequests[i]->Failed(*(HTTPRequests[i]), msg);
-					Locator::getLogger()->trace("CURL UNSUPPORTED PROTOCOL (Probably https)");
-				} else if (msg->msg == CURLMSG_DONE) {
-					HTTPRequests[i]->Done(*(HTTPRequests[i]), msg);
-				} else
-					HTTPRequests[i]->Failed(*(HTTPRequests[i]), msg);
-				if (HTTPRequests[i]->handle != nullptr)
-					curl_easy_cleanup(HTTPRequests[i]->handle);
-				HTTPRequests[i]->handle = nullptr;
-				if (HTTPRequests[i]->form != nullptr)
-					curl_formfree(HTTPRequests[i]->form);
-				HTTPRequests[i]->form = nullptr;
-				delete HTTPRequests[i];
-				idx_to_delete = i;
-				break;
-			}
-		}
-		// Delete this here instead of within the loop to avoid iterator
-		// invalidation
-		if (idx_to_delete != -1)
-			HTTPRequests.erase(HTTPRequests.begin() + idx_to_delete);
-	}
-}
-void
-DownloadManager::UpdatePacks(float fDeltaSeconds)
-{
-	timeSinceLastDownload += fDeltaSeconds;
-	if (!pendingInstallDownloads.empty() && !gameplay) {
-		// Install all pending packs
-		for (auto i = pendingInstallDownloads.begin();
-			 i != pendingInstallDownloads.end();
-			 i++) {
-			i->second->Install();
-			finishedDownloads[i->second->m_Url] = i->second;
-			pendingInstallDownloads.erase(i);
-		}
-		// Reload
-		auto screen = SCREENMAN->GetScreen(0);
-		if (screen && screen->GetName() == "ScreenSelectMusic")
-			static_cast<ScreenSelectMusic*>(screen)->DifferentialReload();
-		else if (screen && screen->GetName() == "ScreenNetSelectMusic")
-			static_cast<ScreenNetSelectMusic*>(screen)->DifferentialReload();
-		else
-			SONGMAN->DifferentialReload();
-	}
-	if (downloadingPacks < maxPacksToDownloadAtOnce && !DownloadQueue.empty() &&
-		timeSinceLastDownload > DownloadCooldownTime) {
-		auto it = DownloadQueue.begin();
-		DownloadQueue.pop_front();
-		auto pack = *it;
-		auto* dl = DLMAN->DownloadAndInstallPack(pack.first, pack.second);
-		if (dl)
-			dl->p_Pack->downloading = true;
-	}
-	if (!downloadingPacks)
-		return;
-	timeval timeout;
-	int rc, maxfd = -1;
-	CURLMcode mc;
-	fd_set fdread, fdwrite, fdexcep;
-	long curl_timeo = -1;
-	FD_ZERO(&fdread);
-	FD_ZERO(&fdwrite);
-	FD_ZERO(&fdexcep);
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 1;
-	curl_multi_timeout(mPackHandle, &curl_timeo);
-
-	mc = curl_multi_fdset(mPackHandle, &fdread, &fdwrite, &fdexcep, &maxfd);
-	if (mc != CURLM_OK) {
-		error = "curl_multi_fdset() failed, code " + to_string(mc);
-		return;
-	}
-	if (maxfd == -1) {
-		rc = 0;
-	} else {
-		rc = select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
-	}
-	switch (rc) {
-		case -1:
-			error = "select error" + to_string(mc);
-			break;
-		case 0:	 /* timeout */
-		default: /* action */
-			curl_multi_perform(mPackHandle, &downloadingPacks);
-			for (auto& dl : downloads)
-			{
-				if (dl.second == nullptr) {
-					Locator::getLogger()->warn("Pack download was null? URL: {}", dl.first);
-					continue;
-				}
-				dl.second->Update(fDeltaSeconds);
-			}
-		
-			break;
-	}
-
-	// Check for finished downloads
-	CURLMsg* msg;
-	int msgs_left;
-	bool installedPacks = false;
-	bool finishedADownload = false;
-	while ((msg = curl_multi_info_read(mPackHandle, &msgs_left))) {
-		/* Find out which handle this message is about */
-		for (auto i = downloads.begin(); i != downloads.end(); i++) {
-			if (msg->easy_handle == i->second->handle) {
-				if (msg->msg == CURLMSG_DONE) {
-					finishedADownload = true;
-					i->second->p_RFWrapper.file.Flush();
-					if (i->second->p_RFWrapper.file.IsOpen())
-						i->second->p_RFWrapper.file.Close();
-					if (msg->data.result != CURLE_PARTIAL_FILE &&
-						i->second->progress.total <=
-						  i->second->progress.downloaded) {
-						timeSinceLastDownload = 0;
-						i->second->Done(i->second);
-						if (!gameplay) {
-							installedPacks = true;
-							i->second->Install();
-							finishedDownloads[i->second->m_Url] = i->second;
-						} else {
-							pendingInstallDownloads[i->second->m_Url] =
-							  i->second;
-						}
-					} else {
-						i->second->Failed();
-						finishedDownloads[i->second->m_Url] = i->second;
-					}
-					if (i->second->handle != nullptr)
-						curl_easy_cleanup(i->second->handle);
-					i->second->handle = nullptr;
-					if (i->second->p_Pack != nullptr)
-						i->second->p_Pack->downloading = false;
-					downloads.erase(i);
-					break;
-				} else if (i->second->p_RFWrapper.stop) {
-					i->second->Failed();
-					finishedDownloads[i->second->m_Url] = i->second;
-					if (i->second->handle != nullptr)
-						curl_easy_cleanup(i->second->handle);
-					i->second->handle = nullptr;
-					if (i->second->p_Pack != nullptr)
-						i->second->p_Pack->downloading = false;
-					downloads.erase(i);
-				}
-			}
-		}
-	}
-	if (finishedADownload) {
-		UpdateDLSpeed();
-		if (downloads.empty())
-			MESSAGEMAN->Broadcast("AllDownloadsCompleted");
-	}
-	if (installedPacks) {
-		auto screen = SCREENMAN->GetScreen(0);
-		if (screen && screen->GetName() == "ScreenSelectMusic")
-			static_cast<ScreenSelectMusic*>(screen)->DifferentialReload();
-		else if (screen && screen->GetName() == "ScreenNetSelectMusic")
-			static_cast<ScreenNetSelectMusic*>(screen)->DifferentialReload();
-		else
-			SONGMAN->DifferentialReload();
-	}
 }
 
 string
@@ -693,121 +311,13 @@ DownloadManager::LoggedIn()
 {
 	return !authToken.empty();
 }
-
-void
-DownloadManager::AddFavorite(const string& chartkey)
-{
-	string req = "user/" + DLMAN->sessionUser + "/favorites";
-	DLMAN->favorites.push_back(chartkey);
-	auto done = [req](HTTPRequest& requ, CURLMsg*) {
-		Locator::getLogger()->warn("Favorited: {}{}{}", requ.result, req, DLMAN->sessionUser);
-	};
-	SendRequest(req, { make_pair("chartkey", chartkey) }, done, true, true);
-}
-
-void
-DownloadManager::RemoveFavorite(const string& chartkey)
-{
-	auto it =
-	  std::find(DLMAN->favorites.begin(), DLMAN->favorites.end(), chartkey);
-	if (it != DLMAN->favorites.end())
-		DLMAN->favorites.erase(it);
-	string req = "user/" + DLMAN->sessionUser + "/favorites/" + chartkey;
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-
-	};
-	auto r = SendRequest(req, {}, done);
-	if (r)
-		curl_easy_setopt(r->handle, CURLOPT_CUSTOMREQUEST, "DELETE");
-}
-
-// we could pass scoregoal objects instead..? -mina
-void
-DownloadManager::RemoveGoal(const string& chartkey, float wife, float rate)
-{
-	string req = "user/" + DLMAN->sessionUser + "/goals/" + chartkey + "/" +
-				 to_string(wife) + "/" + to_string(rate);
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-
-	};
-	auto r = SendRequest(req, {}, done);
-	if (r)
-		curl_easy_setopt(r->handle, CURLOPT_CUSTOMREQUEST, "DELETE");
-}
-
-void
-DownloadManager::AddGoal(const string& chartkey,
-						 float wife,
-						 float rate,
-						 DateTime& timeAssigned)
-{
-	string req = "user/" + DLMAN->sessionUser + "/goals";
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-
-	};
-	std::vector<pair<string, string>> postParams = {
-		make_pair("chartkey", chartkey),
-		make_pair("rate", to_string(rate)),
-		make_pair("wife", to_string(wife)),
-		make_pair("timeAssigned", timeAssigned.GetString())
-	};
-	SendRequest(req, postParams, done, true, true);
-}
-
-void
-DownloadManager::UpdateGoal(const string& chartkey,
-							float wife,
-							float rate,
-							bool achieved,
-							DateTime& timeAssigned,
-							DateTime& timeAchieved)
-{
-	string doot = "0000:00:00 00:00:00";
-	if (achieved)
-		doot = timeAchieved.GetString();
-
-	string req = "user/" + DLMAN->sessionUser + "/goals/update";
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-
-	};
-	std::vector<pair<string, string>> postParams = {
-		make_pair("chartkey", chartkey),
-		make_pair("rate", to_string(rate)),
-		make_pair("wife", to_string(wife)),
-		make_pair("achieved", to_string(achieved)),
-		make_pair("timeAssigned", timeAssigned.GetString()),
-		make_pair("timeAchieved", doot)
-	};
-	SendRequest(req, postParams, done, true, true);
-}
-
-void
-DownloadManager::RefreshFavourites()
-{
-	string req = "user/" + DLMAN->sessionUser + "/favorites";
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError() ||
-			!d.HasMember("data") || !d["data"].IsArray())
-			DLMAN->favorites.clear();
-		else {
-			auto& favs = d["data"];
-			for (auto& fav : favs.GetArray()) {
-				if (fav.HasMember("attributes") && fav["attributes"].IsString())
-					DLMAN->favorites.push_back(fav["attributes"].GetString());
-			}
-		}
-		MESSAGEMAN->Broadcast("FavouritesUpdate");
-	};
-	SendRequest(req, {}, done);
-}
-
 bool
 DownloadManager::ShouldUploadScores()
 {
 	return LoggedIn() && automaticSync &&
 		   GamePreferences::m_AutoPlay == PC_HUMAN;
 }
+/*
 inline void
 SetCURLPOSTScore(CURL*& curlHandle,
 				 curl_httppost*& form,
@@ -891,7 +401,7 @@ SetCURLPOSTScore(CURL*& curlHandle,
 						 lastPtr,
 						 "wifeGrade",
 						 string(GradeToString(hs->GetWifeGrade()).c_str()));
-}
+}*/
 
 void
 DownloadManager::UploadScore(HighScore* hs,
@@ -910,11 +420,6 @@ DownloadManager::UploadScore(HighScore* hs,
 	if (load_from_disk)
 		hs->LoadReplayData();
 
-	CURL* curlHandle = initCURLHandle(true);
-	string url = serverURL.Get() + "/score";
-	curl_httppost* form = nullptr;
-	curl_httppost* lastPtr = nullptr;
-	SetCURLPOSTScore(curlHandle, form, lastPtr, hs);
 	string replayString;
 	const auto& offsets = hs->GetOffsetVector();
 	const auto& columns = hs->GetTrackVector();
@@ -954,14 +459,9 @@ DownloadManager::UploadScore(HighScore* hs,
 		// functions
 		replayString = "[]";
 	}
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "replay_data", replayString);
-	SetCURLPostToURL(curlHandle, url);
-	curl_easy_setopt(curlHandle, CURLOPT_HTTPPOST, form);
-	auto done = [this, hs, callback, load_from_disk](HTTPRequest& req,
-													 CURLMsg*) {
+
+	auto done = [this, hs, callback, load_from_disk](HTTPRequest& req) {
 		long response_code;
-		curl_easy_getinfo(req.handle, CURLINFO_RESPONSE_CODE, &response_code);
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
 			Locator::getLogger()->trace("Score upload response json parse error (error: \"{}\" "
@@ -1067,11 +567,7 @@ DownloadManager::UploadScore(HighScore* hs,
 		callback();
 	};
 	HTTPRequest* req = new HTTPRequest(
-	  curlHandle, done, nullptr, [callback](HTTPRequest& req, CURLMsg*) {
-		  callback();
-	  });
-	SetCURLResultsString(curlHandle, &(req->result));
-	curl_multi_add_handle(mHTTPHandle, req->handle);
+	  done, [callback](HTTPRequest& req) { callback(); });
 	HTTPRequests.push_back(req);
 	Locator::getLogger()->trace("Finished creating UploadScore request");
 }
@@ -1275,40 +771,6 @@ split(const std::string& s, char delimiter)
 	}
 	return tokens;
 }
-// User rank
-void
-DownloadManager::RefreshUserRank()
-{
-	if (!LoggedIn())
-		return;
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RefreshUserRank Error: Malformed request response: {}", req.result);
-			return;
-		}
-		if (d.HasMember("errors") && d["errors"].IsObject() &&
-			d["errors"].HasMember("status") && d["errors"]["status"].IsInt() &&
-			d["errors"]["status"].GetInt() == 404)
-			return;
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject()) {
-			auto& skillsets = d["data"]["attributes"];
-			FOREACH_ENUM(Skillset, ss)
-			{
-				auto str = SkillsetToString(ss);
-				if (skillsets.HasMember(str.c_str()) &&
-					skillsets[str.c_str()].IsInt())
-					(DLMAN->sessionRanks)[ss] = skillsets[str.c_str()].GetInt();
-				else
-					(DLMAN->sessionRanks)[ss] = 0;
-			}
-		}
-		MESSAGEMAN->Broadcast("OnlineUpdate");
-	};
-	SendRequest("user/" + sessionUser + "/ranks", {}, done, true, false, true);
-}
 OnlineTopScore
 DownloadManager::GetTopSkillsetScore(unsigned int rank,
 									 Skillset ss,
@@ -1322,138 +784,7 @@ DownloadManager::GetTopSkillsetScore(unsigned int rank,
 	result = false;
 	return OnlineTopScore();
 }
-
-HTTPRequest*
-DownloadManager::SendRequest(string requestName,
-							 std::vector<pair<string, string>> params,
-							 function<void(HTTPRequest&, CURLMsg*)> done,
-							 bool requireLogin,
-							 bool post,
-							 bool async,
-							 bool withBearer)
-{
-	return SendRequestToURL(serverURL.Get() + "/" + requestName,
-							params,
-							done,
-							requireLogin,
-							post,
-							async,
-							withBearer);
-}
-
-HTTPRequest*
-DownloadManager::SendRequestToURL(
-  string url,
-  std::vector<pair<string, string>> params,
-  function<void(HTTPRequest&, CURLMsg*)> afterDone,
-  bool requireLogin,
-  bool post,
-  bool async,
-  bool withBearer)
-{
-	if (requireLogin && !LoggedIn())
-		return nullptr;
-	if (!post && !params.empty()) {
-		url += "?";
-		for (auto& param : params)
-			url += param.first + "=" + param.second + "&";
-		url = url.substr(0, url.length() - 1);
-	}
-	function<void(HTTPRequest&, CURLMsg*)> done = [afterDone, url](HTTPRequest& req,
-															  CURLMsg* msg) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace(
-			  "SendRequestToURL ({}) Parse Error: {}", url, req.result);
-			return;
-		}
-		if (d.HasMember("errors")) {
-			auto on22 = [req, msg, afterDone]() {
-				DLMAN->StartSession(DLMAN->sessionUser,
-									DLMAN->sessionPass,
-									[req, msg, afterDone](bool logged) {
-										if (logged) {
-											auto r = req;
-											afterDone(r, msg);
-										}
-									});
-			};
-			if (d["errors"].IsArray())
-				for (auto& error : d["errors"].GetArray()) {
-					if (error.HasMember("status") && error["status"].IsInt() &&
-						error["status"].GetInt() == 22) {
-						on22();
-						return;
-					}
-				}
-			else if (d["errors"].IsObject() &&
-					 d["errors"].HasMember("status") &&
-					 d["errors"]["status"].IsInt()) {
-				if (d["errors"]["status"].GetInt() == 22) {
-					on22();
-					return;
-				}
-			}
-		}
-		afterDone(req, msg);
-	};
-	CURL* curlHandle = initCURLHandle(withBearer);
-	SetCURLURL(curlHandle, url);
-	HTTPRequest* req;
-	if (post) {
-		curl_httppost* form = nullptr;
-		curl_httppost* lastPtr = nullptr;
-		for (auto& param : params)
-			CURLFormPostField(curlHandle,
-							  form,
-							  lastPtr,
-							  param.first.c_str(),
-							  param.second.c_str());
-		curl_easy_setopt(curlHandle, CURLOPT_HTTPPOST, form);
-		req = new HTTPRequest(curlHandle, done, form);
-	} else {
-		req = new HTTPRequest(curlHandle, done);
-		curl_easy_setopt(curlHandle, CURLOPT_HTTPGET, 1L);
-	}
-	SetCURLResultsString(curlHandle, &(req->result));
-	if (async) {
-		if (mHTTPHandle == nullptr)
-			mHTTPHandle = curl_multi_init();
-		curl_multi_add_handle(mHTTPHandle, req->handle);
-		HTTPRequests.push_back(req);
-	} else {
-		CURLcode res = curl_easy_perform(req->handle);
-		curl_easy_cleanup(req->handle);
-		done(*req, nullptr);
-		delete req;
-		return nullptr;
-	}
-	return req;
-}
-void
-DownloadManager::RefreshCountryCodes()
-{
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RefreshCountryCodes Error: Malformed request response: {}", req.result);
-			return;
-		}
-		if (d.HasMember("data") && d["data"].IsArray())
-			for (auto& code_obj : d["data"].GetArray()) {
-				if (code_obj.HasMember("id") && code_obj["id"].IsString())
-					DLMAN->countryCodes.push_back(code_obj["id"].GetString());
-				else
-					DLMAN->countryCodes.push_back("");
-			}
-		// append the list to global/player country code so
-		// we dont have to merge tables in lua -mina
-		DLMAN->countryCodes.push_back(string("Global"));
-	};
-	SendRequest(
-	  "/misc/countrycodes", std::vector<pair<string, string>>(), done, true);
-}
-
+/*
 void
 DownloadManager::RequestReplayData(const string& scoreid,
 								   int userid,
@@ -1861,256 +1192,11 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 				done,
 				true);
 }
-
-void
-DownloadManager::RefreshCoreBundles()
-{
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RefreshCoreBundles Error: Malformed request response: {}", req.result);
-			return;
-		}
-
-		if (d.HasMember("data") && d["data"].IsArray()) {
-			auto& dlPacks = DLMAN->downloadablePacks;
-			for (auto& bundleData : d["data"].GetArray()) {
-				if (!bundleData.HasMember("id") ||
-					!bundleData["id"].IsString() ||
-					!bundleData.HasMember("attributes") ||
-					!bundleData["attributes"].IsObject() ||
-					!bundleData["attributes"].HasMember("packs") ||
-					!bundleData["attributes"]["packs"].IsArray())
-					continue;
-				auto bundleName = bundleData["id"].GetString();
-				(DLMAN->bundles)[bundleName] = {};
-				auto& bundle = (DLMAN->bundles)[bundleName];
-				for (auto& pack :
-					 bundleData["attributes"]["packs"].GetArray()) {
-					if (!pack.HasMember("packname") ||
-						!pack["packname"].IsString())
-						continue;
-					auto name = pack["packname"].GetString();
-					auto dlPack = std::find_if(
-					  dlPacks.begin(),
-					  dlPacks.end(),
-					  [&name](DownloadablePack x) { return x.name == name; });
-					if (dlPack != dlPacks.end())
-						bundle.push_back(&(*dlPack));
-				}
-			}
-		}
-		if (MESSAGEMAN != nullptr)
-			MESSAGEMAN->Broadcast("CoreBundlesRefreshed");
-	};
-	SendRequest("packs/collections/", {}, done, false);
-}
-
-std::vector<DownloadablePack*>
-DownloadManager::GetCoreBundle(const string& whichoneyo)
-{
-	return bundles.count(whichoneyo) ? bundles[whichoneyo]
-									 : std::vector<DownloadablePack*>();
-}
-
-void
-DownloadManager::DownloadCoreBundle(const string& whichoneyo, bool mirror)
-{
-	auto bundle = GetCoreBundle(whichoneyo);
-	sort(bundle.begin(),
-		 bundle.end(),
-		 [](DownloadablePack* x1, DownloadablePack* x2) {
-			 return x1->size < x2->size;
-		 });
-	for (auto pack : bundle)
-		DLMAN->DownloadQueue.push_back(std::make_pair(pack, mirror));
-}
-
-void
-DownloadManager::RefreshLastVersion()
-{
-	auto done = [this](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RefreshLastVersion Error: Malformed request response: {}", req.result);
-			return;
-		}
-
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("version") &&
-			d["data"]["attributes"]["version"].IsString())
-			this->lastVersion = d["data"]["attributes"]["version"].GetString();
-		else
-			this->lastVersion = GAMESTATE->GetEtternaVersion();
-	};
-	SendRequest("client/version",
-				std::vector<pair<string, string>>(),
-				done,
-				false,
-				false,
-				true);
-}
-void
-DownloadManager::RefreshRegisterPage()
-{
-	auto done = [this](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RefreshRegisterPage Error: Malformed request response: {}", req.result);
-			return;
-		}
-
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("url") &&
-			d["data"]["attributes"]["url"].IsString())
-			this->registerPage = d["data"]["attributes"]["url"].GetString();
-		else
-			this->registerPage = "";
-	};
-	SendRequest("client/registration",
-				std::vector<pair<string, string>>(),
-				done,
-				false,
-				false,
-				true);
-}
-void
-DownloadManager::RefreshTop25(Skillset ss)
-{
-	DLMAN->topScores[ss].clear();
-	if (!LoggedIn())
-		return;
-	string req = "user/" + DLMAN->sessionUser + "/top/";
-	CURL* curlHandle = initCURLHandle(true);
-	if (ss != Skill_Overall)
-		req += SkillsetToString(ss) + "/25";
-	auto done = [ss](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError() ||
-			(d.HasMember("errors") && d["errors"].IsArray() &&
-			 d["errors"][0].HasMember("status") &&
-			 d["errors"][0]["status"].GetInt() == 404) ||
-			!d.HasMember("data") || !d["data"].IsArray()) {
-			Locator::getLogger()->trace(
-			  "Malformed top25 scores request response: {}", req.result);
-			return;
-		}
-		std::vector<OnlineTopScore>& vec = DLMAN->topScores[ss];
-		auto& scores = d["data"];
-		for (auto& score_obj : scores.GetArray()) {
-			if (!score_obj.HasMember("attributes")) {
-				StringBuffer buffer;
-				Writer<StringBuffer> writer(buffer);
-				score_obj.Accept(writer);
-				Locator::getLogger()->trace(
-				  "Malformed single score in top25 scores request response: {}",
-				  buffer.GetString());
-				continue;
-			}
-			auto& score = score_obj["attributes"];
-			if (!score.HasMember("songName") || !score["songName"].IsString() ||
-				!score.HasMember("wife") || !score["wife"].IsNumber() ||
-				!score.HasMember("Overall") || !score["Overall"].IsNumber() ||
-				!score.HasMember("chartKey") || !score["chartKey"].IsString() ||
-				!score_obj.HasMember("id") || !score_obj["id"].IsString() ||
-				!score.HasMember("rate") || !score["rate"].IsNumber() ||
-				!score.HasMember("difficulty") ||
-				!score["difficulty"].IsString() ||
-				!score.HasMember("skillsets") ||
-				(ss != Skill_Overall &&
-				 (!score["skillsets"].HasMember(SkillsetToString(ss).c_str()) ||
-				  !score["skillsets"][SkillsetToString(ss).c_str()]
-					 .IsNumber()))) {
-				StringBuffer buffer;
-				Writer<StringBuffer> writer(buffer);
-				score_obj.Accept(writer);
-				Locator::getLogger()->trace(
-				  "Malformed single score in top25 scores request response: {}",
-				  buffer.GetString());
-				continue;
-			}
-			OnlineTopScore tmp;
-			tmp.songName = score["songName"].GetString();
-			tmp.wifeScore = score["wife"].GetFloat() / 100.f;
-			tmp.overall = score["Overall"].GetFloat();
-			if (ss != Skill_Overall)
-				tmp.ssr =
-				  score["skillsets"][SkillsetToString(ss).c_str()].GetFloat();
-			else
-				tmp.ssr = tmp.overall;
-			tmp.chartkey = score["chartKey"].GetString();
-			tmp.scorekey = score_obj["id"].GetString();
-			tmp.rate = score["rate"].GetFloat();
-			tmp.difficulty =
-			  StringToDifficulty(score["difficulty"].GetString());
-			vec.push_back(tmp);
-		}
-		MESSAGEMAN->Broadcast("OnlineUpdate");
-	};
-	SendRequest(req, {}, done);
-}
-// Skillset ratings (we dont care about mod lvl, username, about, etc)
-void
-DownloadManager::RefreshUserData()
-{
-	if (!LoggedIn())
-		return;
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace(
-			  "RefreshUserData Error: Malformed request response: {}",
-			  req.result);
-			return;
-		}
-
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("skillsets") &&
-			d["data"]["attributes"]["skillsets"].IsObject()) {
-			auto& attr = d["data"]["attributes"];
-			auto& skillsets = attr["skillsets"];
-			FOREACH_ENUM(Skillset, ss)
-			{
-				auto str = SkillsetToString(ss);
-				if (skillsets.HasMember(str.c_str()) &&
-					skillsets[str.c_str()].IsNumber())
-					(DLMAN->sessionRatings)[ss] =
-					  skillsets[str.c_str()].GetDouble();
-				else
-					(DLMAN->sessionRatings)[ss] = 0.0f;
-			}
-			if (attr.HasMember("playerRating") &&
-				attr["playerRating"].IsNumber())
-				DLMAN->sessionRatings[Skill_Overall] =
-				  attr["playerRating"].GetDouble();
-			if (skillsets.HasMember("countryCode") &&
-				skillsets["countryCode"].IsString())
-				DLMAN->countryCode = attr["countryCode"].GetString();
-			else
-				DLMAN->countryCode = "";
-		} else
-			FOREACH_ENUM(Skillset, ss)
-		(DLMAN->sessionRatings)[ss] = 0.0f;
-
-		MESSAGEMAN->Broadcast("OnlineUpdate");
-	};
-	SendRequest("user/" + sessionUser, {}, done);
-}
+*/
 
 void
 DownloadManager::OnLogin()
 {
-	DLMAN->RefreshUserRank();
-	DLMAN->RefreshUserData();
-	DLMAN->RefreshCountryCodes();
-	FOREACH_ENUM(Skillset, ss)
-	DLMAN->RefreshTop25(ss);
 	if (DLMAN->ShouldUploadScores()) {
 		DLMAN->UploadScores();
 
@@ -2120,8 +1206,6 @@ DownloadManager::OnLogin()
 		// way, but keep disabled for now
 		// DLMAN->UpdateOnlineScoreReplayData();
 	}
-	if (GAMESTATE->m_pCurSteps != nullptr)
-		DLMAN->RequestChartLeaderBoard(GAMESTATE->m_pCurSteps->GetChartKey());
 	MESSAGEMAN->Broadcast("Login");
 	DLMAN->loggingIn = false;
 }
@@ -2138,20 +1222,14 @@ DownloadManager::StartSession(
 	}
 	DLMAN->loggingIn = true;
 	EndSessionIfExists();
-	CURL* curlHandle = initCURLHandle(false);
-	SetCURLPostToURL(curlHandle, url);
-	curl_easy_setopt(
-	  curlHandle, CURLOPT_COOKIEFILE, ""); /* start cookie engine */
 
-	curl_httppost* form = nullptr;
-	curl_httppost* lastPtr = nullptr;
+	/*
 	CURLFormPostField(curlHandle, form, lastPtr, "username", user.c_str());
 	CURLFormPostField(curlHandle, form, lastPtr, "password", pass.c_str());
 	CURLFormPostField(
 	  curlHandle, form, lastPtr, "clientData", CLIENT_DATA_KEY.c_str());
-	curl_easy_setopt(curlHandle, CURLOPT_HTTPPOST, form);
-
-	auto done = [user, pass, callback](HTTPRequest& req, CURLMsg*) {
+	*/
+	auto done = [user, pass, callback](HTTPRequest& req) {
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
 			Locator::getLogger()->trace(
@@ -2183,16 +1261,12 @@ DownloadManager::StartSession(
 		DLMAN->OnLogin();
 		callback(DLMAN->LoggedIn());
 	};
-	HTTPRequest* req = new HTTPRequest(curlHandle, done, form);
-	req->Failed = [](HTTPRequest& req, CURLMsg*) {
+	HTTPRequest* req = new HTTPRequest(done);
+	req->Failed = [](HTTPRequest& req) {
 		DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
 		MESSAGEMAN->Broadcast("LoginFailed");
 		DLMAN->loggingIn = false;
 	};
-	SetCURLResultsString(curlHandle, &(req->result));
-	if (mHTTPHandle == nullptr)
-		mHTTPHandle = curl_multi_init();
-	curl_multi_add_handle(mHTTPHandle, req->handle);
 	HTTPRequests.push_back(req);
 }
 int
@@ -2210,112 +1284,16 @@ DownloadManager::GetSkillsetRating(Skillset ss)
 		return 0.0f;
 	return static_cast<float>(sessionRatings[ss]);
 }
-void
-DownloadManager::RefreshPackList(const string& url)
-{
-	if (url.empty())
-		return;
-	auto done = [](HTTPRequest& req, CURLMsg*) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError() ||
-			!(d.IsArray() || (d.HasMember("data") && d["data"].IsArray()))) {
-			return;
-		}
-		auto& packlist = DLMAN->downloadablePacks;
-		DLMAN->downloadablePacks.clear();
-		Value* packs;
-		if (d.IsArray())
-			packs = &d;
-		else
-			packs = &(d["data"]);
-		for (auto& pack_obj : packs->GetArray()) {
-			DownloadablePack tmp;
-			if (pack_obj.HasMember("id") && pack_obj["id"].IsString())
-				tmp.id = std::stoi(pack_obj["id"].GetString());
-			else
-				tmp.id = 0;
-
-			auto& pack = pack_obj.HasMember("attributes")
-						   ? pack_obj["attributes"]
-						   : pack_obj;
-
-			if (pack.HasMember("pack") && pack["pack"].IsString())
-				tmp.name = pack["pack"].GetString();
-			else if (pack.HasMember("packname") && pack["packname"].IsString())
-				tmp.name = pack["packname"].GetString();
-			else if (pack.HasMember("name") && pack["name"].IsString())
-				tmp.name = pack["name"].GetString();
-			else {
-				StringBuffer buffer;
-				Writer<StringBuffer> writer(buffer);
-				pack_obj.Accept(writer);
-				Locator::getLogger()->trace(
-				  "Missing pack name in packlist element: {}",
-				  buffer.GetString());
-				continue;
-			}
-
-			if (pack.HasMember("download") && pack["download"].IsString())
-				tmp.url = pack["download"].GetString();
-			else if (pack.HasMember("url") && pack["url"].IsString()) {
-				tmp.url = pack["url"].GetString();
-			} else
-				tmp.url = "";
-			if (pack.HasMember("mirror") && pack["mirror"].IsString())
-				tmp.mirror = pack["mirror"].GetString();
-			else
-				tmp.mirror = "";
-			if (tmp.url.empty() && tmp.mirror.empty()) {
-				StringBuffer buffer;
-				Writer<StringBuffer> writer(buffer);
-				pack_obj.Accept(writer);
-				Locator::getLogger()->trace(
-				  "Missing download link in packlist element: {}",
-				  buffer.GetString());
-				continue;
-			}
-			if (tmp.url.empty())
-				tmp.url = tmp.mirror;
-			else if (tmp.mirror.empty())
-				tmp.mirror = tmp.url;
-
-			if (pack.HasMember("average") && pack["average"].IsNumber())
-				tmp.avgDifficulty = pack["average"].GetFloat();
-			else
-				tmp.avgDifficulty = 0.f;
-
-			if (pack.HasMember("size") && pack["size"].IsNumber())
-				tmp.size = pack["size"].GetInt();
-			else
-				tmp.size = 0;
-
-			packlist.push_back(tmp);
-		}
-		if (MESSAGEMAN != nullptr)
-			MESSAGEMAN->Broadcast("PackListRefreshed");
-		DLMAN->RefreshCoreBundles();
-	};
-	SendRequestToURL(url, {}, done, false, false, true, false);
-}
 
 Download::Download(string url, string filename, function<void(Download*)> done)
 {
 	Done = done;
 	m_Url = url;
-	handle = initBasicCURLHandle();
 	m_TempFileName =
 	  DL_DIR + (!filename.empty() ? filename : MakeTempFileName(url));
 	auto opened = p_RFWrapper.file.Open(m_TempFileName, 2);
 	ASSERT_M(opened, p_RFWrapper.file.GetError());
 	DLMAN->EncodeSpaces(m_Url);
-
-	curl_easy_setopt(handle, CURLOPT_WRITEDATA, &p_RFWrapper);
-	curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_data);
-	curl_easy_setopt(handle, CURLOPT_URL, m_Url.c_str());
-	curl_easy_setopt(handle, CURLOPT_XFERINFODATA, &progress);
-	curl_easy_setopt(handle, CURLOPT_XFERINFOFUNCTION, progressfunc);
-	curl_easy_setopt(handle, CURLOPT_NOPROGRESS, 0);
-	curl_easy_setopt(handle, CURLOPT_HTTPGET, 1L);
 }
 
 Download::~Download()
@@ -2373,7 +1351,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetUserCountryCode(T* p, lua_State* L)
 	{
-		lua_pushstring(L, DLMAN->countryCode.c_str());
+		lua_pushstring(L, "World");
 		return 1;
 	}
 	static int GetAllPacks(T* p, lua_State* L)
@@ -2428,6 +1406,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetDownloads(T* p, lua_State* L)
 	{
+		/*
 		map<string, Download*>& dls = DLMAN->downloads;
 		lua_createtable(L, dls.size(), 0);
 		int j = 0;
@@ -2436,6 +1415,8 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			lua_rawseti(L, -2, j + 1);
 			j++;
 		}
+		*/
+		LuaHelpers::CreateTableFromArray(std::vector<Download*>(), L);
 		return 1;
 	}
 	static int IsLoggedIn(T* p, lua_State* L)
@@ -2592,6 +1573,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetCoreBundle(T* p, lua_State* L)
 	{
+		/*
 		// don't remove this yet or at all idk yet -mina
 		auto bundle = DLMAN->GetCoreBundle(SArg(1));
 		lua_createtable(L, bundle.size(), 0);
@@ -2610,6 +1592,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 
 		if (!bundle.empty())
 			avgpackdiff /= bundle.size();
+		
 
 		// this may be kind of unintuitive but lets roll with it for now
 		// -mina
@@ -2617,7 +1600,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		lua_setfield(L, -2, "TotalSize");
 		lua_pushnumber(L, avgpackdiff);
 		lua_setfield(L, -2, "AveragePackDifficulty");
-
+		*/
 		return 1;
 	}
 	static int DownloadCoreBundle(T* p, lua_State* L)
@@ -2626,7 +1609,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		if (!lua_isnoneornil(L, 2)) {
 			bMirror = BArg(2);
 		}
-		DLMAN->DownloadCoreBundle(SArg(1), bMirror);
+		//DLMAN->DownloadCoreBundle(SArg(1), bMirror);
 		return 0;
 	}
 	static int GetToken(T* p, lua_State* L)
@@ -2667,7 +1650,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			return 0;
 		}
 
-		DLMAN->RequestReplayData(scoreid, userid, username, ck, f);
+		//DLMAN->RequestReplayData(scoreid, userid, username, ck, f);
 		return 0;
 	}
 
@@ -2706,7 +1689,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 			}
 			return 0;
 		}
-		DLMAN->RequestChartLeaderBoard(chart, ref);
+		//DLMAN->RequestChartLeaderBoard(chart, ref);
 
 		return 0;
 	}
@@ -2869,7 +1852,7 @@ class LunaDownloadablePack : public Luna<DownloadablePack>
 			p->PushSelf(L);
 			return 1;
 		}
-		Download* dl = DLMAN->DownloadAndInstallPack(p, mirror);
+		Download* dl = nullptr; //DLMAN->DownloadAndInstallPack(p, mirror);
 		if (dl) {
 			dl->PushSelf(L);
 			p->downloading = true;
@@ -2930,12 +1913,14 @@ class LunaDownloadablePack : public Luna<DownloadablePack>
 			// have to check both
 			auto u = p->url;
 			auto m = p->mirror;
+			/*
 			if (DLMAN->downloads.count(u))
 				DLMAN->downloads[u]->PushSelf(L);
 			else if (DLMAN->downloads.count(m))
 				DLMAN->downloads[m]->PushSelf(L);
 			else
 				lua_pushnil(L); // this shouldnt happen
+				*/
 		}
 		else
 			lua_pushnil(L);
@@ -2989,7 +1974,7 @@ class LunaDownload : public Luna<Download>
 	}
 	static int GetTotalKB(T* p, lua_State* L)
 	{
-		lua_pushnumber(L, static_cast<int>(p->progress.total));
+		lua_pushnumber(L, static_cast<int>(p->progress.dltotal));
 		return 1;
 	}
 	static int Stop(T* p, lua_State* L)
