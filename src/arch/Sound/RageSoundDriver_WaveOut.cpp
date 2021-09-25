@@ -9,6 +9,7 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Singletons/PrefsManager.h"
 #include "archutils/Win32/ErrorStrings.h"
+#include <nowide/convert.hpp>
 
 REGISTER_SOUND_DRIVER_CLASS(WaveOut);
 
@@ -24,8 +25,8 @@ const int chunksize = buffersize / num_chunks; /* in bytes */
 static std::string
 wo_ssprintf(MMRESULT err, const char* szFmt, ...)
 {
-	LPWSTR szBuf[MAXERRORLENGTH];
-	waveOutGetErrorText(err, reinterpret_cast<LPWSTR>(szBuf), MAXERRORLENGTH);
+	wchar_t szBuf[MAXERRORLENGTH];
+	waveOutGetErrorText(err, szBuf, MAXERRORLENGTH);
 
 	va_list va;
 	va_start(va, szFmt);

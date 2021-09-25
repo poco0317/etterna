@@ -63,7 +63,7 @@ USBDevice::Open(int iVID,
 
 	std::string path;
 	while (!(path = GetUSBDevicePath(iIndex++)).empty()) {
-		HANDLE h = CreateFile(reinterpret_cast<LPCWSTR>(path.c_str()),
+		HANDLE h = CreateFile(nowide::widen(path).c_str(),
 							  GENERIC_READ,
 							  FILE_SHARE_READ | FILE_SHARE_WRITE,
 							  NULL,
@@ -149,7 +149,7 @@ WindowsFileIO::Open(const std::string& path, int iBlockSize)
 	if (m_Handle != INVALID_HANDLE_VALUE)
 		CloseHandle(m_Handle);
 
-	m_Handle = CreateFile(reinterpret_cast<LPCWSTR>(path.c_str()),
+	m_Handle = CreateFile(nowide::widen(path).c_str(),
 						  GENERIC_READ,
 						  FILE_SHARE_READ | FILE_SHARE_WRITE,
 						  NULL,

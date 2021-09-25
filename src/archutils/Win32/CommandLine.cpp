@@ -1,6 +1,7 @@
 #include "Etterna/Globals/global.h"
 #include "CommandLine.h"
 #include <windows.h>
+#include <nowide/convert.hpp>
 
 /* Ugh. Windows doesn't give us the argv[] parser; all it gives is
  * CommandLineToArgvW, which is NT-only, so we have to do this ourself. Don't
@@ -8,7 +9,12 @@
 int
 GetWin32CmdLine(char**& argv)
 {
-	char* pCmdLine = reinterpret_cast<char*>(GetCommandLine());
+	// dude I DONT WRITE C WHAT IS GOING ON
+	// PROBABLY MEMORY LEAKS EVERYWHERE HERE
+	wchar_t* wcpr = GetCommandLine();
+	std::string wcprs = nowide::narrow(wcpr);
+	char* pCmdLine = new char[wcprs.length() + 1];
+	strcpy(pCmdLine, wcprs.c_str());
 	int argc = 0;
 	argv = NULL;
 

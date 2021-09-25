@@ -9,9 +9,9 @@ WindowsDialogBox::WindowsDialogBox()
 void
 WindowsDialogBox::Run(int iDialog)
 {
-	char szFullAppPath[MAX_PATH];
-	GetModuleFileName(NULL, reinterpret_cast<LPWSTR>(szFullAppPath), MAX_PATH);
-	HINSTANCE hHandle = LoadLibrary(reinterpret_cast<LPCWSTR>(szFullAppPath));
+	wchar_t szFullAppPath[MAX_PATH];
+	GetModuleFileName(NULL, szFullAppPath, MAX_PATH);
+	HINSTANCE hHandle = LoadLibrary(szFullAppPath);
 
 	DialogBoxParam(
 	  hHandle, MAKEINTRESOURCE(iDialog), NULL, DlgProc, (LPARAM)this);

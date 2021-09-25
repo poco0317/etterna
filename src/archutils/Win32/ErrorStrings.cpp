@@ -3,18 +3,18 @@
 #include "RageUtil/Utils/RageUtil.h"
 
 #include <windows.h>
+#include <nowide/convert.hpp>
 
 std::string
 werr_ssprintf(int err, const char* fmt, ...)
 {
-	char buf[1024] = "";
+	wchar_t buf[1024] = L"";
 	FormatMessage(
-	  FORMAT_MESSAGE_FROM_SYSTEM, 0, err, 0,
-				  reinterpret_cast<LPWSTR>(buf), sizeof(buf), NULL);
+	  FORMAT_MESSAGE_FROM_SYSTEM, 0, err, 0, buf, sizeof(buf), NULL);
 
 	// Why is FormatMessage returning text ending with \r\n? (who? -aj)
 	// Perhaps it's because you're on Windows, where newlines are \r\n. -aj
-	std::string text = buf;
+	std::string text = nowide::narrow(buf);
 	s_replace(text, "\n", "");
 	s_replace(text, "\r", " "); // foo\r\nbar -> foo bar
 	TrimRight(text);			// "foo\r\n" -> "foo"

@@ -20,14 +20,13 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		DWORD ignore;
 		DWORD iSize =
 		  GetFileVersionInfoSize(
-		  reinterpret_cast<LPCWSTR>(const_cast<char*>(sFile.c_str())), &ignore);
+		  nowide::widen(sFile).c_str(), &ignore);
 		if (!iSize)
 			break;
 
 		std::string VersionBuffer(iSize, ' ');
-		// Also VC6:
-		if (!GetFileVersionInfo(
-			  reinterpret_cast<LPCWSTR>(const_cast<char*>(sFile.c_str())),
+		// Also VC6: (WHAT? THIS ISNT 2004)
+		if (!GetFileVersionInfo(nowide::widen(sFile).c_str(),
 								NULL,
 								iSize,
 								const_cast<char*>(VersionBuffer.c_str())))
@@ -37,7 +36,7 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		UINT iTransCnt;
 
 		if (!VerQueryValue((void*)VersionBuffer.c_str(),
-			  reinterpret_cast<LPCWSTR>("\\VarFileInfo\\Translation"),
+						   L"\\VarFileInfo\\Translation",
 						   (void**)&iTrans,
 						   &iTransCnt))
 			break;
@@ -51,7 +50,7 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 		std::string sRes = ssprintf(
 		  "\\StringFileInfo\\%04x%04x\\FileVersion", iTrans[0], iTrans[1]);
 		if (!VerQueryValue((void*)VersionBuffer.c_str(),
-						   reinterpret_cast<LPCWSTR>((char*)sRes.c_str()),
+						   nowide::widen(sRes).c_str(),
 						   (void**)&str,
 						   &len) ||
 			len < 1)
@@ -80,8 +79,8 @@ GetFileVersion(const std::string& sFile, std::string& sOut)
 std::string
 FindSystemFile(const std::string& sFile)
 {
-	char szWindowsPath[MAX_PATH];
-	GetWindowsDirectory(reinterpret_cast<LPWSTR>(szWindowsPath), MAX_PATH);
+	wchar_t szWindowsPath[MAX_PATH];
+	GetWindowsDirectory(szWindowsPath, MAX_PATH);
 
 	const char* szPaths[] = { "/system32/", "/system32/drivers/",
 							  "/system/",	"/system/drivers/",

@@ -5,6 +5,7 @@
 #include "archutils/Win32/ErrorStrings.h"
 
 #include <windows.h>
+#include <nowide/convert.hpp>
 
 /* Given "HKEY_LOCAL_MACHINE\hardware\foo", return "hardware\foo", and place
  * the HKEY_LOCAL_MACHINE constant in key. */
@@ -56,13 +57,14 @@ OpenRegKey(const std::string& sKey, RegKeyMode mode, bool bWarnOnError = true)
 
 	HKEY hRetKey;
 	LONG retval = RegOpenKeyEx(hType,
-							   reinterpret_cast<LPCWSTR>(sSubkey.c_str()),
+							   nowide::widen(sSubkey).c_str(),
 							   0,
 							   (mode == READ) ? KEY_READ : KEY_WRITE,
 							   &hRetKey);
 	if (retval != ERROR_SUCCESS) {
 		if (bWarnOnError)
-			Locator::getLogger()->warn(werr_ssprintf(retval, "RegOpenKeyEx(%x,%s) error", hType, sSubkey.c_str()));
+			Locator::getLogger()->warn(werr_ssprintf(
+			  retval, "RegOpenKeyEx(%x,%s) error", hType, sSubkey.c_str()));
 		return nullptr;
 	}
 
@@ -81,9 +83,12 @@ RegistryAccess::GetRegValue(const std::string& sKey,
 	char sBuffer[MAX_PATH];
 	DWORD iSize = sizeof(sBuffer);
 	DWORD iType;
-	LONG iRet = RegQueryValueEx(
-	  hKey,
-								reinterpret_cast<LPCWSTR>(sName.c_str()), nullptr, &iType, (LPBYTE)sBuffer, &iSize);
+	LONG iRet = RegQueryValueEx(hKey,
+								nowide::widen(sName).c_str(),
+								nullptr,
+								&iType,
+								(LPBYTE)sBuffer,
+								&iSize);
 	RegCloseKey(hKey);
 	if (iRet != ERROR_SUCCESS)
 		return false;
@@ -115,9 +120,12 @@ RegistryAccess::GetRegValue(const std::string& sKey,
 	DWORD iValue;
 	DWORD iSize = sizeof(iValue);
 	DWORD iType;
-	LONG iRet = RegQueryValueEx(
-	  hKey,
-								reinterpret_cast<LPCWSTR>(sName.c_str()), nullptr, &iType, (LPBYTE)&iValue, &iSize);
+	LONG iRet = RegQueryValueEx(hKey,
+								nowide::widen(sName).c_str(),
+								nullptr,
+								&iType,
+								(LPBYTE)&iValue,
+								&iSize);
 	RegCloseKey(hKey);
 	if (iRet != ERROR_SUCCESS)
 		return false;
@@ -155,11 +163,16 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 	bool bError = false;
 	for (int index = 0;; ++index) {
 		FILETIME ft;
-		char szBuffer[MAX_PATH];
+		wchar_t szBuffer[MAX_PATH];
 		DWORD iSize = sizeof(szBuffer);
-		LONG iRet = RegEnumKeyEx(
-		  hKey, index,
-								 reinterpret_cast<LPWSTR>(szBuffer), &iSize, nullptr, nullptr, nullptr, &ft);
+		LONG iRet = RegEnumKeyEx(hKey,
+								 index,
+								 szBuffer,
+								 &iSize,
+								 nullptr,
+								 nullptr,
+								 nullptr,
+								 &ft);
 		if (iRet == ERROR_NO_MORE_ITEMS)
 			break;
 
@@ -169,7 +182,8 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 			break;
 		}
 
-		std::string sStr(szBuffer, iSize);
+		std::wstring swStr(szBuffer, iSize);
+		std::string sStr = nowide::narrow(swStr);
 
 		if (re.Compare(sStr)) {
 			if (bReturnPathToo)
@@ -198,10 +212,10 @@ RegistryAccess::SetRegValue(const std::string& sKey,
 	if (sVal.size() > 254)
 		return false;
 
-	strcpy(reinterpret_cast<char*>(sz), sVal.c_str());
+	wcscpy(sz, nowide::widen(sVal).c_str());
 
 	LONG lResult = ::RegSetValueEx(
-	  hKey, LPCTSTR(sName.c_str()), 0, REG_SZ, (LPBYTE)sz, strlen(reinterpret_cast<const char*>(sz)) + 1);
+	  hKey, LPCTSTR(sName.c_str()), 0, REG_SZ, (LPBYTE)sz, wcslen(sz) + 1);
 	if (lResult != ERROR_SUCCESS)
 		bSuccess = false;
 
@@ -243,7 +257,7 @@ RegistryAccess::CreateKey(const std::string& sKey)
 	HKEY hKey;
 	DWORD dwDisposition = 0;
 	if (::RegCreateKeyEx(hType,
-						 reinterpret_cast<LPCWSTR>(sSubkey.c_str()),
+						 nowide::widen(sSubkey).c_str(),
 						 0,
 						 nullptr,
 						 REG_OPTION_NON_VOLATILE,

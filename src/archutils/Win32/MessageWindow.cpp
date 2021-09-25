@@ -3,6 +3,8 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "AppInstance.h"
 #include "archutils/Win32/ErrorStrings.h"
+#include <nowide/convert.hpp>
+
 
 MessageWindow::MessageWindow(const std::string& sClassName)
 {
@@ -17,17 +19,17 @@ MessageWindow::MessageWindow(const std::string& sClassName)
 		LoadCursor(NULL, IDC_ARROW), /* default cursor */
 		NULL,						 /* hbrBackground */
 		NULL,						 /* lpszMenuName */
-		reinterpret_cast<LPCWSTR>(sClassName.c_str()) /* lpszClassName */
+		nowide::widen(sClassName).c_str() /* lpszClassName */
 	};
 
-	if (!RegisterClassA(reinterpret_cast<const WNDCLASSA*>(&WindowClass)) &&
+	if (!RegisterClass(&WindowClass) &&
 		GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
 		RageException::Throw(
 		  "%s", werr_ssprintf(GetLastError(), "RegisterClass").c_str());
 
 	// XXX: on 2k/XP, use HWND_MESSAGE as parent
-	m_hWnd = CreateWindow(reinterpret_cast<LPCWSTR>(sClassName.c_str()),
-						  reinterpret_cast<LPCWSTR>(sClassName.c_str()),
+	m_hWnd = CreateWindow(nowide::widen(sClassName).c_str(),
+						  nowide::widen(sClassName).c_str(),
 						  WS_DISABLED,
 						  0,
 						  0,

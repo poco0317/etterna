@@ -16,6 +16,7 @@
 #elif defined(__unix__) || defined(__APPLE__)
 #include <paths.h>
 #endif
+#include <nowide/convert.hpp>
 
 RageFileManager* FILEMAN = nullptr;
 
@@ -229,9 +230,9 @@ GetDirOfExecutable(std::string argv0)
 
 	std::string sPath;
 #ifdef _WIN32
-	char szBuf[MAX_PATH];
-	GetModuleFileName(nullptr, reinterpret_cast<LPWSTR>(szBuf), sizeof(szBuf));
-	sPath = szBuf;
+	wchar_t szBuf[MAX_PATH];
+	GetModuleFileName(nullptr, szBuf, sizeof(szBuf));
+	sPath = nowide::narrow(szBuf);
 #else
 	sPath = argv0;
 #endif

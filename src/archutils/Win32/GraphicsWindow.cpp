@@ -20,6 +20,7 @@
 
 #include <set>
 #include <dbt.h>
+#include <nowide/convert.hpp>
 
 static const std::string g_sClassName = Core::AppInfo::APP_TITLE;
 
@@ -302,7 +303,7 @@ GraphicsWindow::CreateGraphicsWindow(const VideoModeParams& p,
 		  GetWindowStyle(p.windowed, p.bWindowIsFullscreenBorderless);
 
 		AppInstance inst;
-		HWND hWnd = CreateWindow(reinterpret_cast<LPCWSTR>(g_sClassName.c_str()),
+		HWND hWnd = CreateWindow(nowide::widen(g_sClassName).c_str(),
 								 L"app",
 								 iWindowStyle,
 								 0,
@@ -339,8 +340,7 @@ GraphicsWindow::CreateGraphicsWindow(const VideoModeParams& p,
 	do {
 		if (m_bWideWindowClass) {
 			if (SetWindowText(g_hWndMain,
-							  reinterpret_cast<LPCWSTR>(
-								ConvertUTF8ToACP(p.sWindowTitle).c_str())))
+							  nowide::widen(ConvertUTF8ToACP(p.sWindowTitle).c_str()).c_str())) // vomit
 				break;
 		}
 
@@ -478,17 +478,17 @@ GraphicsWindow::Initialize(bool bD3D)
 			LoadCursor(nullptr, IDC_ARROW), /* default cursor */
 			nullptr,						/* hbrBackground */
 			nullptr,						/* lpszMenuName */
-			reinterpret_cast<LPCWSTR>(g_sClassName.c_str()) /* lpszClassName */
+			nowide::widen(g_sClassName).c_str() /* lpszClassName */
 		};
 
 		m_bWideWindowClass = false;
-		if (!RegisterClassA(reinterpret_cast<const WNDCLASSA*>(&WindowClassA)))
+		if (!RegisterClass(&WindowClassA))
 			RageException::Throw(
 			  "%s", werr_ssprintf(GetLastError(), "RegisterClass").c_str());
 	} while (0);
 
 	g_iQueryCancelAutoPlayMessage =
-	  RegisterWindowMessage(reinterpret_cast<LPCWSTR>("QueryCancelAutoPlay"));
+	  RegisterWindowMessage(L"QueryCancelAutoPlay");
 }
 
 void
@@ -503,7 +503,7 @@ GraphicsWindow::Shutdown()
 	ChangeDisplaySettings(nullptr, 0);
 
 	AppInstance inst;
-	UnregisterClass(reinterpret_cast<LPCWSTR>(g_sClassName.c_str()), inst);
+	UnregisterClass(nowide::widen(g_sClassName).c_str(), inst);
 }
 
 HDC

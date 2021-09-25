@@ -3,6 +3,7 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Singletons/ThemeManager.h"
 #include "archutils/Win32/ErrorStrings.h"
+#include <nowide/convert.hpp>
 
 // Create*Font copied from MFC's CFont
 
@@ -38,7 +39,7 @@ CreatePointFont(int nPointSize, LPCTSTR lpszFaceName)
 	memset(&logFont, 0, sizeof(LOGFONT));
 	logFont.lfCharSet = DEFAULT_CHARSET;
 	logFont.lfHeight = nPointSize;
-	lstrcpyn(logFont.lfFaceName, lpszFaceName, strlen(reinterpret_cast<const char*>(logFont.lfFaceName)));
+	lstrcpyn(logFont.lfFaceName, lpszFaceName, strlen(nowide::narrow(logFont.lfFaceName).c_str()));
 
 	return ::CreatePointFontIndirect(&logFont);
 }
@@ -63,12 +64,12 @@ DialogUtil::LocalizeDialogAndContents(HWND hdlg)
 	ASSERT(THEME != NULL);
 
 	const int LARGE_STRING = 256;
-	char szTemp[LARGE_STRING] = "";
+	wchar_t szTemp[LARGE_STRING] = L"";
 	std::string sGroup;
 
 	{
-		::GetWindowText(hdlg, reinterpret_cast<LPWSTR>(szTemp), ARRAYLEN(szTemp));
-		std::string s = szTemp;
+		::GetWindowText(hdlg, szTemp, ARRAYLEN(szTemp));
+		std::string s = nowide::narrow(szTemp);
 		sGroup = "Dialog-" + s;
 		s = THEME->GetString(sGroup, s);
 		::SetWindowText(hdlg,
@@ -77,8 +78,8 @@ DialogUtil::LocalizeDialogAndContents(HWND hdlg)
 
 	for (HWND hwndChild = ::GetTopWindow(hdlg); hwndChild != NULL;
 		 hwndChild = ::GetNextWindow(hwndChild, GW_HWNDNEXT)) {
-		::GetWindowText(hwndChild, reinterpret_cast<LPWSTR>(szTemp), ARRAYLEN(szTemp));
-		std::string s = szTemp;
+		::GetWindowText(hwndChild, szTemp, ARRAYLEN(szTemp));
+		std::string s = nowide::narrow(szTemp);
 		if (s.empty())
 			continue;
 		s = THEME->GetString(sGroup, s);
