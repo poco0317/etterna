@@ -600,10 +600,12 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 				 */
 				Poco::RegularExpression::MatchVec asMatches;
 				static Poco::RegularExpression parse(
-				  "^RANGE ([A-Z0-9\\-]+)( ?#([0-9A-F]+)-([0-9A-F]+))?$", Poco::RegularExpression::RE_CASELESS);
+				  "^RANGE ([A-Z0-9\\-]+)( ?#([0-9A-F]+)-([0-9A-F]+))?$",
+				  Poco::RegularExpression::RE_CASELESS,
+				  true);
 				int match = parse.match(sName, std::string::size_type(0), asMatches);
-				ASSERT(asMatches.size() == 4); // 4 parens
-				if (match == 0 || asMatches.at(0).length == 0) {
+				// expecting either 1 or 4 matches according to above comment
+				if (match != 2 && match != 5) {
 					LuaHelpers::ReportScriptErrorFmt("Font definition \"%s\" "
 													 "has an invalid range "
 													 "\"%s\": parse error.",
@@ -611,40 +613,52 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 													 sName.c_str());
 					continue;
 				}
-				// We must have either 1 match (just the codeset) or 4 (the
-				// whole thing).
+
 				int count = -1;
 				int first = 0;
-				if (asMatches[2].length > 0) {
-					if (!sscanf(sName.substr(asMatches[2].offset, asMatches[2].length).c_str(), "%x", &first))
+
+				if (match == 5) {
+					try {
+						first = std::stoi(
+						  extractRegexMatch(
+							sName, asMatches[3].offset, asMatches[3].length),
+						  0,
+						  16);
+						const int last = std::stoi(
+						  extractRegexMatch(
+							sName, asMatches[4].offset, asMatches[4].length),
+						  0,
+						  16);
+						if (last < first) {
+							LuaHelpers::ReportScriptErrorFmt(
+							  "Font definition \"%s\" has an invalid range "
+							  "\"%s\": "
+							  "%i < %i.",
+							  ini.GetPath().c_str(),
+							  sName.c_str(),
+							  last,
+							  first);
+							continue;
+						}
+						count = last - first + 1;
+					} catch (std::exception& e) {
 						Locator::getLogger()->warn(
-						  "Font definition {} parse error: {}",
-						  ini.GetPath().c_str(),
-						  sName.c_str());
-					int last;
-					if (!sscanf(sName.substr(asMatches[3].offset, asMatches[3].length).c_str(), "%x", &last))
-						Locator::getLogger()->warn(
-						  "Font definition {} parse error: {}",
-						  ini.GetPath().c_str(),
-						  sName.c_str());
-					if (last < first) {
-						LuaHelpers::ReportScriptErrorFmt(
-						  "Font definition \"%s\" has an invalid range \"%s\": "
-						  "%i < %i.",
+						  "Font definition {} parse error: {} ... {}",
 						  ini.GetPath().c_str(),
 						  sName.c_str(),
-						  last,
-						  first);
-						continue;
+						  e.what());
+						count = -1;
+						first = 0;
 					}
-					count = last - first + 1;
 				}
 
 				std::string error_string = cfg.MapRange(
-				  sName.substr(asMatches[0].offset, asMatches[0].length),
+				  extractRegexMatch(
+					sName, asMatches[1].offset, asMatches[1].length),
 				  first,
 				  pValue->GetValue<int>(),
 				  count);
+
 				if (!error_string.empty()) {
 					LuaHelpers::ReportScriptErrorFmt(
 					  "Font definition \"%s\" has an invalid range \"%s\": %s.",
@@ -653,7 +667,6 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 					  error_string.c_str());
 					continue;
 				}
-
 				continue;
 			}
 
