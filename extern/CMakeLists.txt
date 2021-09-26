@@ -37,8 +37,11 @@ set(ENABLE_REDIS OFF CACHE BOOL "" FORCE)      # Dont need Redis
 set(ENABLE_XML OFF CACHE BOOL "" FORCE)        # Dont need XML for now
 set(ENABLE_DATA_MYSQL OFF CACHE BOOL "" FORCE) # Dont need MySQL
 set(ENABLE_DATA_POSTGRESQL OFF CACHE BOOL "" FORCE) # Dont need PostgreSQL
-set(ENABLE_DATA_ODBC OFF CACHE BOOL "" FORCE)
+set(ENABLE_DATA_ODBC OFF CACHE BOOL "" FORCE) # Dont need ODBC
 set(ENABLE_APACHECONNECTOR OFF CACHE BOOL "" FORCE) # Dont need ApacheConnector
+if (MSVC)
+    set(POCO_MT ON CACHE BOOL "" FORCE) # Build MultiThreaded
+endif()
 set(CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/extern/poco)
 add_subdirectory(poco)
 
