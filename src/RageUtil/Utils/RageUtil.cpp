@@ -971,15 +971,18 @@ splitpath(const std::string& sPath,
 	 * This is really:
 	 * ^(.*[\\/])?(.*)$
 	 */
-	static Poco::RegularExpression sep("^(.*[\\\\/])?(.*)$");
+	static Poco::RegularExpression sep("^(.*[\\\\/])?(.*)$", Poco::RegularExpression::RE_CASELESS, true);
 	const auto bCheck = sep.match(sPath, std::string::size_type(0), asMatches);
 	ASSERT(bCheck);
 
 	sDir = sPath.substr(asMatches[0].offset, asMatches[0].length);
-	const auto sBase = sPath.substr(asMatches[1].offset, asMatches[1].length);
+	const auto sBase =
+	  asMatches[1].offset != std::string::npos
+		? sPath.substr(asMatches[1].offset, asMatches[1].length)
+		: "";
 
 	/* ^(.*)(\.[^\.]+)$ */
-	static Poco::RegularExpression SplitExt("^(.*)(\\.[^\\.]+)$");
+	static Poco::RegularExpression SplitExt("^(.*)(\\.[^\\.]+)$", Poco::RegularExpression::RE_CASELESS, true);
 	if (SplitExt.match(sBase, std::string::size_type(0), asMatches2)) {
 		sFilename = sBase.substr(asMatches2[0].offset, asMatches2[0].length);
 		sExt = sBase.substr(asMatches2[1].offset, asMatches2[1].length);
