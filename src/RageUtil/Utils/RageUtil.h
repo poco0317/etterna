@@ -586,6 +586,11 @@ vssprintf(const char* fmt, va_list argList) -> std::string;
 auto
 ConvertI64FormatString(const std::string& sStr) -> std::string;
 
+std::string
+extractRegexMatch(const std::string& str,
+				  const std::string::size_type& matchOffset,
+				  const std::string::size_type& matchLength);
+
 /*
  * Splits a Path into 4 parts (Directory, Drive, Filename, Extention).
  * Supports UNC path names. If Path is a directory (eg.

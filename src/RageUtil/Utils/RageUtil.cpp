@@ -950,6 +950,15 @@ split(const wstring& Source,
 	do_split(Source, Delimitor, begin, size, Source.size(), bIgnoreEmpty);
 }
 
+std::string
+extractRegexMatch(const std::string& str,
+				  const std::string::size_type& matchOffset, const std::string::size_type& matchLength)
+{
+	if (matchOffset == std::string::npos)
+		return std::string();
+	return str.substr(matchOffset, matchLength);
+}
+
 /*
  * foo\fum\          -> "foo\fum\", "", ""
  * c:\foo\bar.txt    -> "c:\foo\", "bar", ".txt"
@@ -971,21 +980,25 @@ splitpath(const std::string& sPath,
 	 * This is really:
 	 * ^(.*[\\/])?(.*)$
 	 */
-	static Poco::RegularExpression sep("^(.*[\\\\/])?(.*)$", Poco::RegularExpression::RE_CASELESS, true);
+	static Poco::RegularExpression sep(
+	  "^(.*[\\\\/])?(.*)$", Poco::RegularExpression::RE_CASELESS, true);
 	const auto bCheck = sep.match(sPath, std::string::size_type(0), asMatches);
-	ASSERT(bCheck);
 
-	sDir = sPath.substr(asMatches[0].offset, asMatches[0].length);
+	sDir = extractRegexMatch(sPath, asMatches[1].offset, asMatches[1].length);
+	if (asMatches.size() == 2)
+		return;
+
 	const auto sBase =
-	  asMatches[1].offset != std::string::npos
-		? sPath.substr(asMatches[1].offset, asMatches[1].length)
-		: "";
+	  extractRegexMatch(sPath, asMatches[2].offset, asMatches[2].length);
 
 	/* ^(.*)(\.[^\.]+)$ */
-	static Poco::RegularExpression SplitExt("^(.*)(\\.[^\\.]+)$", Poco::RegularExpression::RE_CASELESS, true);
+	static Poco::RegularExpression SplitExt(
+	  "^(.*)(\\.[^\\.]+)$", Poco::RegularExpression::RE_CASELESS, true);
 	if (SplitExt.match(sBase, std::string::size_type(0), asMatches2)) {
-		sFilename = sBase.substr(asMatches2[0].offset, asMatches2[0].length);
-		sExt = sBase.substr(asMatches2[1].offset, asMatches2[1].length);
+		sFilename =
+		  extractRegexMatch(sBase, asMatches2[1].offset, asMatches2[1].length);
+		sExt =
+		  extractRegexMatch(sBase, asMatches2[2].offset, asMatches2[2].length);
 	} else {
 		sFilename = sBase;
 	}
