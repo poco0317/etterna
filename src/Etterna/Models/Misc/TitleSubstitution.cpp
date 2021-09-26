@@ -12,9 +12,9 @@ static const std::string ERASE_MARKER = "-erase-";
 
 struct TitleTrans
 {
-	Poco::RegularExpression* TitleFrom;
-	Poco::RegularExpression* SubFrom;
-	Poco::RegularExpression* ArtistFrom;
+	Poco::RegularExpression* TitleFrom = nullptr;
+	Poco::RegularExpression* SubFrom = nullptr;
+	Poco::RegularExpression* ArtistFrom = nullptr;
 	TitleFields Replacement;
 
 	/* If this is true, no translit fields will be generated automatically. */
@@ -69,7 +69,6 @@ TitleTrans::LoadFromNode(const XNode* pNode)
 		if (sKeyName == "DontTransliterate")
 			translit = false;
 		else if (sKeyName == "TitleFrom") {
-
 			if (TitleFrom != nullptr)
 				delete TitleFrom;
 			TitleFrom =
