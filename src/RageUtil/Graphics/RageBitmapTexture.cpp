@@ -17,10 +17,6 @@
 #include <algorithm>
 #include <string>
 
-using std::max;
-using std::min;
-using std::string;
-
 static void
 GetResolutionFromFileName(std::string& sPath, int& iWidth, int& iHeight)
 {
@@ -125,29 +121,29 @@ RageBitmapTexture::Create()
 	auto sHintString =
 	  make_lower(GetID().filename + actualID.AdditionalTextureHints);
 
-	if (sHintString.find("32bpp") != string::npos)
+	if (sHintString.find("32bpp") != std::string::npos)
 		actualID.iColorDepth = 32;
-	else if (sHintString.find("16bpp") != string::npos)
+	else if (sHintString.find("16bpp") != std::string::npos)
 		actualID.iColorDepth = 16;
-	if (sHintString.find("dither") != string::npos)
+	if (sHintString.find("dither") != std::string::npos)
 		actualID.bDither = true;
-	if (sHintString.find("stretch") != string::npos)
+	if (sHintString.find("stretch") != std::string::npos)
 		actualID.bStretch = true;
-	if (sHintString.find("mipmaps") != string::npos)
+	if (sHintString.find("mipmaps") != std::string::npos)
 		actualID.bMipMaps = true;
-	if (sHintString.find("nomipmaps") != string::npos)
+	if (sHintString.find("nomipmaps") != std::string::npos)
 		actualID.bMipMaps = false; // check for "nomipmaps" after "mipmaps"
 
 	/* If the image is marked grayscale, then use all bits not used for alpha
 	 * for the intensity.  This way, if an image has no alpha, you get an 8-bit
 	 * grayscale; if it only has boolean transparency, you get a 7-bit
 	 * grayscale. */
-	if (sHintString.find("grayscale") != string::npos)
+	if (sHintString.find("grayscale") != std::string::npos)
 		actualID.iGrayscaleBits = 8 - actualID.iAlphaBits;
 
 	/* This indicates that the only component in the texture is alpha; assume
 	 * all color is white. */
-	if (sHintString.find("alphamap") != string::npos)
+	if (sHintString.find("alphamap") != std::string::npos)
 		actualID.iGrayscaleBits = 0;
 
 	/* No iGrayscaleBits for images that are already paletted.  We don't support
@@ -158,7 +154,8 @@ RageBitmapTexture::Create()
 		actualID.iGrayscaleBits = -1;
 
 	/* Cap the max texture size to the hardware max. */
-	actualID.iMaxSize = min(actualID.iMaxSize, DISPLAY->GetMaxTextureSize());
+	actualID.iMaxSize =
+	  std::min(actualID.iMaxSize, DISPLAY->GetMaxTextureSize());
 
 	/* Save information about the source. */
 	m_iSourceWidth = pImg->w;
@@ -170,7 +167,7 @@ RageBitmapTexture::Create()
 
 	/* if "doubleres" (high resolution) and we're not allowing high res
 	 * textures, then image dimensions are half of the source */
-	if (sHintString.find("doubleres") != string::npos) {
+	if (sHintString.find("doubleres") != std::string::npos) {
 		if (!StepMania::GetHighResolutionTextures()) {
 			m_iImageWidth = m_iImageWidth / 2;
 			m_iImageHeight = m_iImageHeight / 2;
@@ -178,8 +175,8 @@ RageBitmapTexture::Create()
 	}
 
 	/* image size cannot exceed max size */
-	m_iImageWidth = min(m_iImageWidth, actualID.iMaxSize);
-	m_iImageHeight = min(m_iImageHeight, actualID.iMaxSize);
+	m_iImageWidth = std::min(m_iImageWidth, actualID.iMaxSize);
+	m_iImageHeight = std::min(m_iImageHeight, actualID.iMaxSize);
 
 	/* Texture dimensions need to be a power of two; jump to the next. */
 	m_iTextureWidth = power_of_two(m_iImageWidth);
@@ -189,8 +186,8 @@ RageBitmapTexture::Create()
 	 * hardware. */
 	if (m_iTextureWidth < 8 || m_iTextureHeight < 8) {
 		actualID.bStretch = true;
-		m_iTextureWidth = max(8, m_iTextureWidth);
-		m_iTextureHeight = max(8, m_iTextureHeight);
+		m_iTextureWidth = std::max(8, m_iTextureWidth);
+		m_iTextureHeight = std::max(8, m_iTextureHeight);
 	}
 
 	ASSERT_M(m_iTextureWidth <= actualID.iMaxSize,
@@ -232,7 +229,8 @@ RageBitmapTexture::Create()
 				auto iSourceAlphaBits = 8 - pImg->fmt.Loss[3];
 
 				// Don't use more than we were hinted to.
-				iSourceAlphaBits = min(actualID.iAlphaBits, iSourceAlphaBits);
+				iSourceAlphaBits =
+				  std::min(actualID.iAlphaBits, iSourceAlphaBits);
 
 				switch (iSourceAlphaBits) {
 					case 0:
@@ -307,7 +305,7 @@ RageBitmapTexture::Create()
 		// Otherwise, pixel/texel alignment will be off.
 		auto iDimensionMultiple = 2;
 
-		if (sHintString.find("doubleres") != string::npos) {
+		if (sHintString.find("doubleres") != std::string::npos) {
 			iDimensionMultiple = 4;
 		}
 
@@ -375,7 +373,7 @@ RageBitmapTexture::Create()
 	 * with dimensions 1/2 of the source. So, cut down the source dimension here
 	 * after everything above is finished operating with the real image
 	 * source dimensions. */
-	if (sHintString.find("doubleres") != string::npos) {
+	if (sHintString.find("doubleres") != std::string::npos) {
 		m_iSourceWidth = m_iSourceWidth / 2;
 		m_iSourceHeight = m_iSourceHeight / 2;
 	}

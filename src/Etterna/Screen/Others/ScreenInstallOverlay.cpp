@@ -34,7 +34,7 @@ struct FileCopyResult
 };
 
 void
-InstallSmzipOsArg(const string& sOsZipFile)
+InstallSmzipOsArg(const std::string& sOsZipFile)
 {
 	SCREENMAN->SystemMessage("Installing " + sOsZipFile);
 
@@ -75,10 +75,10 @@ DoInstalls(CommandLineActions::CommandLineArgs args)
 		auto s = args.argv[i];
 		if (s == "notedataCache") {
 			// TODO: Create the directories if they dont exist
-			string packFolder = "packbanner/";
-			string cdtitleFolder = "cdtitle/";
-			string bgFolder = "bg/";
-			string bannerFolder = "banner/";
+			std::string packFolder = "packbanner/";
+			std::string cdtitleFolder = "cdtitle/";
+			std::string bgFolder = "bg/";
+			std::string bannerFolder = "banner/";
 
 			auto ndOutputPath = args.argv[i + 1]; // notedata
 			EnsureSlashEnding(ndOutputPath);
@@ -124,7 +124,7 @@ DoInstalls(CommandLineActions::CommandLineArgs args)
 					vpStepsToSave.push_back(s);
 				}
 
-				string songkey;
+				std::string songkey;
 				for (auto& st : vpStepsToSave) {
 					songkey += st->GetChartKey();
 				}

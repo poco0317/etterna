@@ -15,11 +15,6 @@
 #include <algorithm>
 #include <set>
 
-using std::pair;
-using std::set;
-using std::string;
-using std::tuple;
-
 // TODO: Remove these constants that aren't time signature-aware
 static const int BEATS_PER_MEASURE = 4;
 static const int ROWS_PER_MEASURE = ROWS_PER_BEAT * BEATS_PER_MEASURE;
@@ -80,7 +75,7 @@ LoadFromSMNoteDataStringWithPlayer(NoteData& out,
 	 * string at all. */
 	auto size = -1;
 	const auto end = start + len;
-	std::vector<pair<const char*, const char*>> aMeasureLines;
+	std::vector<std::pair<const char*, const char*>> aMeasureLines;
 	for (unsigned m = 0; true; ++m) {
 		/* XXX Ignoring empty seems wrong for measures. It means that ",,," is
 		 * treated as
@@ -122,7 +117,7 @@ LoadFromSMNoteDataStringWithPlayer(NoteData& out,
 				--endLine;
 			if (beginLine < endLine) // nonempty
 				aMeasureLines.emplace_back(
-				  pair<const char*, const char*>(beginLine, endLine));
+				  std::pair<const char*, const char*>(beginLine, endLine));
 		}
 
 		for (unsigned l = 0; l < aMeasureLines.size(); l++) {
@@ -727,7 +722,7 @@ NoteDataUtil::GetETTNoteDataString(const NoteData& in, std::string& sRet)
 		sRet.append(std::to_string(nt));
 		for (auto r = iMeasureStartRow; r <= iMeasureLastRow;
 			 r += iRowSpacing) {
-			string halp;
+			std::string halp;
 			for (auto t = 0; t < nd.GetNumTracks(); ++t) {
 				const auto& tn = nd.GetTapNote(t, r);
 				if (tn.type == TapNoteType_Empty) {
@@ -800,42 +795,42 @@ NoteDataUtil::GetETTNoteDataString(const NoteData& in, std::string& sRet)
 	size_t oop = 1;
 	for (;;) {
 		oop = sRet.find("??", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, "~");
 	}
 	oop = 1;
 	for (;;) {
 		oop = sRet.find("~~", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, "|");
 	}
 	oop = 1;
 	for (;;) {
 		oop = sRet.find("||", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, "!");
 	}
 	oop = 1;
 	for (;;) {
 		oop = sRet.find("!!", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, "-");
 	}
 	oop = 1;
 	for (;;) {
 		oop = sRet.find("--", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, "`");
 	}
 	oop = 1;
 	for (;;) {
 		oop = sRet.find("``", oop - 1);
-		if (oop == string::npos)
+		if (oop == std::string::npos)
 			break;
 		sRet.replace(sRet.begin() + oop, sRet.begin() + oop + 2, ".");
 	}
@@ -1246,7 +1241,7 @@ NoteDataUtil::RemoveSimultaneousNotes(NoteData& in,
 
 	FOREACH_NONEMPTY_ROW_ALL_TRACKS_RANGE(in, r, iStartIndex, iEndIndex)
 	{
-		set<int> viTracksHeld;
+		std::set<int> viTracksHeld;
 		in.GetTracksHeldAtRow(r, viTracksHeld);
 
 		// remove the first tap note or the first hold note that starts on this
@@ -1791,7 +1786,7 @@ SuperShuffleTaps(NoteData& inout, int iStartIndex, int iEndIndex)
 					   r));
 
 			// Probe for a spot to swap with.
-			set<int> vTriedTracks;
+			std::set<int> vTriedTracks;
 			for (auto i = 0; i < 4; i++) // probe max 4 times
 			{
 				auto t2 = RandomInt(inout.GetNumTracks());
@@ -2269,7 +2264,7 @@ NoteDataUtil::Echo(NoteData& inout, int iStartIndex, int iEndIndex)
 
 		const auto iRowEcho = r + rows_per_interval;
 		{
-			set<int> viTracks;
+			std::set<int> viTracks;
 			inout.GetTracksHeldAtRow(iRowEcho, viTracks);
 
 			// don't lay if holding 2 already
@@ -2277,7 +2272,7 @@ NoteDataUtil::Echo(NoteData& inout, int iStartIndex, int iEndIndex)
 				continue; // don't lay
 
 			// don't lay echos on top of a HoldNote
-			if (find(viTracks.begin(), viTracks.end(), iEchoTrack) !=
+			if (std::find(viTracks.begin(), viTracks.end(), iEchoTrack) !=
 				viTracks.end())
 				continue; // don't lay
 		}
@@ -2334,7 +2329,7 @@ NoteDataUtil::ConvertTapsToHolds(NoteData& inout,
 						break;
 					}
 
-					set<int> tracksDown;
+					std::set<int> tracksDown;
 					inout.GetTracksHeldAtRow(r2, tracksDown);
 					inout.GetTapNonEmptyTracks(r2, tracksDown);
 					iTapsLeft -= tracksDown.size();
@@ -2375,7 +2370,7 @@ NoteDataUtil::IcyWorld(NoteData& inout,
 					   int iEndIndex)
 {
 	// Row, tap column
-	std::vector<tuple<int, int>> rowsWithNotes;
+	std::vector<std::tuple<int, int>> rowsWithNotes;
 	auto currentTap = -1;
 
 	FOREACH_NONEMPTY_ROW_ALL_TRACKS_RANGE(inout, r, iStartIndex, iEndIndex)
@@ -2391,7 +2386,7 @@ NoteDataUtil::IcyWorld(NoteData& inout,
 				break;
 			}
 		}
-		rowsWithNotes.emplace_back(tuple<int, int>(r, currentTap));
+		rowsWithNotes.emplace_back(std::tuple<int, int>(r, currentTap));
 	}
 
 	auto lastTap = -1;
@@ -2447,7 +2442,7 @@ NoteDataUtil::AnchorJS(NoteData& inout,
 					   int iEndIndex)
 {
 	// Row, tap column
-	std::vector<tuple<int, int>> rowsWithNotes;
+	std::vector<std::tuple<int, int>> rowsWithNotes;
 	auto currentTap = -1;
 
 	FOREACH_NONEMPTY_ROW_ALL_TRACKS_RANGE(inout, r, iStartIndex, iEndIndex)
@@ -2463,7 +2458,7 @@ NoteDataUtil::AnchorJS(NoteData& inout,
 				break;
 			}
 		}
-		rowsWithNotes.emplace_back(tuple<int, int>(r, currentTap));
+		rowsWithNotes.emplace_back(std::tuple<int, int>(r, currentTap));
 	}
 
 	auto lastTap = -1;
@@ -2521,7 +2516,7 @@ NoteDataUtil::JackJS(NoteData& inout,
 					 int iEndIndex)
 {
 	// Row, tap column
-	std::vector<tuple<int, int>> rowsWithNotes;
+	std::vector<std::tuple<int, int>> rowsWithNotes;
 	auto currentTap = -1;
 
 	FOREACH_NONEMPTY_ROW_ALL_TRACKS_RANGE(inout, r, iStartIndex, iEndIndex)
@@ -2537,7 +2532,7 @@ NoteDataUtil::JackJS(NoteData& inout,
 				break;
 			}
 		}
-		rowsWithNotes.emplace_back(tuple<int, int>(r, currentTap));
+		rowsWithNotes.emplace_back(std::tuple<int, int>(r, currentTap));
 	}
 
 	auto lastTap = -1;

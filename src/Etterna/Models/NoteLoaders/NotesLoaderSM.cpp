@@ -13,9 +13,6 @@
 
 #include <algorithm>
 
-using std::pair;
-using std::string;
-
 // Everything from this line to the creation of sm_parser_helper exists to
 // speed up parsing by allowing the use of std::map.  All these functions
 // are put into a map of function pointers which is used when loading.
@@ -27,7 +24,7 @@ struct SMSongTagInfo
 	Song* song;
 	const MsdFile::value_t* params;
 	const std::string& path;
-	std::vector<pair<float, float>> BPMChanges, Stops;
+	std::vector<std::pair<float, float>> BPMChanges, Stops;
 	SMSongTagInfo(SMLoader* l, Song* s, const std::string& p)
 	  : loader(l)
 	  , song(s)
@@ -430,7 +427,7 @@ SMLoader::ProcessInstrumentTracks(Song& out, const std::string& sParam)
 }
 
 void
-SMLoader::ParseBPMs(std::vector<pair<float, float>>& out,
+SMLoader::ParseBPMs(std::vector<std::pair<float, float>>& out,
 					const std::string& line,
 					const int rowsPerBeat)
 {
@@ -462,7 +459,7 @@ SMLoader::ParseBPMs(std::vector<pair<float, float>>& out,
 }
 
 void
-SMLoader::ParseStops(std::vector<pair<float, float>>& out,
+SMLoader::ParseStops(std::vector<std::pair<float, float>>& out,
 					 const std::string& line,
 					 const int rowsPerBeat)
 {
@@ -497,7 +494,7 @@ SMLoader::ParseStops(std::vector<pair<float, float>>& out,
 // Utility function for sorting timing change data
 namespace {
 bool
-compare_first(pair<float, float> a, pair<float, float> b)
+compare_first(std::pair<float, float> a, std::pair<float, float> b)
 {
 	return a.first < b.first;
 }
@@ -509,11 +506,11 @@ compare_first(pair<float, float> a, pair<float, float> b)
 //     parameter, already sorted by beat.
 void
 SMLoader::ProcessBPMsAndStops(TimingData& out,
-							  std::vector<pair<float, float>>& vBPMs,
-							  std::vector<pair<float, float>>& vStops)
+							  std::vector<std::pair<float, float>>& vBPMs,
+							  std::vector<std::pair<float, float>>& vStops)
 {
-	std::vector<pair<float, float>>::const_iterator ibpm, ibpmend;
-	std::vector<pair<float, float>>::const_iterator istop, istopend;
+	std::vector<std::pair<float, float>>::const_iterator ibpm, ibpmend;
+	std::vector<std::pair<float, float>>::const_iterator istop, istopend;
 
 	// Current BPM (positive or negative)
 	float bpm = 0;
@@ -718,7 +715,7 @@ SMLoader::ProcessDelays(TimingData& out,
 void
 SMLoader::ProcessDelays(TimingData& out,
 						const std::string& line,
-						const string& songname,
+						const std::string& songname,
 						const int rowsPerBeat)
 {
 	std::vector<std::string> arrayDelayExpressions;
@@ -765,7 +762,7 @@ SMLoader::ProcessTimeSignatures(TimingData& out,
 void
 SMLoader::ProcessTimeSignatures(TimingData& out,
 								const std::string& line,
-								const string& songname,
+								const std::string& songname,
 								const int rowsPerBeat)
 {
 	std::vector<std::string> vs1;
@@ -830,7 +827,7 @@ SMLoader::ProcessTickcounts(TimingData& out,
 void
 SMLoader::ProcessTickcounts(TimingData& out,
 							const std::string& line,
-							const string& songname,
+							const std::string& songname,
 							const int rowsPerBeat)
 {
 	std::vector<std::string> arrayTickcountExpressions;
@@ -867,7 +864,7 @@ SMLoader::ProcessSpeeds(TimingData& out,
 void
 SMLoader::ProcessSpeeds(TimingData& out,
 						const std::string& line,
-						const string& songname,
+						const std::string& songname,
 						const int rowsPerBeat)
 {
 	std::vector<std::string> vs1;
@@ -937,7 +934,7 @@ SMLoader::ProcessFakes(TimingData& out,
 void
 SMLoader::ProcessFakes(TimingData& out,
 					   const std::string& line,
-					   const string& songname,
+					   const std::string& songname,
 					   const int rowsPerBeat)
 {
 	std::vector<std::string> arrayFakeExpressions;
@@ -1004,8 +1001,8 @@ SMLoader::LoadFromBGChangesString(BackgroundChange& change,
 		case 8: {
 			auto tmp = make_lower(aBGChangeValues[7]);
 
-			if ((tmp.find(".ini") != string::npos ||
-				 tmp.find(".xml") != string::npos)) {
+			if ((tmp.find(".ini") != std::string::npos ||
+				 tmp.find(".xml") != std::string::npos)) {
 				return false;
 			}
 			change.m_def.m_sFile2 = aBGChangeValues[7];
@@ -1044,8 +1041,8 @@ SMLoader::LoadFromBGChangesString(BackgroundChange& change,
 			// fall through
 		case 2: {
 			auto tmp = make_lower(aBGChangeValues[1]);
-			if ((tmp.find(".ini") != string::npos ||
-				 tmp.find(".xml") != string::npos)) {
+			if ((tmp.find(".ini") != std::string::npos ||
+				 tmp.find(".xml") != std::string::npos)) {
 				return false;
 			}
 			change.m_def.m_sFile1 = aBGChangeValues[1];

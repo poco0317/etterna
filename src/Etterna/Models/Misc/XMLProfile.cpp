@@ -18,16 +18,14 @@
 #include "Etterna/Singletons/SongManager.h"
 #include "Etterna/Models/StepsAndStyles/Steps.h"
 
-using std::string;
-
-const string ETT_XML = "Etterna.xml";
-const string ETT_XML_GZ = "Etterna.xml.gz";
+const std::string ETT_XML = "Etterna.xml";
+const std::string ETT_XML_GZ = "Etterna.xml.gz";
 /** @brief The filename containing the signature for ETT_XML's signature. */
-const string DONT_SHARE_SIG = "DontShare.sig";
+const std::string DONT_SHARE_SIG = "DontShare.sig";
 static Preference<bool> g_bProfileDataCompress("ProfileDataCompress", false);
 
 ProfileLoadResult
-XMLProfile::LoadEttFromDir(string dir)
+XMLProfile::LoadEttFromDir(std::string dir)
 {
 	profiledir = dir + PROFILEMAN->GetStatsPrefix();
 	loadingProfile->IsEtternaProfile = true;
@@ -53,7 +51,7 @@ XMLProfile::LoadEttFromDir(string dir)
 }
 
 bool
-XMLProfile::SaveEttXmlToDir(string sDir, const Profile* profile) const
+XMLProfile::SaveEttXmlToDir(std::string sDir, const Profile* profile) const
 {
 	Locator::getLogger()->trace("Saving Etterna Profile to: {}", sDir.c_str());
 	const std::unique_ptr<XNode> xml(SaveEttXmlCreateNode(profile));
@@ -62,7 +60,7 @@ XMLProfile::SaveEttXmlToDir(string sDir, const Profile* profile) const
 	const auto fn = pDir.append(ETT_XML);
 	const auto fngz = pDir.append(ETT_XML_GZ);
 	{
-		string sError;
+		std::string sError;
 		RageFile f;
 		if (!f.Open(fn, RageFile::WRITE)) {
 			LuaHelpers::ReportScriptErrorFmt("Couldn't open %s for writing: %s",
@@ -193,7 +191,7 @@ GoalsForChart::LoadFromNode(const XNode* pNode)
 		doot.LoadFromNode(sg);
 		Add(doot);
 	}
-	string chartkey;
+	std::string chartkey;
 	pNode->GetAttrValue("Key", chartkey);
 	for (auto& goal : goals)
 		goal.chartkey = chartkey;
@@ -204,7 +202,7 @@ XMLProfile::LoadScoreGoalsFromNode(const XNode* pNode)
 {
 	Locator::getLogger()->trace("Loading the scoregoals node.");
 
-	string ck;
+	std::string ck;
 	FOREACH_CONST_Child(pNode, chgoals)
 	{
 		chgoals->GetAttrValue("Key", ck);
@@ -323,7 +321,7 @@ XMLProfile::SaveEttGeneralDataCreateNode(const Profile* profile) const
 }
 
 void
-XMLProfile::MoveBackupToDir(string sFromDir, string sToDir)
+XMLProfile::MoveBackupToDir(std::string sFromDir, std::string sToDir)
 {
 	auto frompath = sFromDir.append(ETT_XML);
 	const auto fromsig = frompath.append(SIGNATURE_APPEND);
@@ -341,7 +339,7 @@ XMLProfile::LoadEttGeneralDataFromNode(const XNode* pNode)
     Locator::getLogger()->trace("Loading the general node.");
 	ASSERT(pNode->GetName() == "GeneralData");
 
-	string s;
+	std::string s;
 	const XNode* pTemp;
 
 	pNode->GetChildValue("DisplayName", loadingProfile->m_sDisplayName);

@@ -472,7 +472,7 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 			auto* to_reload = m_MusicWheel.GetSelectedSong();
 			if (to_reload != nullptr) {
 				auto stepses = to_reload->GetAllSteps();
-				std::vector<string> oldChartkeys;
+				std::vector<std::string> oldChartkeys;
 				for (auto* steps : stepses)
 					oldChartkeys.emplace_back(steps->GetChartKey());
 
@@ -1056,7 +1056,6 @@ ScreenSelectMusic::HandleScreenMessage(const ScreenMessage& SM)
 	{
 		this->PlayCommand("SortChange");
 	} else if (SM == SM_GainFocus) {
-		DLMAN->UpdateDLSpeed(false);
 		CodeDetector::RefreshCacheItems(CODES);
 	} else if (SM == SM_LoseFocus) {
 		CodeDetector::RefreshCacheItems(); // reset for other screens
@@ -1250,8 +1249,6 @@ ScreenSelectMusic::SelectCurrent(PlayerNumber pn, GameplayMode mode)
 	m_soundStart.Play(true);
 
 	if (m_SelectionState == SelectionState_Finalized) {
-		DLMAN->UpdateDLSpeed(true);
-
 		if (!m_bStepsChosen) {
 			m_bStepsChosen = true;
 			// Don't play start sound. We play it again below on finalized
@@ -1644,7 +1641,7 @@ class LunaScreenSelectMusic : public Luna<ScreenSelectMusic>
 
 	static int StartPlaylistAsCourse(T* p, lua_State* L)
 	{
-		const string name = SArg(1);
+		const std::string name = SArg(1);
 		auto& pl = SONGMAN->GetPlaylists()[name];
 
 		// don't allow empty playlists to be started as a course

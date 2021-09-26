@@ -9,8 +9,6 @@
 #include <string>
 #include <map>
 
-using std::string;
-
 bool
 XmlFileUtil::LoadFromFileShowErrors(XNode& xml, RageFileBasic& f)
 {
@@ -157,7 +155,7 @@ LoadAttributes(XNode* pNode,
 			if (sErrorOut.empty())
 				sErrorOut = ssprintf("<%s> attribute has error ",
 									 pNode->GetName().c_str());
-			return string::npos;
+			return std::string::npos;
 		}
 
 		// XML Attr Name
@@ -198,7 +196,7 @@ LoadAttributes(XNode* pNode,
 					sErrorOut = ssprintf(
 					  "<%s> attribute text: couldn't find matching quote",
 					  sName.c_str());
-				return string::npos;
+				return std::string::npos;
 			}
 
 			std::string sValue;
@@ -213,7 +211,7 @@ LoadAttributes(XNode* pNode,
 	}
 
 	// not well-formed tag
-	return string::npos;
+	return std::string::npos;
 }
 
 // <TAG attr1="value1" attr2='value2' attr3=value3 >
@@ -235,8 +233,8 @@ LoadInternal(XNode* pNode,
 
 	// <
 	iOffset = xml.find(chXMLTagOpen, iOffset);
-	if (iOffset == string::npos)
-		return string::npos;
+	if (iOffset == std::string::npos)
+		return std::string::npos;
 
 	// </
 	if (xml[iOffset + 1] == chXMLTagPre)
@@ -248,11 +246,11 @@ LoadInternal(XNode* pNode,
 
 		// Find the close tag.
 		std::string::size_type iEnd = xml.find("-->", iOffset);
-		if (iEnd == string::npos) {
+		if (iEnd == std::string::npos) {
 			if (sErrorOut.empty())
 				sErrorOut = "Unterminated comment";
 
-			return string::npos;
+			return std::string::npos;
 		}
 
 		// Skip -->.
@@ -271,8 +269,8 @@ LoadInternal(XNode* pNode,
 
 	// Generate XML Attribute List
 	iOffset = LoadAttributes(pNode, xml, sErrorOut, iOffset);
-	if (iOffset == string::npos)
-		return string::npos;
+	if (iOffset == std::string::npos)
+		return std::string::npos;
 
 	// alone tag <TAG ... /> or <?TAG ... ?> or <!-- ... -->
 	// current pointer:   ^               ^              ^
@@ -292,7 +290,7 @@ LoadInternal(XNode* pNode,
 				sErrorOut = "Element must be closed.";
 
 			// ill-formed tag
-			return string::npos;
+			return std::string::npos;
 		}
 
 		// well-formed tag
@@ -315,13 +313,13 @@ LoadInternal(XNode* pNode,
 		// Text Value
 		++iOffset;
 		std::string::size_type iEnd = xml.find(chXMLTagOpen, iOffset);
-		if (iEnd == string::npos) {
+		if (iEnd == std::string::npos) {
 			if (sErrorOut.empty())
 				sErrorOut = ssprintf("%s must be closed with </%s>",
 									 pNode->GetName().c_str(),
 									 pNode->GetName().c_str());
 			// error cos not exist CloseTag </TAG>
-			return string::npos;
+			return std::string::npos;
 		}
 
 		std::string sValue;
@@ -338,7 +336,7 @@ LoadInternal(XNode* pNode,
 		XNode* node = new XNode;
 
 		iOffset = LoadInternal(node, xml, sErrorOut, iOffset);
-		if (iOffset == string::npos) {
+		if (iOffset == std::string::npos) {
 			delete node;
 			return iOffset;
 		}
@@ -362,12 +360,12 @@ LoadInternal(XNode* pNode,
 				continue;
 
 			std::string::size_type iEnd = xml.find_first_of(" >", iOffset);
-			if (iEnd == string::npos) {
+			if (iEnd == std::string::npos) {
 				if (sErrorOut.empty())
 					sErrorOut = ssprintf("it must be closed with </%s>",
 										 pNode->GetName().c_str());
 				// error
-				return string::npos;
+				return std::string::npos;
 			}
 
 			std::string closename;
@@ -383,7 +381,7 @@ LoadInternal(XNode* pNode,
 					sErrorOut = ssprintf("'<%s> ... </%s>' is not well-formed.",
 										 pNode->GetName().c_str(),
 										 closename.c_str());
-				return string::npos;
+				return std::string::npos;
 			}
 		} else // Alone child Tag Loaded
 		{
@@ -391,12 +389,12 @@ LoadInternal(XNode* pNode,
 				iOffset < xml.size() && xml[iOffset] != chXMLTagOpen) {
 				// Text Value
 				std::string::size_type iEnd = xml.find(chXMLTagOpen, iOffset);
-				if (iEnd == string::npos) {
+				if (iEnd == std::string::npos) {
 					// error cos not exist CloseTag </TAG>
 					if (sErrorOut.empty())
 						sErrorOut = ssprintf("it must be closed with </%s>",
 											 pNode->GetName().c_str());
-					return string::npos;
+					return std::string::npos;
 				}
 
 				std::string sValue;

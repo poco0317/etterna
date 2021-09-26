@@ -85,7 +85,7 @@ getCpuHash() -> uint16_t
 }
 
 auto
-getMachineName() -> string
+getMachineName() -> std::string
 {
 	LPWSTR computerName;
 	DWORD size = 128;
@@ -279,7 +279,7 @@ computeSystemUniqueId() -> uint16_t*
 	return id;
 }
 auto
-getSystemUniqueId() -> string
+getSystemUniqueId() -> std::string
 {
 	// get the name of the computer
 	auto str = getMachineName();

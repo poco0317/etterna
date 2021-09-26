@@ -81,7 +81,7 @@ ScreenGameplay::ScreenGameplay()
 	m_delaying_ready_announce = false;
 
 	// Tell DownloadManager we are in Gameplay
-	DLMAN->UpdateDLSpeed(true);
+	DLMAN->SetInGameplay(true);
 
 	// Unload all Replay Data to prevent some things (if not replaying)
 	if (GamePreferences::m_AutoPlay != PC_REPLAY) {
@@ -399,15 +399,14 @@ ScreenGameplay::~ScreenGameplay()
 			NSMAN->ReportSongOver();
 		}
 
-		// Tell DownloadManager we aren't in Gameplay
-		DLMAN->UpdateDLSpeed(false);
-
 		GAMESTATE->m_gameplayMode.Set(GameplayMode_Normal);
 		GAMESTATE->TogglePracticeMode(false);
 	}
 
 	// Always unpause when exiting gameplay (or restarting)
 	GAMESTATE->SetPaused(false);
+	// Tell DownloadManager we aren't in Gameplay
+	DLMAN->SetInGameplay(false);
 }
 
 void
@@ -1686,7 +1685,7 @@ ScreenGameplay::HandleScreenMessage(const ScreenMessage& SM)
 			}
 		}
 	} else if (ScreenMessageHelpers::ScreenMessageToString(SM).find("0Combo") !=
-			   string::npos) {
+			   std::string::npos) {
 		int iCombo;
 		const auto sCropped =
 		  ScreenMessageHelpers::ScreenMessageToString(SM).substr(3);

@@ -695,7 +695,7 @@ HighScore::LoadReplayDataBasic(const std::string& dir) -> bool
 	std::ifstream fileStream(path, std::ios::binary);
 	std::string line;
 	std::string buffer;
-	std::vector<string> tokens;
+	std::vector<std::string> tokens;
 	int noteRow = 0;
 	float offset = 0.f;
 
@@ -1338,7 +1338,7 @@ HighScore::SetSkillsetSSR(Skillset ss, float ssr)
 	m_Impl->fSkillsetSSRs[ss] = ssr;
 }
 void
-HighScore::SetValidationKey(ValidationKey vk, string k)
+HighScore::SetValidationKey(ValidationKey vk, std::string k)
 {
 	m_Impl->ValidationKeys[vk] = std::move(k);
 }

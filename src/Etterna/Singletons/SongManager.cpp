@@ -33,10 +33,6 @@
 #include <mutex>
 #include <utility>
 
-using std::map;
-using std::string;
-using std::vector;
-
 typedef std::string SongDir;
 struct Group
 {
@@ -143,7 +139,7 @@ SongManager::DifferentialReload() -> int
 
 // See LoadStepManiaSongDir for any comment clarification -mina
 auto
-SongManager::DifferentialReloadDir(string dir) -> int
+SongManager::DifferentialReloadDir(std::string dir) -> int
 {
 	if (dir.back() != '/') {
 		dir += "/";
@@ -428,7 +424,7 @@ SongManager::CalcTestStuff()
 }
 
 void
-Chart::FromKey(const string& ck)
+Chart::FromKey(const std::string& ck)
 {
 	auto song = SONGMAN->GetSongByChartkey(ck);
 	key = ck;
@@ -485,7 +481,7 @@ Chart::LoadFromNode(const XNode* node)
 }
 
 void
-Playlist::AddChart(const string& ck)
+Playlist::AddChart(const std::string& ck)
 {
 	auto rate = GAMESTATE->m_SongOptions.GetCurrent().m_fMusicRate;
 	Chart ch;
@@ -515,10 +511,10 @@ Playlist::CreateNode() const -> XNode*
 	cl->AppendChild(ch->CreateNode(true));
 
 	auto cr = new XNode("CourseRuns");
-	FOREACH_CONST(std::vector<string>, courseruns, run)
+	FOREACH_CONST(std::vector<std::string>, courseruns, run)
 	{
 		auto r = new XNode("Run");
-		FOREACH_CONST(string, *run, sk)
+		FOREACH_CONST(std::string, *run, sk)
 		r->AppendChild(*sk);
 		cr->AppendChild(r);
 	}
@@ -558,7 +554,7 @@ Playlist::LoadFromNode(const XNode* node)
 		if (cr != nullptr) {
 			FOREACH_CONST_Child(cr, run)
 			{
-				std::vector<string> tmp;
+				std::vector<std::string> tmp;
 				FOREACH_CONST_Child(run, sk) tmp.emplace_back(sk->GetName());
 				courseruns.emplace_back(tmp);
 			}
@@ -567,7 +563,8 @@ Playlist::LoadFromNode(const XNode* node)
 }
 
 void
-SongManager::MakeSongGroupsFromPlaylists(map<string, Playlist>& playlists)
+SongManager::MakeSongGroupsFromPlaylists(
+  std::map<std::string, Playlist>& playlists)
 {
 	if (!PlaylistsAreSongGroups) {
 		return;
@@ -614,9 +611,9 @@ Playlist::GetAverageRating() -> float
 }
 
 auto
-Playlist::GetKeys() -> std::vector<string>
+Playlist::GetKeys() -> std::vector<std::string>
 {
-	std::vector<string> o;
+	std::vector<std::string> o;
 	for (auto& i : chartlist) {
 		o.emplace_back(i.key);
 	}
@@ -624,7 +621,8 @@ Playlist::GetKeys() -> std::vector<string>
 }
 
 void
-SongManager::DeletePlaylist(const string& pl, map<string, Playlist>& playlists)
+SongManager::DeletePlaylist(const std::string& pl,
+							std::map<std::string, Playlist>& playlists)
 {
 	playlists.erase(pl);
 
@@ -642,7 +640,7 @@ SongManager::DeletePlaylist(const string& pl, map<string, Playlist>& playlists)
 
 void
 SongManager::MakePlaylistFromFavorites(
-  std::set<string>& favs,
+  std::set<std::string>& favs,
   std::map<std::string, Playlist>& playlists)
 {
 	Playlist pl;
@@ -946,7 +944,7 @@ SongManager::IsGroupNeverCached(const std::string& group) const -> bool
 }
 
 void
-SongManager::SetFavoritedStatus(std::set<string>& favs)
+SongManager::SetFavoritedStatus(std::set<std::string>& favs)
 {
 	for (auto song : m_pSongs) {
 		auto fav = false;
@@ -961,7 +959,7 @@ SongManager::SetFavoritedStatus(std::set<string>& favs)
 }
 
 void
-SongManager::SetPermaMirroredStatus(std::set<string>& pmir)
+SongManager::SetPermaMirroredStatus(std::set<std::string>& pmir)
 {
 	for (auto song : m_pSongs) {
 		for (auto steps : song->GetAllSteps()) {
@@ -974,7 +972,7 @@ SongManager::SetPermaMirroredStatus(std::set<string>& pmir)
 
 // hurr should probably redo both (all three) of these -mina
 void
-SongManager::SetHasGoal(std::unordered_map<string, GoalsForChart>& goalmap)
+SongManager::SetHasGoal(std::unordered_map<std::string, GoalsForChart>& goalmap)
 {
 	for (auto song : m_pSongs) {
 		auto hasGoal = false;
@@ -1035,7 +1033,7 @@ SongManager::DoesSongGroupExist(const std::string& sSongGroup) const -> bool
 
 auto
 SongManager::GetSongGroupColor(const std::string& sSongGroup,
-							   map<string, Playlist>& playlists) const
+							   std::map<std::string, Playlist>& playlists) const
   -> RageColor
 {
 	for (unsigned i = 0; i < m_sSongGroupNames.size(); i++) {
@@ -1104,7 +1102,7 @@ SongManager::ForceReloadSongGroup(const std::string& sGroupName) const
 	auto songs = GetSongs(sGroupName);
 	for (auto s : songs) {
 		auto stepses = s->GetAllSteps();
-		std::vector<string> oldChartkeys;
+		std::vector<std::string> oldChartkeys;
 		oldChartkeys.reserve(stepses.size());
 		for (auto steps : stepses) {
 			oldChartkeys.emplace_back(steps->GetChartKey());
@@ -1187,7 +1185,7 @@ SongManager::Invalidate(const Song* pStaleSong)
 }
 
 auto
-SongManager::GetPlaylists() -> map<string, Playlist>&
+SongManager::GetPlaylists() -> std::map<std::string, Playlist>&
 {
 	return PROFILEMAN->GetProfile(PLAYER_1)->allplaylists;
 }
@@ -1282,7 +1280,7 @@ makePlaylist(const std::string& answer)
 		PROFILEMAN->SaveProfile(PLAYER_1);
 	}
 }
-static const string calctest_XML = "CalcTestList.xml";
+static const std::string calctest_XML = "CalcTestList.xml";
 
 auto
 CalcTestList::CreateNode() const -> XNode*
@@ -1398,7 +1396,7 @@ SongManager::SaveCalcTestXmlToDir() const
 	auto fn = "Save/" + calctest_XML;
 	// calc test hardcode stuff cuz ASDKLFJASKDJLFHASHDFJ
 	const std::unique_ptr<XNode> xml(SaveCalcTestCreateNode());
-	string err;
+	std::string err;
 	RageFile f;
 	if (!f.Open(fn, RageFile::WRITE)) {
 		LuaHelpers::ReportScriptErrorFmt(
