@@ -152,15 +152,15 @@ SongOptions::FromOneModString(const std::string& sOneMod,
 	auto sBit = make_lower(sOneMod);
 	Trim(sBit);
 
-	Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)xmusic$", Poco::RegularExpression::RE_CASELESS);
+	Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)xmusic$",
+								 Poco::RegularExpression::RE_CASELESS);
 	Poco::RegularExpression::MatchVec matches;
 	if (mult.match(sBit, std::string::size_type(0), matches)) {
-		m_fMusicRate = StringToFloat(sBit.substr(matches[0].offset, matches[0].length));
+		m_fMusicRate = StringToFloat(
+		  extractRegexMatch(sBit, matches[1].offset, matches[1].length));
 		MESSAGEMAN->Broadcast("RateChanged");
 		return true;
 	}
-
-	matches.clear();
 
 	std::vector<std::string> asParts;
 	split(sBit, " ", asParts, true);

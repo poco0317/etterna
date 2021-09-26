@@ -701,7 +701,8 @@ InputMapper::AutoMapJoysticksForCurrentGame()
 		const std::string& sDescription = device->sDesc;
 		FOREACH_CONST(AutoMappings, vAutoMappings, mapping)
 		{
-			Poco::RegularExpression regex(mapping->m_sDriverRegex, Poco::RegularExpression::RE_CASELESS);
+			Poco::RegularExpression regex(mapping->m_sDriverRegex,
+										  Poco::RegularExpression::RE_CASELESS);
 			if (!regex.match(sDescription))
 				continue; // driver names don't match
 

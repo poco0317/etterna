@@ -691,15 +691,18 @@ Profile::MakeUniqueFileNameNoExtension(const std::string& sDir,
 	auto iIndex = 0;
 
 	for (int i = files.size() - 1; i >= 0; --i) {
-		static Poco::RegularExpression re("^" + sFileNameBeginning + "([0-9]{5})\\....$", Poco::RegularExpression::RE_CASELESS);
+		static Poco::RegularExpression re("^" + sFileNameBeginning +
+											"([0-9]{5})\\....$",
+										  Poco::RegularExpression::RE_CASELESS,
+										  true);
 		Poco::RegularExpression::MatchVec matches;
 		if (!re.match(files[i], std::string::size_type(0), matches))
 			continue;
 
-		ASSERT(matches.size() == 1);
-		iIndex =
-		  StringToInt(files[i].substr(matches[0].offset, matches[0].length)) +
-		  1;
+		ASSERT(matches.size() == 2);
+		iIndex = StringToInt(extractRegexMatch(
+				   files[i], matches[1].offset, matches[1].length)) +
+				 1;
 		break;
 	}
 

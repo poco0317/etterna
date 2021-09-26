@@ -492,11 +492,12 @@ PlayerOptions::FromOneModString(const std::string& sOneMod,
 	}
 	const auto on = (level > 0.5f);
 
-	static Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)x$", Poco::RegularExpression::RE_CASELESS);
+	static Poco::RegularExpression mult(
+	  "^([0-9]+(\\.[0-9]+)?)x$", Poco::RegularExpression::RE_CASELESS, true);
 	Poco::RegularExpression::MatchVec matches;
 	if (mult.match(sBit, std::string::size_type(0), matches)) {
 		StringConversion::FromString(
-		  sBit.substr(matches[0].offset, matches[0].length), level);
+		  extractRegexMatch(sBit, matches[1].offset, matches[1].length), level);
 		SET_FLOAT(fScrollSpeed)
 		SET_FLOAT(fTimeSpacing)
 		m_fTimeSpacing = 0;

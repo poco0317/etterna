@@ -58,16 +58,20 @@ LyricsLoader::LoadFromLRCFile(const std::string& sPath, Song& out)
 		}
 		// (most tags are in the format of...)
 		// "[data1] data2".  Ignore whitespace at the beginning of the line.
-		static Poco::RegularExpression x("^ *\\[([^]]+)\\] *(.*)$", Poco::RegularExpression::RE_CASELESS);
+		static Poco::RegularExpression x("^ *\\[([^]]+)\\] *(.*)$",
+										 Poco::RegularExpression::RE_CASELESS,
+										 true);
 
 		Poco::RegularExpression::MatchVec matches;
 		if (!x.match(line, std::string::size_type(0), matches)) {
 			continue;
 		}
-		ASSERT(matches.size() == 2);
+		ASSERT(matches.size() == 3);
 
-		auto& sValueName = line.substr(matches[0].offset, matches[0].length);
-		auto& sValueData = line.substr(matches[1].offset, matches[1].length);
+		auto& sValueName =
+		  extractRegexMatch(line, matches[1].offset, matches[1].length);
+		auto& sValueData =
+		  extractRegexMatch(line, matches[2].offset, matches[2].length);
 		StripCrnl(sValueData);
 
 		// handle the data
