@@ -40,7 +40,6 @@ static bool g_Shutdown;
 std::mutex g_dlmutex;
 
 std::shared_ptr<DownloadManager> DLMAN = nullptr;
-LuaReference DownloadManager::EMPTY_REFERENCE = LuaReference();
 
 static Preference<unsigned int> maxDLPerSecond(
   "maximumBytesDownloadedPerSecond",
@@ -58,21 +57,31 @@ static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
   0);
-static const string TEMP_ZIP_MOUNT_POINT = "/@temp-zip/";
-static const string CLIENT_DATA_KEY =
-  "4406B28A97B326DA5346A9885B0C9DEE8D66F89B562CF5E337AC04C17EB95C40";
-static const string DL_DIR = SpecialFiles::CACHE_DIR + "Downloads/";
-static const string wife3_rescore_upload_flag = "rescoredw3";
+
+static const std::string TEMP_ZIP_MOUNT_POINT = "/@temp-zip/";
+static const std::string API_KEY = "adc";
+static const std::string DL_DIR = SpecialFiles::CACHE_DIR + "Downloads/";
+static const std::string wife3_rescore_upload_flag = "rescoredw3";
+
+// endpoint construction constants
+// all paths should begin with / and end without /
+/// API root path
+static const std::string API_ROOT = "/api/client";
+
+static const std::string API_LOGIN = "/login";
+static const std::string API_RANKED_CHARTKEYS = "/charts/ranked";
+static const std::string API_UPLOAD_SCORE = "/scores";
+static const std::string API_UPLOAD_SCORE_BULK = "/scores/bulk";
 
 bool
-DownloadManager::InstallSmzip(const string& sZipFile)
+DownloadManager::InstallSmzip(const std::string& sZipFile)
 {
 	if (!FILEMAN->Mount("zip", sZipFile, TEMP_ZIP_MOUNT_POINT))
-		FAIL_M(static_cast<string>("Failed to mount " + sZipFile).c_str());
+		FAIL_M(static_cast<std::string>("Failed to mount " + sZipFile).c_str());
 	std::vector<std::string> v_packs;
 	GetDirListing(TEMP_ZIP_MOUNT_POINT + "*", v_packs, true, true);
 
-	string doot = TEMP_ZIP_MOUNT_POINT;
+	std::string doot = TEMP_ZIP_MOUNT_POINT;
 	if (v_packs.size() > 1) {
 		doot += sZipFile.substr(sZipFile.find_last_of('/') +
 								1); // attempt to whitelist pack name, this
@@ -81,7 +90,7 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 		doot = doot.substr(0, doot.length() - 4) + "/";
 	}
 
-	std::vector<string> vsFiles;
+	std::vector<std::string> vsFiles;
 	{
 		std::vector<std::string> vsRawFiles;
 		GetDirListingRecursive(doot, "*", vsRawFiles);
@@ -91,23 +100,23 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 			return false;
 		}
 
-		std::vector<string> vsPrettyFiles;
+		std::vector<std::string> vsPrettyFiles;
 		for (auto& s : vsRawFiles) {
 			if (EqualsNoCase(GetExtension(s), "ctl"))
 				continue;
 
 			vsFiles.push_back(s);
 
-			string s2 = tail(s, s.length() - TEMP_ZIP_MOUNT_POINT.length());
+			std::string s2 = tail(s, s.length() - TEMP_ZIP_MOUNT_POINT.length());
 			vsPrettyFiles.push_back(s2);
 		}
 		sort(vsPrettyFiles.begin(), vsPrettyFiles.end());
 	}
-	string sResult = "Success installing " + sZipFile;
-	string extractTo =
+	std::string sResult = "Success installing " + sZipFile;
+	std::string extractTo =
 	  downloadPacksToAdditionalSongs ? "AdditionalSongs/" : "Songs/";
 	for (auto& sSrcFile : vsFiles) {
-		string sDestFile = sSrcFile;
+		std::string sDestFile = sSrcFile;
 		sDestFile = tail(std::string(sDestFile.c_str()),
 						 sDestFile.length() - TEMP_ZIP_MOUNT_POINT.length());
 
@@ -204,8 +213,6 @@ DownloadManager::~DownloadManager()
 	DownloadManagerThread.Wait();
 
 	EmptyTempDLFileDir();
-	if (LoggedIn())
-		EndSession();
 
 	if (p_httpsClientSession != nullptr)
 		delete p_httpsClientSession;
@@ -214,7 +221,14 @@ DownloadManager::~DownloadManager()
 }
 
 void
-DownloadManager::GenerateRequest(const std::string& url, const std::string requestMethod, bool https)
+DownloadManager::Init()
+{
+	initialized = true;
+
+}
+
+void
+DownloadManager::GenerateRequest(const std::string& url, const std::string requestMethod, HTMLForm* requestForm, bool https)
 {
 	Poco::URI uri(url);
 	std::string path(uri.getPathAndQuery());
@@ -223,9 +237,14 @@ DownloadManager::GenerateRequest(const std::string& url, const std::string reque
 	if (path.empty())
 		path = "/";
 	HTTPRequest* request = new HTTPRequest(requestMethod, path, Poco::Net::HTTPMessage::HTTP_1_1);
+	request->setContentType("application/json");
+	request->setContentLength(0);
+
+	if (IsLoggedIn())
+		request->setCredentials("Bearer", loginToken);
 
 	Poco::Net::HTTPClientSession* session;
-	std::vector<HTTPRequest*>* requestQueue;
+	std::vector<std::pair<HTTPRequest*, HTMLForm*>>* requestQueue;
 	if (https) {
 		session = p_httpsClientSession;
 		requestQueue = &apiHttpsRequests;
@@ -242,7 +261,7 @@ DownloadManager::GenerateRequest(const std::string& url, const std::string reque
 
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
-		requestQueue->push_back(request);
+		requestQueue->push_back({ request, requestForm });
 		// The thread updates should catch this one eventually
 	}
 }
@@ -256,24 +275,39 @@ DownloadManager::SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 	session->setPort(uri.getPort());
 }
 
+/*
 void
-DownloadManager::UpdateDLSpeed(bool gameplay)
+DownloadManager::UpdateDLSpeed()
 {
-	this->gameplay = gameplay;
 	if (gameplay)
 		MESSAGEMAN->Broadcast("PausingDownloads");
 	else
 		MESSAGEMAN->Broadcast("ResumingDownloads");
 }
+*/
+
+void
+DownloadManager::SetInGameplay(bool inGameplay)
+{
+	const std::lock_guard<std::mutex> lock(g_dlmutex);
+	this->inGameplay = inGameplay;
+}
+
+void
+DownloadManager::SetApiShouldUseHttps(bool state)
+{
+	const std::lock_guard<std::mutex> lock(g_dlmutex);
+	this->apiShouldUseHttps = state;
+}
 
 bool
-DownloadManager::EncodeSpaces(string& str)
+DownloadManager::EncodeSpaces(std::string& str)
 {
 
 	// Parse spaces (curl doesnt parse them properly)
 	bool foundSpaces = false;
 	size_t index = str.find(' ', 0);
-	while (index != string::npos) {
+	while (index != std::string::npos) {
 
 		str.erase(index, 1);
 		str.insert(index, "%20");
@@ -284,27 +318,10 @@ DownloadManager::EncodeSpaces(string& str)
 }
 
 void
-Download::Update(float fDeltaSeconds)
-{
-	progress.time += fDeltaSeconds;
-	if (progress.time > 1.0) {
-		speed = std::to_string(progress.downloaded / 1024 - downloadedAtLastUpdate);
-		progress.time = 0;
-		downloadedAtLastUpdate = progress.downloaded / 1024;
-	}
-}
-void
-DownloadManager::init()
-{
-	initialized = true;
-
-	GenerateRequest(std::string("/api/client/login"), HTTPRequest::HTTP_POST, false);
-}
-void
 DownloadManager::Update(float fDeltaSeconds)
 {
 	if (!initialized)
-		init();
+		Init();
 
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
@@ -320,13 +337,15 @@ DownloadManager::Update(float fDeltaSeconds)
 void
 DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 {
-	std::vector<HTTPRequest*> reqs;
+	std::vector<std::pair<HTTPRequest*, HTMLForm*>> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpsRequests;
 		apiHttpsRequests.clear();
 	}
-	for (auto& req : reqs) {
+	for (auto& p : reqs) {
+		auto& req = p.first;
+		auto& form = p.second;
 		Poco::Net::HTTPResponse response;
 		try {
 			p_httpsClientSession->sendRequest(*req);
@@ -346,21 +365,30 @@ DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 									response.getContentLength());
 
 		delete req;
+		if (form != nullptr)
+			delete form;
 	}
 }
 void
 DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 {
-	std::vector<HTTPRequest*> reqs;
+	std::vector<std::pair<HTTPRequest*, HTMLForm*>> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpRequests;
 		apiHttpRequests.clear();
 	}
-	for (auto& req : reqs) {
+	for (auto& p : reqs) {
+		auto& req = p.first;
+		auto& form = p.second;
 		Poco::Net::HTTPResponse response;
 		try {
-			p_httpClientSession->sendRequest(*req);
+
+			if (form != nullptr)
+				form->write(p_httpClientSession->sendRequest(*req));
+			else
+				p_httpClientSession->sendRequest(*req);
+
 			p_httpClientSession->receiveResponse(response);
 		} catch (Poco::Exception& e) {
 			Locator::getLogger()->info("EXCPETION {} {} {}",
@@ -377,24 +405,52 @@ DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 									response.getContentLength());
 
 		delete req;
+		if (form != nullptr)
+			delete form;
 	}
 }
 
-string
-Download::MakeTempFileName(string s)
-{
-	return Basename(s);
-}
 bool
-DownloadManager::LoggedIn()
+DownloadManager::IsLoggedIn()
 {
-	return !authToken.empty();
+	return !loginToken.empty();
 }
+
+bool
+DownloadManager::IsInGameplay()
+{
+	return inGameplay;
+}
+
+void
+DownloadManager::Login(const std::string& username, const std::string& password)
+{
+	Locator::getLogger()->trace("Generating user+pass login request ...");
+
+	HTMLForm* form = new HTMLForm;
+	form->setEncoding(HTMLForm::ENCODING_URL);
+	form->set("email", username);
+	form->set("password", password);
+	form->set("key", API_KEY);
+
+	GenerateRequest(
+	  API_ROOT + API_LOGIN, HTTPRequest::HTTP_POST, form, apiShouldUseHttps);
+}
+
+void
+DownloadManager::Login(const std::string& token)
+{
+	Locator::getLogger()->trace("Generating token login request ...");
+
+
+}
+
 bool
 DownloadManager::ShouldUploadScores()
 {
-	return LoggedIn() && automaticSync &&
-		   GamePreferences::m_AutoPlay == PC_HUMAN;
+	return false;
+	//return LoggedIn() && automaticSync &&
+	//	   GamePreferences::m_AutoPlay == PC_HUMAN;
 }
 /*
 inline void
@@ -697,9 +753,6 @@ uploadSequentially()
 bool
 DownloadManager::UploadScores()
 {
-	if (!LoggedIn())
-		return false;
-
 	// First we accumulate scores that have not been uploaded and have
 	// replay data. There is no reason to upload updated calc versions to the
 	// site anymore - the site uses its own calc and afaik ignores the provided
@@ -822,13 +875,7 @@ DownloadManager::ForceUploadAllScores()
 		uploadSequentially();
 	}
 }
-void
-DownloadManager::EndSessionIfExists()
-{
-	if (!LoggedIn())
-		return;
-	EndSession();
-}
+/*
 void
 DownloadManager::EndSession()
 {
@@ -839,18 +886,8 @@ DownloadManager::EndSession()
 	if (MESSAGEMAN != nullptr)
 		MESSAGEMAN->Broadcast("LogOut");
 }
+*/
 
-std::vector<std::string>
-split(const std::string& s, char delimiter)
-{
-	std::vector<std::string> tokens;
-	std::string token;
-	std::istringstream tokenStream(s);
-	while (std::getline(tokenStream, token, delimiter)) {
-		tokens.push_back(token);
-	}
-	return tokens;
-}
 OnlineTopScore
 DownloadManager::GetTopSkillsetScore(unsigned int rank,
 									 Skillset ss,
@@ -1287,16 +1324,16 @@ DownloadManager::OnLogin()
 		// DLMAN->UpdateOnlineScoreReplayData();
 	}
 	MESSAGEMAN->Broadcast("Login");
-	DLMAN->loggingIn = false;
 }
 
+/*
 void
 DownloadManager::StartSession(
   string user,
   string pass,
   std::function<void(bool loggedIn)> callback = [](bool) {})
 {
-	/*
+	
 	string url = serverURL.Get() + "/login";
 	if (loggingIn || user.empty()) {
 		return;
@@ -1346,25 +1383,42 @@ DownloadManager::StartSession(
 		DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
 		MESSAGEMAN->Broadcast("LoginFailed");
 		DLMAN->loggingIn = false;
-	};*/
+	};
 }
+*/
 int
 DownloadManager::GetSkillsetRank(Skillset ss)
 {
-	if (!LoggedIn())
-		return 0;
 	return sessionRanks[ss];
 }
 
 float
 DownloadManager::GetSkillsetRating(Skillset ss)
 {
-	if (!LoggedIn())
-		return 0.0f;
 	return static_cast<float>(sessionRatings[ss]);
 }
 
-Download::Download(string url, string filename, std::function<void(Download*)> done)
+std::string
+Download::MakeTempFileName(std::string s)
+{
+	return Basename(s);
+}
+
+void
+Download::Update(float fDeltaSeconds)
+{
+	progress.time += fDeltaSeconds;
+	if (progress.time > 1.0) {
+		speed =
+		  std::to_string(progress.downloaded / 1024 - downloadedAtLastUpdate);
+		progress.time = 0;
+		downloadedAtLastUpdate = progress.downloaded / 1024;
+	}
+}
+
+Download::Download(std::string url,
+				   std::string filename,
+				   std::function<void(Download*)> done)
 {
 	Done = done;
 	m_Url = url;
@@ -1469,7 +1523,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetUsername(T* p, lua_State* L)
 	{
-		lua_pushstring(L, DLMAN->sessionUser.c_str());
+		lua_pushstring(L, "");
 		return 1;
 	}
 	static int GetSkillsetRank(T* p, lua_State* L)
@@ -1500,40 +1554,40 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int IsLoggedIn(T* p, lua_State* L)
 	{
-		lua_pushboolean(L, DLMAN->LoggedIn());
+		lua_pushboolean(L, false);
 		return 1;
 	}
 	static int Login(T* p, lua_State* L)
 	{
-		string user = SArg(1);
-		string pass = SArg(2);
-		DLMAN->StartSession(user, pass);
+		std::string user = SArg(1);
+		std::string pass = SArg(2);
+		//DLMAN->StartSession(user, pass);
 		return 0;
 	}
 	static int LoginWithToken(T* p, lua_State* L)
 	{
-		string user = SArg(1);
-		string token = SArg(2);
-		DLMAN->EndSessionIfExists();
-		DLMAN->authToken = token;
-		DLMAN->sessionUser = user;
-		DLMAN->sessionPass = "";
-		DLMAN->OnLogin();
+		std::string user = SArg(1);
+		std::string token = SArg(2);
+		//DLMAN->EndSessionIfExists();
+		//DLMAN->authToken = token;
+		//DLMAN->sessionUser = user;
+		//DLMAN->sessionPass = "";
+		//DLMAN->OnLogin();
 		return 0;
 	}
 	static int Logout(T* p, lua_State* L)
 	{
-		DLMAN->EndSessionIfExists();
+		//DLMAN->EndSessionIfExists();
 		return 0;
 	}
 	static int GetLastVersion(T* p, lua_State* L)
 	{
-		lua_pushstring(L, DLMAN->lastVersion.c_str());
+		lua_pushstring(L, "0.70.4");
 		return 1;
 	}
 	static int GetRegisterPage(T* p, lua_State* L)
 	{
-		lua_pushstring(L, DLMAN->registerPage.c_str());
+		lua_pushstring(L, "");
 		return 1;
 	}
 	static int GetTopSkillsetScore(T* p, lua_State* L)
@@ -1565,7 +1619,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetTopChartScoreCount(T* p, lua_State* L)
 	{
-		string ck = SArg(1);
+		std::string ck = SArg(1);
 		if (DLMAN->chartLeaderboards.count(ck))
 			lua_pushnumber(L, DLMAN->chartLeaderboards[ck].size());
 		else
@@ -1574,7 +1628,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetTopChartScore(T* p, lua_State* L)
 	{
-		string chartkey = SArg(1);
+		std::string chartkey = SArg(1);
 		int rank = IArg(2);
 		int index = rank - 1;
 		if (index < 0 || !DLMAN->chartLeaderboards.count(chartkey) ||
@@ -1693,7 +1747,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetToken(T* p, lua_State* L)
 	{
-		lua_pushstring(L, DLMAN->authToken.c_str());
+		lua_pushstring(L, "token");
 		return 1;
 	}
 
@@ -1702,9 +1756,9 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		OnlineHighScore* hs =
 		  (OnlineHighScore*)GetPointerFromStack(L, "HighScore", 1);
 		int userid = hs->userid;
-		string username = hs->GetDisplayName();
-		string scoreid = hs->scoreid;
-		string ck = hs->GetChartKey();
+		std::string username = hs->GetDisplayName();
+		std::string scoreid = hs->scoreid;
+		std::string ck = hs->GetChartKey();
 
 		bool alreadyHasReplay = false;
 		alreadyHasReplay |= !hs->GetNoteRowVector().empty();
@@ -1743,7 +1797,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		// an unranked chart check could be done here
 		// but just in case, don't check
 		// allow another request for those -- if it gets ranked during a session
-		string chart = SArg(1);
+		std::string chart = SArg(1);
 		LuaReference ref;
 		auto& leaderboardScores = DLMAN->chartLeaderboards[chart];
 		if (lua_isfunction(L, 2)) {
@@ -1776,10 +1830,10 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	static int GetChartLeaderBoard(T* p, lua_State* L)
 	{
 		std::vector<HighScore*> filteredLeaderboardScores;
-		std::unordered_set<string> userswithscores;
+		std::unordered_set<std::string> userswithscores;
 		auto ck = SArg(1);
 		auto& leaderboardScores = DLMAN->chartLeaderboards[ck];
-		string country = "";
+		std::string country = "";
 		if (!lua_isnoneornil(L, 2)) {
 			country = SArg(2);
 		}

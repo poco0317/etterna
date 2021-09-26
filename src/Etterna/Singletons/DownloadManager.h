@@ -12,8 +12,10 @@
 #include <deque>
 #include "Poco/Net/HTTPRequest.h"
 #include "Poco/Net/HTTPSClientSession.h"
+#include "Poco/Net/HTMLForm.h"
 
 using Poco::Net::HTTPRequest;
+using Poco::Net::HTMLForm;
 
 class ProgressData
 {
@@ -144,46 +146,33 @@ class OnlineScore
 class DownloadManager
 {
   public:
-	static LuaReference EMPTY_REFERENCE;
 	DownloadManager();
 	~DownloadManager();
 
-	/// Active HTTP requests
-	std::vector<HTTPRequest*> apiHttpsRequests{};
-	std::vector<HTTPRequest*> apiHttpRequests{};
-	/// Main HTTPS Client Session
-	Poco::Net::HTTPSClientSession* p_httpsClientSession;
-	/// Alternate HTTP Client Session
-	Poco::Net::HTTPClientSession* p_httpClientSession;
+	void Init();
+	void Update(float fDeltaSeconds);
+	void UpdateHTTPSRequests(float fDeltaSeconds);
+	void UpdateHTTPRequests(float fDeltaSeconds);
+
+	bool IsLoggedIn();
+	bool IsInGameplay();
+	bool ShouldUploadScores();
+
+	void SetInGameplay(bool inGameplay);
+	void SetApiShouldUseHttps(bool state);
 
 	void GenerateRequest(
 	  const std::string& url,
 	  const std::string requestMethod = HTTPRequest::HTTP_GET,
+	  HTMLForm* requestForm = nullptr,
 	  bool https = true);
 	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 							   const std::string url);
 
-	void UpdateHTTPSRequests(float fDeltaSeconds);
-	void UpdateHTTPRequests(float fDeltaSeconds);
+	void Login(const std::string& username, const std::string& password);
+	void Login(const std::string& token);
 
-	int HTTPRunning{ 0 };
-	/// Currently logging in (Since it's async, to not try twice)
-	bool loggingIn{ false };
-	/// Currently in gameplay
-	bool gameplay{ false };
-	bool initialized{ false };
-	std::string error{ "" };
 	std::vector<DownloadablePack> downloadablePacks;
-	/// Session cookie content
-	std::string authToken{ "" };
-	/// Currently logged in username
-	std::string sessionUser{ "" };
-	/// Currently logged in password
-	std::string sessionPass{ "" };
-	/// Last version according to server (Or current if non was obtained)
-	std::string lastVersion{ "" };
-	/// Register page from server (Or empty if non was obtained)
-	std::string registerPage{ "" };
 	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
 	std::set<std::string> unrankedCharts;
 	std::vector<std::string> countryCodes;
@@ -191,16 +180,7 @@ class DownloadManager
 	std::map<Skillset, int> sessionRanks;
 	std::map<Skillset, double> sessionRatings;
 	std::map<Skillset, std::vector<OnlineTopScore>> topScores;
-	bool LoggedIn();
 
-	/// Calls EndSession if logged in
-	void EndSessionIfExists();
-	/// Sends session destroy request
-	void EndSession();
-	/// Sends login request if not already logging in
-	void StartSession(std::string user,
-					  std::string pass,
-					  std::function<void(bool loggedIn)> done);
 	void OnLogin();
 	/// Uploads all scores not yet uploaded to current
 	bool UploadScores();
@@ -211,15 +191,8 @@ class DownloadManager
 								  bool startnow = true);
 	void ForceUploadAllScores();
 
-	void init();
-	void Update(float fDeltaSeconds);
 	bool InstallSmzip(const std::string& sZipFile);
 
-	void UpdateDLSpeed();
-	void UpdateDLSpeed(bool gameplay);
-
-	std::string GetError() { return error; }
-	bool Error() { return error.empty(); }
 	bool EncodeSpaces(std::string& str);
 
 	void UploadScore(HighScore* hs,
@@ -230,7 +203,6 @@ class DownloadManager
 	  HighScore* hs,
 	  std::function<void()> callback = []() {});
 
-	bool ShouldUploadScores();
 	bool currentrateonly = false;
 	bool topscoresonly = true;
 	bool ccoffonly = false;
@@ -252,6 +224,22 @@ class DownloadManager
 
 	// Lua
 	void PushSelf(lua_State* L);
+
+  private:
+	/// Active HTTP requests
+	std::vector<std::pair<HTTPRequest*, HTMLForm*>> apiHttpsRequests{};
+	std::vector<std::pair<HTTPRequest*, HTMLForm*>> apiHttpRequests{};
+	/// Main HTTPS Client Session
+	Poco::Net::HTTPSClientSession* p_httpsClientSession;
+	/// Alternate HTTP Client Session
+	Poco::Net::HTTPClientSession* p_httpClientSession;
+	/// Allow toggling https
+	bool apiShouldUseHttps = false;
+
+	bool initialized = false;
+	bool inGameplay = false;
+
+	std::string loginToken = "";
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;
