@@ -12,9 +12,9 @@ static const std::string ERASE_MARKER = "-erase-";
 
 struct TitleTrans
 {
-	std::unique_ptr<Poco::RegularExpression> TitleFrom;
-	std::unique_ptr<Poco::RegularExpression> SubFrom;
-	std::unique_ptr<Poco::RegularExpression> ArtistFrom;
+	std::shared_ptr<Poco::RegularExpression> TitleFrom;
+	std::shared_ptr<Poco::RegularExpression> SubFrom;
+	std::shared_ptr<Poco::RegularExpression> ArtistFrom;
 	TitleFields Replacement;
 
 	/* If this is true, no translit fields will be generated automatically. */
@@ -27,17 +27,7 @@ struct TitleTrans
 	{
 	}
 
-	TitleTrans(const TitleTrans& other)
-	  : Replacement(other.Replacement)
-	  , translit(other.translit)
-	  , TitleFrom(other.TitleFrom.get())
-	  , SubFrom(other.SubFrom.get())
-	  , ArtistFrom(other.ArtistFrom.get())
-	{
-	}
-
 	bool Matches(const TitleFields& tf, TitleFields& to);
-
 	void LoadFromNode(const XNode* pNode);
 };
 
@@ -69,11 +59,14 @@ TitleTrans::LoadFromNode(const XNode* pNode)
 		if (sKeyName == "DontTransliterate")
 			translit = false;
 		else if (sKeyName == "TitleFrom")
-			TitleFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
+			TitleFrom.reset(new Poco::RegularExpression(
+			  std::string("^(" + sValue + ")$"), 0, true));
 		else if (sKeyName == "ArtistFrom")
-			ArtistFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
+			ArtistFrom.reset(new Poco::RegularExpression(
+			  std::string("^(" + sValue + ")$"), 0, true));
 		else if (sKeyName == "SubtitleFrom")
-			SubFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
+			SubFrom.reset(new Poco::RegularExpression(
+			  std::string("^(" + sValue + ")$"), 0, true));
 		else if (sKeyName == "TitleTo")
 			Replacement.Title = sValue;
 		else if (sKeyName == "ArtistTo")
