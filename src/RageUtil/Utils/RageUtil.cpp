@@ -1408,7 +1408,6 @@ GetFileContents(const std::string& sFile, std::vector<std::string>& asOut)
 	return true;
 }
 
-#include "pcre.h"
 
 void
 Regex::Compile()

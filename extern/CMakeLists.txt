@@ -50,7 +50,6 @@ add_subdirectory(stb)
 add_subdirectory(luajit)
 add_subdirectory(muFFT)
 add_subdirectory(glew-1.5.8)
-add_subdirectory(pcre)
 add_subdirectory(zlib)
 add_subdirectory(mad-0.15.1b)
 add_subdirectory(fmt)
@@ -76,7 +75,7 @@ endif()
 list(APPEND EXT_TARGETS
     SQLiteCpp sqlite3
     discord-rpc muFFT
-    zlib libmad pcre
+    zlib libmad
     ogg vorbis glfw
     fmt)
 
