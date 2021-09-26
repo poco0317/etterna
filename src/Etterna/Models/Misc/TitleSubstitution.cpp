@@ -12,9 +12,9 @@ static const std::string ERASE_MARKER = "-erase-";
 
 struct TitleTrans
 {
-	Poco::RegularExpression* TitleFrom = nullptr;
-	Poco::RegularExpression* SubFrom = nullptr;
-	Poco::RegularExpression* ArtistFrom = nullptr;
+	std::unique_ptr<Poco::RegularExpression> TitleFrom;
+	std::unique_ptr<Poco::RegularExpression> SubFrom;
+	std::unique_ptr<Poco::RegularExpression> ArtistFrom;
 	TitleFields Replacement;
 
 	/* If this is true, no translit fields will be generated automatically. */
@@ -27,13 +27,13 @@ struct TitleTrans
 	{
 	}
 
-	~TitleTrans() {
-		if (TitleFrom != nullptr)
-			delete TitleFrom;
-		if (SubFrom != nullptr)
-			delete SubFrom;
-		if (ArtistFrom != nullptr)
-			delete ArtistFrom;
+	TitleTrans(const TitleTrans& other)
+	  : Replacement(other.Replacement)
+	  , translit(other.translit)
+	  , TitleFrom(other.TitleFrom.get())
+	  , SubFrom(other.SubFrom.get())
+	  , ArtistFrom(other.ArtistFrom.get())
+	{
 	}
 
 	bool Matches(const TitleFields& tf, TitleFields& to);
@@ -68,22 +68,12 @@ TitleTrans::LoadFromNode(const XNode* pNode)
 		const auto sValue = attr->second->GetValue<std::string>();
 		if (sKeyName == "DontTransliterate")
 			translit = false;
-		else if (sKeyName == "TitleFrom") {
-			if (TitleFrom != nullptr)
-				delete TitleFrom;
-			TitleFrom =
-			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
-		} else if (sKeyName == "ArtistFrom") {
-			if (ArtistFrom != nullptr)
-				delete ArtistFrom;
-			ArtistFrom =
-			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
-		} else if (sKeyName == "SubtitleFrom") {
-			if (SubFrom != nullptr)
-				delete SubFrom;
-			SubFrom =
-			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
-		}
+		else if (sKeyName == "TitleFrom")
+			TitleFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
+		else if (sKeyName == "ArtistFrom")
+			ArtistFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
+		else if (sKeyName == "SubtitleFrom")
+			SubFrom.reset(new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true));
 		else if (sKeyName == "TitleTo")
 			Replacement.Title = sValue;
 		else if (sKeyName == "ArtistTo")
