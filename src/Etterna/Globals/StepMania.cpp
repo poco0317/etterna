@@ -457,7 +457,7 @@ struct VideoCardDefaults
 	}
 } const g_VideoCardDefaults[] = {
 #ifdef _WINDOWS
-	VideoCardDefaults("", "d3d, opengl", 800, 600, 32, 32, 32, 1024, false)
+	VideoCardDefaults(".*", "d3d, opengl", 800, 600, 32, 32, 32, 1024, false)
 #else
 	VideoCardDefaults(
 	  "Voodoo *5",
@@ -641,7 +641,7 @@ struct VideoCardDefaults
 	VideoCardDefaults(
 	  // Default graphics settings used for all cards that don't match above.
 	  // This must be the very last entry!
-	  "",
+	  ".*",
 	  "opengl,d3d",
 	  640,
 	  480,
@@ -686,7 +686,7 @@ CheckVideoDefaultSettings()
 		defaults = g_VideoCardDefaults[i];
 
 		std::string sDriverRegex = defaults.sDriverRegex;
-		Poco::RegularExpression regex(sDriverRegex);
+		Poco::RegularExpression regex(sDriverRegex, Poco::RegularExpression::RE_CASELESS);
 		if (regex.match(sVideoDriver)) {
 			if (PREFSMAN->m_verbose_log > 1)
 				Locator::getLogger()->trace("Card matches '{}'.", sDriverRegex.size() ? sDriverRegex.c_str() : "(unknown card)");
