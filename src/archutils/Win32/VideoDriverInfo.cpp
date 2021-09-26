@@ -4,28 +4,12 @@
 #include "Core/Services/Locator.hpp"
 #include "RegistryAccess.h"
 #include <windows.h>
+#include "nowide/convert.hpp"
 
 // this will not work on 95 and NT because of EnumDisplayDevices
 std::string
 GetPrimaryVideoName()
 {
-	typedef BOOL(WINAPI *
-				 pfnEnumDisplayDevices)(PVOID, DWORD, PDISPLAY_DEVICE, DWORD);
-	pfnEnumDisplayDevices EnumDisplayDevices;
-	HINSTANCE hInstUser32;
-
-	hInstUser32 = LoadLibrary(L"User32.DLL");
-	if (!hInstUser32)
-		return std::string();
-
-	// VC6 don't have a stub to static link with, so link dynamically.
-	EnumDisplayDevices =
-	  (pfnEnumDisplayDevices)GetProcAddress(hInstUser32, "EnumDisplayDevicesA");
-	if (EnumDisplayDevices == nullptr) {
-		FreeLibrary(hInstUser32);
-		return std::string();
-	}
-
 	std::string sPrimaryDeviceName;
 	for (int i = 0; true; ++i) {
 		DISPLAY_DEVICE dd;
@@ -34,12 +18,11 @@ GetPrimaryVideoName()
 		if (!EnumDisplayDevices(nullptr, i, &dd, 0))
 			break;
 		if (dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) {
-			sPrimaryDeviceName = (char*)dd.DeviceString;
+			sPrimaryDeviceName = nowide::narrow(std::wstring(dd.DeviceString));
 			break;
 		}
 	}
 
-	FreeLibrary(hInstUser32);
 	TrimRight(sPrimaryDeviceName);
 	return sPrimaryDeviceName;
 }
