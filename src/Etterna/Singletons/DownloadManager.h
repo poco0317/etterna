@@ -152,9 +152,9 @@ class DownloadManager
 	std::vector<HTTPRequest*> apiHttpRequests{};
 	std::vector<HTTPRequest*> secondaryApiHttpRequests{};
 	/// Main HTTP Client Session
-	Poco::Net::HTTPSClientSession apiClientSession{};
+	Poco::Net::HTTPSClientSession* p_apiClientSession;
 	/// Alternate HTTP Client Session
-	Poco::Net::HTTPSClientSession secondaryApiClientSession{};
+	Poco::Net::HTTPSClientSession* p_secondaryApiClientSession;
 
 	void GenerateRequest(
 	  std::vector<HTTPRequest*>* requestQueue,

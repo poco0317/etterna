@@ -30,6 +30,8 @@
 #include <algorithm>
 #include "Poco/URI.h"
 #include "Poco/Net/HTTPResponse.h"
+#include "Poco/Net/SSLManager.h"
+#include "Poco/Net/ConsoleCertificateHandler.h"
 
 using namespace rapidjson;
 
@@ -158,8 +160,24 @@ DownloadManager::DownloadManager()
 {
 	EmptyTempDLFileDir();
 
-	SetClientSessionByURL(&apiClientSession, serverURL);
-	SetClientSessionByURL(&secondaryApiClientSession, packListURL);
+	Poco::SharedPtr<Poco::Net::InvalidCertificateHandler> pCert =
+	  new Poco::Net::ConsoleCertificateHandler(false);
+	Poco::Net::Context::Ptr pCtx =
+	  new Poco::Net::Context(Poco::Net::Context::TLS_CLIENT_USE,
+							 "",
+							 "",
+							 "",
+							 Poco::Net::Context::VERIFY_NONE,
+							 9,
+							 false,
+							 "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
+	Poco::Net::SSLManager::instance().initializeClient(0, pCert, pCtx);
+
+	p_apiClientSession = new Poco::Net::HTTPSClientSession;
+	p_secondaryApiClientSession = new Poco::Net::HTTPSClientSession;
+
+	SetClientSessionByURL(p_apiClientSession, serverURL);
+	SetClientSessionByURL(p_secondaryApiClientSession, packListURL);
 
 	g_Shutdown = false;
 	DownloadManagerThread.SetName("DownloadManager");
@@ -180,6 +198,11 @@ DownloadManager::~DownloadManager()
 	EmptyTempDLFileDir();
 	if (LoggedIn())
 		EndSession();
+
+	if (p_apiClientSession != nullptr)
+		delete p_apiClientSession;
+	if (p_secondaryApiClientSession != nullptr)
+		delete p_secondaryApiClientSession;
 }
 
 void
@@ -211,8 +234,6 @@ DownloadManager::UpdateDLSpeed(bool gameplay)
 		MESSAGEMAN->Broadcast("PausingDownloads");
 	else
 		MESSAGEMAN->Broadcast("ResumingDownloads");
-
-	UpdateDLSpeed();
 }
 
 bool
@@ -270,8 +291,8 @@ DownloadManager::UpdatePrimaryRequests(float fDeltaSeconds)
 	apiHttpRequests.clear();
 	for (auto& req : reqs) {
 		Poco::Net::HTTPResponse response;
-		apiClientSession.sendRequest(*req);
-		apiClientSession.receiveResponse(response);
+		p_apiClientSession->sendRequest(*req);
+		p_apiClientSession->receiveResponse(response);
 
 		Locator::getLogger()->trace("{} {} {} {}",
 									response.getStatus(),
@@ -289,8 +310,8 @@ DownloadManager::UpdateSecondaryRequests(float fDeltaSeconds)
 	secondaryApiHttpRequests.clear();
 	for (auto& req : reqs) {
 		Poco::Net::HTTPResponse response;
-		secondaryApiClientSession.sendRequest(*req);
-		secondaryApiClientSession.receiveResponse(response);
+		p_secondaryApiClientSession->sendRequest(*req);
+		p_secondaryApiClientSession->receiveResponse(response);
 
 		Locator::getLogger()->trace("{} {} {} {}",
 									response.getStatus(),
