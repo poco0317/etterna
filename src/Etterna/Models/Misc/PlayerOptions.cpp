@@ -492,7 +492,7 @@ PlayerOptions::FromOneModString(const std::string& sOneMod,
 	}
 	const auto on = (level > 0.5f);
 
-	static Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)x$");
+	static Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)x$", Poco::RegularExpression::RE_CASELESS);
 	Poco::RegularExpression::MatchVec matches;
 	if (mult.match(sBit, std::string::size_type(0), matches)) {
 		StringConversion::FromString(

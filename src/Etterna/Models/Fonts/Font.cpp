@@ -600,7 +600,7 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 				 */
 				Poco::RegularExpression::MatchVec asMatches;
 				static Poco::RegularExpression parse(
-				  "^RANGE ([A-Z0-9\\-]+)( ?#([0-9A-F]+)-([0-9A-F]+))?$");
+				  "^RANGE ([A-Z0-9\\-]+)( ?#([0-9A-F]+)-([0-9A-F]+))?$", Poco::RegularExpression::RE_CASELESS);
 				int match = parse.match(sName, std::string::size_type(0), asMatches);
 				ASSERT(asMatches.size() == 4); // 4 parens
 				if (match == 0 || asMatches.at(0).length == 0) {

@@ -70,7 +70,7 @@ RageTexture::GetFrameDimensionsFromFileName(const std::string& sPath,
 											int source_width,
 											int source_height)
 {
-	static Poco::RegularExpression match(" ([0-9]+)x([0-9]+)([\\. ]|$)");
+	static Poco::RegularExpression match(" ([0-9]+)x([0-9]+)([\\. ]|$)", Poco::RegularExpression::RE_CASELESS);
 	Poco::RegularExpression::MatchVec asMatch;
 	if (!match.match(sPath, std::string::size_type(0), asMatch)) {
 		*piFramesWide = *piFramesHigh = 1;

@@ -159,7 +159,7 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 	if (hKey == nullptr)
 		return false;
 
-	Poco::RegularExpression re(regex);
+	Poco::RegularExpression re(regex, Poco::RegularExpression::RE_CASELESS);
 
 	bool bError = false;
 	for (int index = 0;; ++index) {

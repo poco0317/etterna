@@ -29,7 +29,7 @@ GetResolutionFromFileName(std::string& sPath, int& iWidth, int& iHeight)
 	 * Also allow, eg:
 	 *  Foo (dither, res 512x128).png
 	 * Be careful that this doesn't get mixed up with frame dimensions. */
-	static Poco::RegularExpression re("\\([^\\)]*res ([0-9]+)x([0-9]+).*\\)");
+	static Poco::RegularExpression re("\\([^\\)]*res ([0-9]+)x([0-9]+).*\\)", Poco::RegularExpression::RE_CASELESS);
 
 	Poco::RegularExpression::MatchVec asMatches;
 	if (!re.match(sPath, std::string::size_type(0), asMatches))

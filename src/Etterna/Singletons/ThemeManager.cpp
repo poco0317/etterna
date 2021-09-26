@@ -378,7 +378,7 @@ ThemeManager::LoadThemeMetrics(const std::string& sThemeName_,
 		/* sMetric must be "foo::bar=baz". "foo" and "bar" never contain "=", so
 		 * in "foo::bar=1+1=2", "baz" is always "1+1=2". Neither foo nor bar may
 		 * be empty, but baz may be. */
-		Poco::RegularExpression re("^([^=]+)::([^=]+)=(.*)$");
+		Poco::RegularExpression re("^([^=]+)::([^=]+)=(.*)$", Poco::RegularExpression::RE_CASELESS);
 		Poco::RegularExpression::MatchVec sBits;
 		if (!re.match(sMetric, std::string::size_type(0), sBits))
 			RageException::Throw("Invalid argument \"--metric=%s\".",

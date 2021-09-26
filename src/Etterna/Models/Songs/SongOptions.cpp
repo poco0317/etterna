@@ -152,7 +152,7 @@ SongOptions::FromOneModString(const std::string& sOneMod,
 	auto sBit = make_lower(sOneMod);
 	Trim(sBit);
 
-	Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)xmusic$");
+	Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)xmusic$", Poco::RegularExpression::RE_CASELESS);
 	Poco::RegularExpression::MatchVec matches;
 	if (mult.match(sBit, std::string::size_type(0), matches)) {
 		m_fMusicRate = StringToFloat(sBit.substr(matches[0].offset, matches[0].length));
