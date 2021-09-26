@@ -44,6 +44,13 @@ if (MSVC)
 endif()
 set(CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/extern/poco)
 add_subdirectory(poco)
+if (MSVC)
+	# normally, this would be nothing (1?) which makes sense
+	# but that breaks windows building???
+	# setting it to 2 makes it use the OpenSSL libs the way Etterna
+	# requires it generally
+	target_compile_definitions(Crypto PUBLIC POCO_EXTERNAL_OPENSSL=2)
+endif()
 
 ## Header Only
 add_subdirectory(rapidjson)
