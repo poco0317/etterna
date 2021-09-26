@@ -149,34 +149,22 @@ class DownloadManager
 	~DownloadManager();
 
 	/// Active HTTP requests
+	std::vector<HTTPRequest*> apiHttpsRequests{};
 	std::vector<HTTPRequest*> apiHttpRequests{};
-	std::vector<HTTPRequest*> secondaryApiHttpRequests{};
-	/// Main HTTP Client Session
-	Poco::Net::HTTPSClientSession* p_apiClientSession;
+	/// Main HTTPS Client Session
+	Poco::Net::HTTPSClientSession* p_httpsClientSession;
 	/// Alternate HTTP Client Session
-	Poco::Net::HTTPSClientSession* p_secondaryApiClientSession;
+	Poco::Net::HTTPClientSession* p_httpClientSession;
 
 	void GenerateRequest(
-	  std::vector<HTTPRequest*>* requestQueue,
-	  std::string& url,
-	  const std::string requestMethod = HTTPRequest::HTTP_GET);
-	inline void GeneratePrimaryAPIRequest(
-	  std::string& url,
-	  const std::string requestMethod = HTTPRequest::HTTP_GET)
-	{
-		GenerateRequest(&apiHttpRequests, url, requestMethod);
-	}
-	inline void GenerateSecondaryAPIRequest(
-	  std::string& url,
-	  const std::string requestMethod = HTTPRequest::HTTP_GET)
-	{
-		GenerateRequest(&secondaryApiHttpRequests, url, requestMethod);
-	}
-	void SetClientSessionByURL(Poco::Net::HTTPSClientSession* session,
+	  const std::string& url,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET,
+	  bool https = true);
+	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 							   const std::string url);
 
-	void UpdatePrimaryRequests(float fDeltaSeconds);
-	void UpdateSecondaryRequests(float fDeltaSeconds);
+	void UpdateHTTPSRequests(float fDeltaSeconds);
+	void UpdateHTTPRequests(float fDeltaSeconds);
 
 	int HTTPRunning{ 0 };
 	/// Currently logging in (Since it's async, to not try twice)

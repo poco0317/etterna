@@ -52,8 +52,8 @@ static Preference<std::string> packListURL(
   "PackListURL",
   "https://api.etternaonline.com/v2/packs");
 static Preference<std::string> serverURL(
-  "BaseAPIURL2",
-  "https://api.etternaonline.com/api/client/");
+  "BaseAPIURL",
+  "http://api.beta.etternaonline.com/");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -149,9 +149,8 @@ DownloadManager_Thread(void* p)
 		float fDeltaTime = cdiff.count();
 		deltaTimeClock = now;
 
-		const std::lock_guard<std::mutex> lock(g_dlmutex);
-
-		dlman->Update(fDeltaTime);
+		if (!g_Shutdown)
+			dlman->Update(fDeltaTime);
 	}
 	return 0;
 }
@@ -173,14 +172,14 @@ DownloadManager::DownloadManager()
 							 "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
 	Poco::Net::SSLManager::instance().initializeClient(0, pCert, pCtx);
 
-	p_apiClientSession = new Poco::Net::HTTPSClientSession;
-	p_secondaryApiClientSession = new Poco::Net::HTTPSClientSession;
+	p_httpsClientSession = new Poco::Net::HTTPSClientSession;
+	p_httpClientSession = new Poco::Net::HTTPClientSession;
 
-	SetClientSessionByURL(p_apiClientSession, serverURL);
-	SetClientSessionByURL(p_secondaryApiClientSession, packListURL);
+	SetClientSessionByURL(p_httpsClientSession, serverURL);
+	SetClientSessionByURL(p_httpClientSession, serverURL);
 
 	g_Shutdown = false;
-	DownloadManagerThread.SetName("DownloadManager");
+	DownloadManagerThread.SetName("DownloadManager thread");
 	DownloadManagerThread.Create(DownloadManager_Thread, this);
 
 	// Register with Lua.
@@ -195,30 +194,61 @@ DownloadManager::DownloadManager()
 
 DownloadManager::~DownloadManager()
 {
+	// Unregister with Lua.
+	LUA->UnsetGlobal("DLMAN");
+
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		g_Shutdown = true;
+	}
+	DownloadManagerThread.Wait();
+
 	EmptyTempDLFileDir();
 	if (LoggedIn())
 		EndSession();
 
-	if (p_apiClientSession != nullptr)
-		delete p_apiClientSession;
-	if (p_secondaryApiClientSession != nullptr)
-		delete p_secondaryApiClientSession;
+	if (p_httpsClientSession != nullptr)
+		delete p_httpsClientSession;
+	if (p_httpClientSession != nullptr)
+		delete p_httpClientSession;
 }
 
 void
-DownloadManager::GenerateRequest(std::vector<HTTPRequest*>* requestQueue, std::string& url, const std::string requestMethod)
+DownloadManager::GenerateRequest(const std::string& url, const std::string requestMethod, bool https)
 {
 	Poco::URI uri(url);
 	std::string path(uri.getPathAndQuery());
+	auto host = uri.getHost();
+	auto port = uri.getPort();
 	if (path.empty())
 		path = "/";
 	HTTPRequest* request = new HTTPRequest(requestMethod, path, Poco::Net::HTTPMessage::HTTP_1_1);
-	requestQueue->push_back(request);
-	// The thread updates should catch this one eventually
+
+	Poco::Net::HTTPClientSession* session;
+	std::vector<HTTPRequest*>* requestQueue;
+	if (https) {
+		session = p_httpsClientSession;
+		requestQueue = &apiHttpsRequests;
+	} else {
+		session = p_httpClientSession;
+		requestQueue = &apiHttpRequests;
+	}
+
+	if (!host.empty()) {
+		session->reset();
+		session->setHost(host);
+		session->setPort(port);
+	}
+
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		requestQueue->push_back(request);
+		// The thread updates should catch this one eventually
+	}
 }
 
 void
-DownloadManager::SetClientSessionByURL(Poco::Net::HTTPSClientSession* session,
+DownloadManager::SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 									   const std::string url)
 {
 	Poco::URI uri(url);
@@ -268,33 +298,48 @@ DownloadManager::init()
 {
 	initialized = true;
 
-	GeneratePrimaryAPIRequest(std::string("/login"));
+	GenerateRequest(std::string("/api/client/login"), HTTPRequest::HTTP_POST, false);
 }
 void
 DownloadManager::Update(float fDeltaSeconds)
 {
 	if (!initialized)
 		init();
-	if (gameplay)
-		return;
 
-	if (!apiHttpRequests.empty())
-		UpdatePrimaryRequests(fDeltaSeconds);
-	if (!secondaryApiHttpRequests.empty())
-		UpdateSecondaryRequests(fDeltaSeconds);
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		if (gameplay)
+			return;
+		if (apiHttpRequests.empty() && apiHttpsRequests.empty())
+			return;
+	}
+	UpdateHTTPSRequests(fDeltaSeconds);
+	UpdateHTTPRequests(fDeltaSeconds);
 }
 
 void
-DownloadManager::UpdatePrimaryRequests(float fDeltaSeconds)
+DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 {
-	std::vector<HTTPRequest*> reqs = apiHttpRequests;
-	apiHttpRequests.clear();
+	std::vector<HTTPRequest*> reqs;
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		reqs = apiHttpsRequests;
+		apiHttpsRequests.clear();
+	}
 	for (auto& req : reqs) {
 		Poco::Net::HTTPResponse response;
-		p_apiClientSession->sendRequest(*req);
-		p_apiClientSession->receiveResponse(response);
+		try {
+			p_httpsClientSession->sendRequest(*req);
+			p_httpsClientSession->receiveResponse(response);
+		} catch (Poco::Exception& e) {
+			Locator::getLogger()->info("EXCPETION {} {} {}",
+									   e.className(),
+									   e.displayText(),
+									   e.message());
+			p_httpsClientSession->reset();
+		}
 
-		Locator::getLogger()->trace("{} {} {} {}",
+		Locator::getLogger()->info("{} {} {} {}",
 									response.getStatus(),
 									response.getContentType(),
 									response.getReason(),
@@ -304,16 +349,28 @@ DownloadManager::UpdatePrimaryRequests(float fDeltaSeconds)
 	}
 }
 void
-DownloadManager::UpdateSecondaryRequests(float fDeltaSeconds)
+DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 {
-	std::vector<HTTPRequest*> reqs = secondaryApiHttpRequests;
-	secondaryApiHttpRequests.clear();
+	std::vector<HTTPRequest*> reqs;
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		reqs = apiHttpRequests;
+		apiHttpRequests.clear();
+	}
 	for (auto& req : reqs) {
 		Poco::Net::HTTPResponse response;
-		p_secondaryApiClientSession->sendRequest(*req);
-		p_secondaryApiClientSession->receiveResponse(response);
+		try {
+			p_httpClientSession->sendRequest(*req);
+			p_httpClientSession->receiveResponse(response);
+		} catch (Poco::Exception& e) {
+			Locator::getLogger()->info("EXCPETION {} {} {}",
+									   e.className(),
+									   e.displayText(),
+									   e.message());
+			p_httpClientSession->reset();
+		}
 
-		Locator::getLogger()->trace("{} {} {} {}",
+		Locator::getLogger()->info("{} {} {} {}",
 									response.getStatus(),
 									response.getContentType(),
 									response.getReason(),
