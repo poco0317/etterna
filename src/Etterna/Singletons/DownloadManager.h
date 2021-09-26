@@ -10,8 +10,10 @@
 #include "Etterna/Models/Misc/Difficulty.h"
 
 #include <deque>
+#include "Poco/Net/HTTPRequest.h"
+#include "Poco/Net/HTTPSClientSession.h"
 
-class DownloadablePack;
+using Poco::Net::HTTPRequest;
 
 class ProgressData
 {
@@ -31,6 +33,19 @@ class RageFileWrapper
 	bool stop{ false };
 };
 
+class DownloadablePack
+{
+  public:
+	std::string name{ "" };
+	size_t size{ 0 };
+	int id{ 0 };
+	float avgDifficulty{ 0 };
+	std::string url{ "" };
+	std::string mirror{ "" };
+	bool downloading{ false };
+	// Lua
+	void PushSelf(lua_State* L);
+};
 class Download
 {
   public:
@@ -71,33 +86,6 @@ class Download
 
   protected:
 	std::string MakeTempFileName(std::string s);
-};
-
-class DownloadablePack
-{
-  public:
-	std::string name{ "" };
-	size_t size{ 0 };
-	int id{ 0 };
-	float avgDifficulty{ 0 };
-	std::string url{ "" };
-	std::string mirror{ "" };
-	bool downloading{ false };
-	// Lua
-	void PushSelf(lua_State* L);
-};
-
-class HTTPRequest
-{
-  public:
-	HTTPRequest(
-	  std::function<void(HTTPRequest&)> done = [](HTTPRequest& req) {},
-	  std::function<void(HTTPRequest&)> fail = [](HTTPRequest& req) {})
-	  : Done(done)
-	  , Failed(fail){};
-	std::string result;
-	std::function<void(HTTPRequest&)> Done;
-	std::function<void(HTTPRequest&)> Failed;
 };
 class OnlineTopScore
 {
@@ -159,8 +147,36 @@ class DownloadManager
 	static LuaReference EMPTY_REFERENCE;
 	DownloadManager();
 	~DownloadManager();
-	/// Active HTTP requests (async, curlMulti)
-	std::vector<HTTPRequest*> HTTPRequests;
+
+	/// Active HTTP requests
+	std::vector<HTTPRequest*> apiHttpRequests{};
+	std::vector<HTTPRequest*> secondaryApiHttpRequests{};
+	/// Main HTTP Client Session
+	Poco::Net::HTTPSClientSession apiClientSession{};
+	/// Alternate HTTP Client Session
+	Poco::Net::HTTPSClientSession secondaryApiClientSession{};
+
+	void GenerateRequest(
+	  std::vector<HTTPRequest*>* requestQueue,
+	  std::string& url,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET);
+	inline void GeneratePrimaryAPIRequest(
+	  std::string& url,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET)
+	{
+		GenerateRequest(&apiHttpRequests, url, requestMethod);
+	}
+	inline void GenerateSecondaryAPIRequest(
+	  std::string& url,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET)
+	{
+		GenerateRequest(&secondaryApiHttpRequests, url, requestMethod);
+	}
+	void SetClientSessionByURL(Poco::Net::HTTPSClientSession* session,
+							   const std::string url);
+
+	void UpdatePrimaryRequests(float fDeltaSeconds);
+	void UpdateSecondaryRequests(float fDeltaSeconds);
 
 	int HTTPRunning{ 0 };
 	/// Currently logging in (Since it's async, to not try twice)

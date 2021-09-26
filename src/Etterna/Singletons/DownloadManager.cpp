@@ -28,14 +28,14 @@
 
 #include <unordered_set>
 #include <algorithm>
-
-using std::function;
-using std::map;
-using std::pair;
-using std::string;
-using std::to_string;
+#include "Poco/URI.h"
+#include "Poco/Net/HTTPResponse.h"
 
 using namespace rapidjson;
+
+static RageThread DownloadManagerThread;
+static bool g_Shutdown;
+std::mutex g_dlmutex;
 
 std::shared_ptr<DownloadManager> DLMAN = nullptr;
 LuaReference DownloadManager::EMPTY_REFERENCE = LuaReference();
@@ -49,8 +49,9 @@ static Preference<unsigned int> maxDLPerSecondGameplay(
 static Preference<std::string> packListURL(
   "PackListURL",
   "https://api.etternaonline.com/v2/packs");
-static Preference<std::string> serverURL("BaseAPIURL",
-										 "https://api.etternaonline.com/v2");
+static Preference<std::string> serverURL(
+  "BaseAPIURL2",
+  "https://api.etternaonline.com/api/client/");
 static Preference<unsigned int> automaticSync("automaticScoreSync", 1);
 static Preference<unsigned int> downloadPacksToAdditionalSongs(
   "downloadPacksToAdditionalSongs",
@@ -60,36 +61,6 @@ static const string CLIENT_DATA_KEY =
   "4406B28A97B326DA5346A9885B0C9DEE8D66F89B562CF5E337AC04C17EB95C40";
 static const string DL_DIR = SpecialFiles::CACHE_DIR + "Downloads/";
 static const string wife3_rescore_upload_flag = "rescoredw3";
-size_t
-write_memory_buffer(void* contents, size_t size, size_t nmemb, void* userp)
-{
-	size_t realsize = size * nmemb;
-	string tmp(static_cast<char*>(contents), realsize);
-	static_cast<string*>(userp)->append(tmp);
-	return realsize;
-}
-
-class ReadThis
-{
-  public:
-	RageFile file;
-};
-
-size_t
-ReadThisReadCallback(void* dest, size_t size, size_t nmemb, void* userp)
-{
-	auto rt = static_cast<ReadThis*>(userp);
-	size_t buffer_size = size * nmemb;
-
-	return rt->file.Read(dest, buffer_size);
-}
-
-int
-ReadThisSeekCallback(void* arg, size_t offset, int origin)
-{
-	return static_cast<ReadThis*>(arg)->file.Seek(static_cast<int>(offset),
-												  origin);
-}
 
 bool
 DownloadManager::InstallSmzip(const string& sZipFile)
@@ -153,53 +124,6 @@ DownloadManager::InstallSmzip(const string& sZipFile)
 	return true;
 }
 
-// Functions used to read/write data
-int
-progressfunc(void* clientp,
-			 size_t dltotal,
-			 size_t dlnow,
-			 size_t ultotal,
-			 size_t ulnow)
-{
-	auto ptr = static_cast<ProgressData*>(clientp);
-	ptr->dltotal = dltotal;
-	ptr->downloaded = dlnow;
-	return 0;
-}
-int
-pogressfunc(void* p,
-			size_t dltotal,
-			size_t dlnow,
-			size_t ultotal, size_t ulnow)
-{
-	auto pogress = static_cast<ProgressData*>(p);
-	pogress->ultotal = ultotal;
-	pogress->uploaded = ulnow;
-	SCREENMAN->SystemMessage(ssprintf("Current upload progress: %ld / %ld", ulnow, ultotal));
-	return 0;
-}
-size_t
-write_data(void* dlBuffer, size_t size, size_t nmemb, void* pnf)
-{
-	auto RFW = static_cast<RageFileWrapper*>(pnf);
-	size_t b = RFW->stop ? 0 : RFW->file.Write(dlBuffer, size * nmemb);
-	RFW->bytes += b;
-	return b;
-}
-// A couple utility inline string functions
-inline bool
-ends_with(std::string const& value, std::string const& ending)
-{
-	if (ending.size() > value.size())
-		return false;
-	return std::equal(ending.rbegin(), ending.rend(), value.rbegin());
-}
-inline void
-checkProtocol(string& url)
-{
-	if (!(starts_with(url, "https://") || starts_with(url, "http://")))
-		url = string("http://").append(url);
-}
 inline void
 EmptyTempDLFileDir()
 {
@@ -210,9 +134,37 @@ EmptyTempDLFileDir()
 			FILEMAN->Remove(file);
 	}
 }
+
+int
+DownloadManager_Thread(void* p)
+{
+	auto* dlman = static_cast<DownloadManager*>(p);
+
+	auto deltaTimeClock = std::chrono::steady_clock::now();
+	while (!g_Shutdown) {
+		auto now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> cdiff = now - deltaTimeClock;
+		float fDeltaTime = cdiff.count();
+		deltaTimeClock = now;
+
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+
+		dlman->Update(fDeltaTime);
+	}
+	return 0;
+}
+
 DownloadManager::DownloadManager()
 {
 	EmptyTempDLFileDir();
+
+	SetClientSessionByURL(&apiClientSession, serverURL);
+	SetClientSessionByURL(&secondaryApiClientSession, packListURL);
+
+	g_Shutdown = false;
+	DownloadManagerThread.SetName("DownloadManager");
+	DownloadManagerThread.Create(DownloadManager_Thread, this);
+
 	// Register with Lua.
 	{
 		Lua* L = LUA->Get();
@@ -231,21 +183,24 @@ DownloadManager::~DownloadManager()
 }
 
 void
-DownloadManager::UpdateDLSpeed()
+DownloadManager::GenerateRequest(std::vector<HTTPRequest*>* requestQueue, std::string& url, const std::string requestMethod)
 {
-	size_t maxDLSpeed;
-	if (this->gameplay) {
-		maxDLSpeed = maxDLPerSecondGameplay;
-	} else {
-		maxDLSpeed = maxDLPerSecond;
-	}
-	/*
-	for (auto& x : downloads)
-		curl_easy_setopt(
-		  x.second->handle,
-		  CURLOPT_MAX_RECV_SPEED_LARGE,
-		  static_cast<curl_off_t>(maxDLSpeed / downloads.size()));
-		  */
+	Poco::URI uri(url);
+	std::string path(uri.getPathAndQuery());
+	if (path.empty())
+		path = "/";
+	HTTPRequest* request = new HTTPRequest(requestMethod, path, Poco::Net::HTTPMessage::HTTP_1_1);
+	requestQueue->push_back(request);
+	// The thread updates should catch this one eventually
+}
+
+void
+DownloadManager::SetClientSessionByURL(Poco::Net::HTTPSClientSession* session,
+									   const std::string url)
+{
+	Poco::URI uri(url);
+	session->setHost(uri.getHost());
+	session->setPort(uri.getPort());
 }
 
 void
@@ -282,7 +237,7 @@ Download::Update(float fDeltaSeconds)
 {
 	progress.time += fDeltaSeconds;
 	if (progress.time > 1.0) {
-		speed = to_string(progress.downloaded / 1024 - downloadedAtLastUpdate);
+		speed = std::to_string(progress.downloaded / 1024 - downloadedAtLastUpdate);
 		progress.time = 0;
 		downloadedAtLastUpdate = progress.downloaded / 1024;
 	}
@@ -291,6 +246,8 @@ void
 DownloadManager::init()
 {
 	initialized = true;
+
+	GeneratePrimaryAPIRequest(std::string("/login"));
 }
 void
 DownloadManager::Update(float fDeltaSeconds)
@@ -299,6 +256,50 @@ DownloadManager::Update(float fDeltaSeconds)
 		init();
 	if (gameplay)
 		return;
+
+	if (!apiHttpRequests.empty())
+		UpdatePrimaryRequests(fDeltaSeconds);
+	if (!secondaryApiHttpRequests.empty())
+		UpdateSecondaryRequests(fDeltaSeconds);
+}
+
+void
+DownloadManager::UpdatePrimaryRequests(float fDeltaSeconds)
+{
+	std::vector<HTTPRequest*> reqs = apiHttpRequests;
+	apiHttpRequests.clear();
+	for (auto& req : reqs) {
+		Poco::Net::HTTPResponse response;
+		apiClientSession.sendRequest(*req);
+		apiClientSession.receiveResponse(response);
+
+		Locator::getLogger()->trace("{} {} {} {}",
+									response.getStatus(),
+									response.getContentType(),
+									response.getReason(),
+									response.getContentLength());
+
+		delete req;
+	}
+}
+void
+DownloadManager::UpdateSecondaryRequests(float fDeltaSeconds)
+{
+	std::vector<HTTPRequest*> reqs = secondaryApiHttpRequests;
+	secondaryApiHttpRequests.clear();
+	for (auto& req : reqs) {
+		Poco::Net::HTTPResponse response;
+		secondaryApiClientSession.sendRequest(*req);
+		secondaryApiClientSession.receiveResponse(response);
+
+		Locator::getLogger()->trace("{} {} {} {}",
+									response.getStatus(),
+									response.getContentType(),
+									response.getReason(),
+									response.getContentLength());
+
+		delete req;
+	}
 }
 
 string
@@ -405,9 +406,10 @@ SetCURLPOSTScore(CURL*& curlHandle,
 
 void
 DownloadManager::UploadScore(HighScore* hs,
-							 function<void()> callback,
+							 std::function<void()> callback,
 							 bool load_from_disk)
 {
+	/*
 	Locator::getLogger()->trace("Creating UploadScore request");
 	if (!LoggedIn()) {
 		Locator::getLogger()->trace(
@@ -440,8 +442,8 @@ DownloadManager::UploadScore(HighScore* hs,
 			rows, hs->GetMusicRate());
 		for (size_t i = 0; i < offsets.size(); i++) {
 			replayString += "[";
-			replayString += to_string(timestamps[i]) + ",";
-			replayString += to_string(1000.f * offsets[i]) + ",";
+			replayString += std::to_string(timestamps[i]) + ",";
+			replayString += std::to_string(1000.f * offsets[i]) + ",";
 			if (hs->GetReplayType() == 2) {
 				replayString += to_string(columns[i]) + ",";
 				replayString += to_string(types[i]) + ",";
@@ -568,8 +570,8 @@ DownloadManager::UploadScore(HighScore* hs,
 	};
 	HTTPRequest* req = new HTTPRequest(
 	  done, [callback](HTTPRequest& req) { callback(); });
-	HTTPRequests.push_back(req);
 	Locator::getLogger()->trace("Finished creating UploadScore request");
+	*/
 }
 
 // this is for new/live played scores that have replaydata in memory
@@ -584,7 +586,7 @@ DownloadManager::UploadScoreWithReplayData(HighScore* hs)
 // function we should probably do some refactoring of this
 void
 DownloadManager::UploadScoreWithReplayDataFromDisk(HighScore* hs,
-												   function<void()> callback)
+												   std::function<void()> callback)
 {
 	this->UploadScore(
 	  hs, callback, true /* (With replay data loading from disk)*/);
@@ -1214,8 +1216,9 @@ void
 DownloadManager::StartSession(
   string user,
   string pass,
-  function<void(bool loggedIn)> callback = [](bool) {})
+  std::function<void(bool loggedIn)> callback = [](bool) {})
 {
+	/*
 	string url = serverURL.Get() + "/login";
 	if (loggingIn || user.empty()) {
 		return;
@@ -1223,12 +1226,12 @@ DownloadManager::StartSession(
 	DLMAN->loggingIn = true;
 	EndSessionIfExists();
 
-	/*
+	
 	CURLFormPostField(curlHandle, form, lastPtr, "username", user.c_str());
 	CURLFormPostField(curlHandle, form, lastPtr, "password", pass.c_str());
 	CURLFormPostField(
 	  curlHandle, form, lastPtr, "clientData", CLIENT_DATA_KEY.c_str());
-	*/
+	
 	auto done = [user, pass, callback](HTTPRequest& req) {
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
@@ -1261,13 +1264,11 @@ DownloadManager::StartSession(
 		DLMAN->OnLogin();
 		callback(DLMAN->LoggedIn());
 	};
-	HTTPRequest* req = new HTTPRequest(done);
 	req->Failed = [](HTTPRequest& req) {
 		DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
 		MESSAGEMAN->Broadcast("LoginFailed");
 		DLMAN->loggingIn = false;
-	};
-	HTTPRequests.push_back(req);
+	};*/
 }
 int
 DownloadManager::GetSkillsetRank(Skillset ss)
@@ -1285,7 +1286,7 @@ DownloadManager::GetSkillsetRating(Skillset ss)
 	return static_cast<float>(sessionRatings[ss]);
 }
 
-Download::Download(string url, string filename, function<void(Download*)> done)
+Download::Download(string url, string filename, std::function<void(Download*)> done)
 {
 	Done = done;
 	m_Url = url;
@@ -1881,7 +1882,7 @@ class LunaDownloadablePack : public Luna<DownloadablePack>
 		auto it = std::find_if(
 		  DLMAN->DownloadQueue.begin(),
 		  DLMAN->DownloadQueue.end(),
-		  [p](pair<DownloadablePack*, bool> pair) { return pair.first == p; });
+		  [p](std::pair<DownloadablePack*, bool> pair) { return pair.first == p; });
 		lua_pushboolean(L, it != DLMAN->DownloadQueue.end());
 		return 1;
 	}
@@ -1890,7 +1891,7 @@ class LunaDownloadablePack : public Luna<DownloadablePack>
 		auto it = std::find_if(
 		  DLMAN->DownloadQueue.begin(),
 		  DLMAN->DownloadQueue.end(),
-		  [p](pair<DownloadablePack*, bool> pair) { return pair.first == p; });
+		  [p](std::pair<DownloadablePack*, bool> pair) { return pair.first == p; });
 		if (it == DLMAN->DownloadQueue.end())
 			// does not exist
 			lua_pushboolean(L, false);
