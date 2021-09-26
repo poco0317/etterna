@@ -9,6 +9,7 @@
 #include "Etterna/Models/StepsAndStyles/Style.h"
 #include "Etterna/Globals/rngthing.h"
 #include "Core/Services/Locator.hpp"
+#include "Poco/RegularExpression.h"
 
 #include <cmath>
 
@@ -491,10 +492,11 @@ PlayerOptions::FromOneModString(const std::string& sOneMod,
 	}
 	const auto on = (level > 0.5f);
 
-	static Regex mult("^([0-9]+(\\.[0-9]+)?)x$");
-	std::vector<std::string> matches;
-	if (mult.Compare(sBit, matches)) {
-		StringConversion::FromString(matches[0], level);
+	static Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)x$");
+	Poco::RegularExpression::MatchVec matches;
+	if (mult.match(sBit, std::string::size_type(0), matches)) {
+		StringConversion::FromString(
+		  sBit.substr(matches[0].offset, matches[0].length), level);
 		SET_FLOAT(fScrollSpeed)
 		SET_FLOAT(fTimeSpacing)
 		m_fTimeSpacing = 0;

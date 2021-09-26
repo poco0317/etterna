@@ -4,6 +4,7 @@
 #include "RageSurface.h"
 #include "RageSurfaceUtils.h"
 #include "RageUtil/Utils/RageUtil.h"
+#include "Poco/RegularExpression.h"
 
 RageTexture::RageTexture(const RageTextureID& name)
   : m_iRefCount(1)
@@ -69,15 +70,17 @@ RageTexture::GetFrameDimensionsFromFileName(const std::string& sPath,
 											int source_width,
 											int source_height)
 {
-	static Regex match(" ([0-9]+)x([0-9]+)([\\. ]|$)");
-	std::vector<std::string> asMatch;
-	if (!match.Compare(sPath, asMatch)) {
+	static Poco::RegularExpression match(" ([0-9]+)x([0-9]+)([\\. ]|$)");
+	Poco::RegularExpression::MatchVec asMatch;
+	if (!match.match(sPath, std::string::size_type(0), asMatch)) {
 		*piFramesWide = *piFramesHigh = 1;
 		return;
 	}
 	// Check for nonsense values.  Some people might not intend the hint. -Kyz
-	const auto maybe_width = StringToInt(asMatch[0]);
-	const auto maybe_height = StringToInt(asMatch[1]);
+	const auto maybe_width =
+	  StringToInt(sPath.substr(asMatch[0].offset, asMatch[0].length));
+	const auto maybe_height =
+	  StringToInt(sPath.substr(asMatch[1].offset, asMatch[1].length));
 	if (maybe_width <= 0 || maybe_height <= 0) {
 		*piFramesWide = *piFramesHigh = 1;
 		return;

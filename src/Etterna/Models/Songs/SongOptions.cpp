@@ -3,6 +3,7 @@
 #include "Etterna/Singletons/GameState.h"
 #include "RageUtil/Utils/RageUtil.h"
 #include "SongOptions.h"
+#include "Poco/RegularExpression.h"
 
 #include "Etterna/Models/Misc/Foreach.h"
 
@@ -151,10 +152,10 @@ SongOptions::FromOneModString(const std::string& sOneMod,
 	auto sBit = make_lower(sOneMod);
 	Trim(sBit);
 
-	Regex mult("^([0-9]+(\\.[0-9]+)?)xmusic$");
-	std::vector<std::string> matches;
-	if (mult.Compare(sBit, matches)) {
-		m_fMusicRate = StringToFloat(matches[0]);
+	Poco::RegularExpression mult("^([0-9]+(\\.[0-9]+)?)xmusic$");
+	Poco::RegularExpression::MatchVec matches;
+	if (mult.match(sBit, std::string::size_type(0), matches)) {
+		m_fMusicRate = StringToFloat(sBit.substr(matches[0].offset, matches[0].length));
 		MESSAGEMAN->Broadcast("RateChanged");
 		return true;
 	}

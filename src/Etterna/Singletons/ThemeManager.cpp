@@ -19,6 +19,7 @@
 #include "Etterna/FileTypes/XmlFileUtil.h"
 #include "Core/Services/Locator.hpp"
 #include "Core/Platform/Platform.hpp"
+#include "Poco/RegularExpression.h"
 
 #include "PrefsManager.h"
 
@@ -377,13 +378,16 @@ ThemeManager::LoadThemeMetrics(const std::string& sThemeName_,
 		/* sMetric must be "foo::bar=baz". "foo" and "bar" never contain "=", so
 		 * in "foo::bar=1+1=2", "baz" is always "1+1=2". Neither foo nor bar may
 		 * be empty, but baz may be. */
-		Regex re("^([^=]+)::([^=]+)=(.*)$");
-		std::vector<std::string> sBits;
-		if (!re.Compare(sMetric, sBits))
+		Poco::RegularExpression re("^([^=]+)::([^=]+)=(.*)$");
+		Poco::RegularExpression::MatchVec sBits;
+		if (!re.match(sMetric, std::string::size_type(0), sBits))
 			RageException::Throw("Invalid argument \"--metric=%s\".",
 								 sMetric.c_str());
 
-		g_pLoadedThemeData->iniMetrics.SetValue(sBits[0], sBits[1], sBits[2]);
+		g_pLoadedThemeData->iniMetrics.SetValue(
+		  sMetric.substr(sBits[0].offset, sBits[0].length),
+		  sMetric.substr(sBits[1].offset, sBits[1].length),
+		  sMetric.substr(sBits[2].offset, sBits[2].length));
 	}
 
 	if (PREFSMAN->m_verbose_log > 1) {

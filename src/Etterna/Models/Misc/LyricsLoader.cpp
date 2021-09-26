@@ -5,6 +5,7 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Models/Songs/Song.h"
 #include "Etterna/Singletons/ThemeManager.h"
+#include "Poco/RegularExpression.h"
 
 #include <algorithm>
 
@@ -57,16 +58,16 @@ LyricsLoader::LoadFromLRCFile(const std::string& sPath, Song& out)
 		}
 		// (most tags are in the format of...)
 		// "[data1] data2".  Ignore whitespace at the beginning of the line.
-		static Regex x("^ *\\[([^]]+)\\] *(.*)$");
+		static Poco::RegularExpression x("^ *\\[([^]]+)\\] *(.*)$");
 
-		std::vector<std::string> matches;
-		if (!x.Compare(line, matches)) {
+		Poco::RegularExpression::MatchVec matches;
+		if (!x.match(line, std::string::size_type(0), matches)) {
 			continue;
 		}
 		ASSERT(matches.size() == 2);
 
-		auto& sValueName = matches[0];
-		auto& sValueData = matches[1];
+		auto& sValueName = line.substr(matches[0].offset, matches[0].length);
+		auto& sValueData = line.substr(matches[1].offset, matches[1].length);
 		StripCrnl(sValueData);
 
 		// handle the data

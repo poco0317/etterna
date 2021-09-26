@@ -6,6 +6,7 @@
 
 #include <windows.h>
 #include <nowide/convert.hpp>
+#include "Poco/RegularExpression.h"
 
 /* Given "HKEY_LOCAL_MACHINE\hardware\foo", return "hardware\foo", and place
  * the HKEY_LOCAL_MACHINE constant in key. */
@@ -158,7 +159,7 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 	if (hKey == nullptr)
 		return false;
 
-	Regex re(regex);
+	Poco::RegularExpression re(regex);
 
 	bool bError = false;
 	for (int index = 0;; ++index) {
@@ -185,7 +186,7 @@ RegistryAccess::GetRegSubKeys(const std::string& sKey,
 		std::wstring swStr(szBuffer, iSize);
 		std::string sStr = nowide::narrow(swStr);
 
-		if (re.Compare(sStr)) {
+		if (re.match(sStr)) {
 			if (bReturnPathToo)
 				sStr = sKey + "\\" + sStr;
 			lst.push_back(sStr);

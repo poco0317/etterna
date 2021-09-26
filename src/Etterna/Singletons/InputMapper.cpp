@@ -11,6 +11,7 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Globals/SpecialFiles.h"
 #include "arch/Dialog/Dialog.h"
+#include "Poco/RegularExpression.h"
 
 #include <map>
 #include <algorithm>
@@ -700,8 +701,8 @@ InputMapper::AutoMapJoysticksForCurrentGame()
 		const std::string& sDescription = device->sDesc;
 		FOREACH_CONST(AutoMappings, vAutoMappings, mapping)
 		{
-			Regex regex(mapping->m_sDriverRegex);
-			if (!regex.Compare(sDescription))
+			Poco::RegularExpression regex(mapping->m_sDriverRegex);
+			if (!regex.match(sDescription))
 				continue; // driver names don't match
 
 			// We have a mapping for this joystick

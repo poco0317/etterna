@@ -12,6 +12,7 @@
 #include "Etterna/Globals/StepMania.h"
 #include "arch/Dialog/Dialog.h"
 #include "Etterna/Singletons/PrefsManager.h"
+#include "Poco/RegularExpression.h"
 
 #include <algorithm>
 #include <string>
@@ -28,15 +29,17 @@ GetResolutionFromFileName(std::string& sPath, int& iWidth, int& iHeight)
 	 * Also allow, eg:
 	 *  Foo (dither, res 512x128).png
 	 * Be careful that this doesn't get mixed up with frame dimensions. */
-	static Regex re("\\([^\\)]*res ([0-9]+)x([0-9]+).*\\)");
+	static Poco::RegularExpression re("\\([^\\)]*res ([0-9]+)x([0-9]+).*\\)");
 
-	std::vector<std::string> asMatches;
-	if (!re.Compare(sPath, asMatches))
+	Poco::RegularExpression::MatchVec asMatches;
+	if (!re.match(sPath, std::string::size_type(0), asMatches))
 		return;
 
 	// Check for nonsense values.  Some people might not intend the hint. -Kyz
-	const auto maybe_width = StringToInt(asMatches[0]);
-	const auto maybe_height = StringToInt(asMatches[1]);
+	const auto maybe_width =
+	  StringToInt(sPath.substr(asMatches[0].offset, asMatches[0].length));
+	const auto maybe_height =
+	  StringToInt(sPath.substr(asMatches[1].offset, asMatches[1].length));
 	if (maybe_width <= 0 || maybe_height <= 0) {
 		return;
 	}

@@ -9,6 +9,7 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/Singletons/ThemeManager.h"
 #include "arch/Dialog/Dialog.h"
+#include "Poco/RegularExpression.h"
 
 #include <algorithm>
 
@@ -597,12 +598,12 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 				 * Map hiragana to 0-84:
 				 * range Unicode #3041-3094=0
 				 */
-				std::vector<std::string> asMatches;
-				static Regex parse(
+				Poco::RegularExpression::MatchVec asMatches;
+				static Poco::RegularExpression parse(
 				  "^RANGE ([A-Z0-9\\-]+)( ?#([0-9A-F]+)-([0-9A-F]+))?$");
-				bool match = parse.Compare(sName, asMatches);
+				int match = parse.match(sName, std::string::size_type(0), asMatches);
 				ASSERT(asMatches.size() == 4); // 4 parens
-				if (!match || asMatches[0].empty()) {
+				if (match == 0 || asMatches.at(0).length == 0) {
 					LuaHelpers::ReportScriptErrorFmt("Font definition \"%s\" "
 													 "has an invalid range "
 													 "\"%s\": parse error.",
@@ -614,14 +615,14 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 				// whole thing).
 				int count = -1;
 				int first = 0;
-				if (!asMatches[2].empty()) {
-					if (!sscanf(asMatches[2].c_str(), "%x", &first))
+				if (asMatches[2].length > 0) {
+					if (!sscanf(sName.substr(asMatches[2].offset, asMatches[2].length).c_str(), "%x", &first))
 						Locator::getLogger()->warn(
 						  "Font definition {} parse error: {}",
 						  ini.GetPath().c_str(),
 						  sName.c_str());
 					int last;
-					if (!sscanf(asMatches[3].c_str(), "%x", &last))
+					if (!sscanf(sName.substr(asMatches[3].offset, asMatches[3].length).c_str(), "%x", &last))
 						Locator::getLogger()->warn(
 						  "Font definition {} parse error: {}",
 						  ini.GetPath().c_str(),
@@ -640,7 +641,10 @@ Font::LoadFontPageSettings(FontPageSettings& cfg,
 				}
 
 				std::string error_string = cfg.MapRange(
-				  asMatches[0], first, pValue->GetValue<int>(), count);
+				  sName.substr(asMatches[0].offset, asMatches[0].length),
+				  first,
+				  pValue->GetValue<int>(),
+				  count);
 				if (!error_string.empty()) {
 					LuaHelpers::ReportScriptErrorFmt(
 					  "Font definition \"%s\" has an invalid range \"%s\": %s.",

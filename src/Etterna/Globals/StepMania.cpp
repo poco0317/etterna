@@ -56,6 +56,7 @@
 #include "Etterna/Singletons/NetworkSyncManager.h"
 #include "Etterna/Singletons/StatsManager.h"
 #include "discord_rpc.h"
+#include "Poco/RegularExpression.h"
 
 #include <ctime>
 
@@ -685,8 +686,8 @@ CheckVideoDefaultSettings()
 		defaults = g_VideoCardDefaults[i];
 
 		std::string sDriverRegex = defaults.sDriverRegex;
-		Regex regex(sDriverRegex);
-		if (regex.Compare(sVideoDriver)) {
+		Poco::RegularExpression regex(sDriverRegex);
+		if (regex.match(sVideoDriver)) {
 			if (PREFSMAN->m_verbose_log > 1)
 				Locator::getLogger()->trace("Card matches '{}'.", sDriverRegex.size() ? sDriverRegex.c_str() : "(unknown card)");
 			break;

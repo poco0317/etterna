@@ -846,32 +846,6 @@ auto
 GetFileContents(const std::string& sFile, std::vector<std::string>& asOut)
   -> bool;
 
-class Regex
-{
-  public:
-	Regex(const std::string& sPat = "");
-	Regex(const Regex& rhs);
-	auto operator=(const Regex& rhs) -> Regex&;
-	auto operator=(Regex&& rhs) noexcept -> Regex&;
-	~Regex();
-	[[nodiscard]] auto IsSet() const -> bool { return !m_sPattern.empty(); }
-	void Set(const std::string& str);
-	auto Compare(const std::string& sStr) -> bool;
-	auto Compare(const std::string& sStr, std::vector<std::string>& asMatches)
-	  -> bool;
-	auto Replace(const std::string& sReplacement,
-				 const std::string& sSubject,
-				 std::string& sOut) -> bool;
-
-  private:
-	void Compile();
-	void Release();
-
-	void* m_pReg;
-	unsigned m_iBackrefs;
-	std::string m_sPattern;
-};
-
 void
 ReplaceEntityText(std::string& sText,
 				  const std::map<std::string, std::string>& m);

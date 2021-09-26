@@ -22,6 +22,7 @@
 #include "Etterna/Models/Misc/XMLProfile.h"
 #include "Etterna/Models/Songs/SongOptions.h"
 #include "Etterna/Singletons/DownloadManager.h"
+#include "Poco/RegularExpression.h"
 
 #include <algorithm>
 #include <map>
@@ -690,13 +691,15 @@ Profile::MakeUniqueFileNameNoExtension(const std::string& sDir,
 	auto iIndex = 0;
 
 	for (int i = files.size() - 1; i >= 0; --i) {
-		static Regex re("^" + sFileNameBeginning + "([0-9]{5})\\....$");
-		std::vector<std::string> matches;
-		if (!re.Compare(files[i], matches))
+		static Poco::RegularExpression re("^" + sFileNameBeginning + "([0-9]{5})\\....$");
+		Poco::RegularExpression::MatchVec matches;
+		if (!re.match(files[i], std::string::size_type(0), matches))
 			continue;
 
 		ASSERT(matches.size() == 1);
-		iIndex = StringToInt(matches[0]) + 1;
+		iIndex =
+		  StringToInt(files[i].substr(matches[0].offset, matches[0].length)) +
+		  1;
 		break;
 	}
 

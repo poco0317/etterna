@@ -5,13 +5,16 @@
 #include "RageUtil/Utils/RageUtil.h"
 #include "Etterna/FileTypes/XmlFile.h"
 #include "Etterna/FileTypes/XmlFileUtil.h"
+#include "Poco/RegularExpression.h"
 
 static const std::string TRANSLATIONS_PATH = "Data/Translations.xml";
 static const std::string ERASE_MARKER = "-erase-";
 
 struct TitleTrans
 {
-	Regex TitleFrom, SubFrom, ArtistFrom;
+	Poco::RegularExpression* TitleFrom;
+	Poco::RegularExpression* SubFrom;
+	Poco::RegularExpression* ArtistFrom;
 	TitleFields Replacement;
 
 	/* If this is true, no translit fields will be generated automatically. */
@@ -24,6 +27,15 @@ struct TitleTrans
 	{
 	}
 
+	~TitleTrans() {
+		if (TitleFrom != nullptr)
+			delete TitleFrom;
+		if (SubFrom != nullptr)
+			delete SubFrom;
+		if (ArtistFrom != nullptr)
+			delete ArtistFrom;
+	}
+
 	bool Matches(const TitleFields& tf, TitleFields& to);
 
 	void LoadFromNode(const XNode* pNode);
@@ -32,11 +44,11 @@ struct TitleTrans
 bool
 TitleTrans::Matches(const TitleFields& from, TitleFields& to)
 {
-	if (!TitleFrom.Replace(Replacement.Title, from.Title, to.Title))
+	if (TitleFrom != nullptr && TitleFrom->subst(to.Title, Replacement.Title, Poco::RegularExpression::RE_GLOBAL) == 0)
 		return false; /* no match */
-	if (!SubFrom.Replace(Replacement.Subtitle, from.Subtitle, to.Subtitle))
+	if (SubFrom != nullptr && SubFrom->subst(to.Subtitle, Replacement.Subtitle, Poco::RegularExpression::RE_GLOBAL) == 0)
 		return false; /* no match */
-	if (!ArtistFrom.Replace(Replacement.Artist, from.Artist, to.Artist))
+	if (ArtistFrom != nullptr && ArtistFrom->subst(to.Artist, Replacement.Artist, Poco::RegularExpression::RE_GLOBAL) == 0)
 		return false; /* no match */
 
 	return true;
@@ -56,12 +68,23 @@ TitleTrans::LoadFromNode(const XNode* pNode)
 		const auto sValue = attr->second->GetValue<std::string>();
 		if (sKeyName == "DontTransliterate")
 			translit = false;
-		else if (sKeyName == "TitleFrom")
-			TitleFrom = std::string("^(" + sValue + ")$");
-		else if (sKeyName == "ArtistFrom")
-			ArtistFrom = std::string("^(" + sValue + ")$");
-		else if (sKeyName == "SubtitleFrom")
-			SubFrom = std::string("^(" + sValue + ")$");
+		else if (sKeyName == "TitleFrom") {
+
+			if (TitleFrom != nullptr)
+				delete TitleFrom;
+			TitleFrom =
+			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
+		} else if (sKeyName == "ArtistFrom") {
+			if (ArtistFrom != nullptr)
+				delete ArtistFrom;
+			ArtistFrom =
+			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
+		} else if (sKeyName == "SubtitleFrom") {
+			if (SubFrom != nullptr)
+				delete SubFrom;
+			SubFrom =
+			  new Poco::RegularExpression(std::string("^(" + sValue + ")$"), 0, true);
+		}
 		else if (sKeyName == "TitleTo")
 			Replacement.Title = sValue;
 		else if (sKeyName == "ArtistTo")
@@ -83,7 +106,6 @@ TitleTrans::LoadFromNode(const XNode* pNode)
 void
 TitleSubst::AddTrans(const TitleTrans& tr)
 {
-	ASSERT(tr.TitleFrom.IsSet() || tr.SubFrom.IsSet() || tr.ArtistFrom.IsSet());
 	ttab.push_back(new TitleTrans(tr));
 }
 

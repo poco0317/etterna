@@ -7,6 +7,7 @@
 #include "RageUtil/Sound/RageSoundReader_FileReader.h"
 #include "RageUtil.h"
 #include "RageUtil/Misc/RageUnicode.h"
+#include "Poco/RegularExpression.h"
 
 #include <algorithm>
 #include <ctime>
@@ -962,25 +963,26 @@ splitpath(const std::string& sPath,
 {
 	sDir = sFilename = sExt = "";
 
-	std::vector<std::string> asMatches;
+	Poco::RegularExpression::MatchVec asMatches;
+	Poco::RegularExpression::MatchVec asMatches2;
 
 	/*
 	 * One level of escapes for the regex, one for C. Ew.
 	 * This is really:
 	 * ^(.*[\\/])?(.*)$
 	 */
-	static Regex sep("^(.*[\\\\/])?(.*)$");
-	const auto bCheck = sep.Compare(sPath, asMatches);
+	static Poco::RegularExpression sep("^(.*[\\\\/])?(.*)$");
+	const auto bCheck = sep.match(sPath, std::string::size_type(0), asMatches);
 	ASSERT(bCheck);
 
-	sDir = asMatches[0];
-	const auto sBase = asMatches[1];
+	sDir = sPath.substr(asMatches[0].offset, asMatches[0].length);
+	const auto sBase = sPath.substr(asMatches[1].offset, asMatches[1].length);
 
 	/* ^(.*)(\.[^\.]+)$ */
-	static Regex SplitExt("^(.*)(\\.[^\\.]+)$");
-	if (SplitExt.Compare(sBase, asMatches)) {
-		sFilename = asMatches[0];
-		sExt = asMatches[1];
+	static Poco::RegularExpression SplitExt("^(.*)(\\.[^\\.]+)$");
+	if (SplitExt.match(sBase, std::string::size_type(0), asMatches2)) {
+		sFilename = sBase.substr(asMatches2[0].offset, asMatches2[0].length);
+		sExt = sBase.substr(asMatches2[1].offset, asMatches2[1].length);
 	} else {
 		sFilename = sBase;
 	}
@@ -1405,161 +1407,6 @@ GetFileContents(const std::string& sFile, std::vector<std::string>& asOut)
 	std::string sLine;
 	while (file.GetLine(sLine))
 		asOut.push_back(sLine);
-	return true;
-}
-
-
-void
-Regex::Compile()
-{
-	const char* error;
-	int offset;
-	m_pReg =
-	  pcre_compile(m_sPattern.c_str(), PCRE_CASELESS, &error, &offset, nullptr);
-
-	if (m_pReg == nullptr)
-		RageException::Throw(
-		  "Invalid regex: \"%s\" (%s).", m_sPattern.c_str(), error);
-
-	const auto iRet = pcre_fullinfo(static_cast<pcre*>(m_pReg),
-									nullptr,
-									PCRE_INFO_CAPTURECOUNT,
-									&m_iBackrefs);
-	ASSERT(iRet >= 0);
-
-	++m_iBackrefs;
-	ASSERT(m_iBackrefs < 128);
-}
-
-void
-Regex::Set(const std::string& sStr)
-{
-	Release();
-	m_sPattern = sStr;
-	Compile();
-}
-
-void
-Regex::Release()
-{
-	pcre_free(m_pReg);
-	m_pReg = nullptr;
-	m_sPattern = std::string();
-}
-
-Regex::Regex(const std::string& sStr)
-  : m_pReg(nullptr)
-  , m_iBackrefs(0)
-  , m_sPattern(std::string())
-{
-	Set(sStr);
-}
-
-Regex::Regex(const Regex& rhs)
-  : m_pReg(nullptr)
-  , m_iBackrefs(0)
-  , m_sPattern(std::string())
-{
-	Set(rhs.m_sPattern);
-}
-
-Regex&
-Regex::operator=(const Regex& rhs)
-{
-	if (this != &rhs)
-		Set(rhs.m_sPattern);
-	return *this;
-}
-
-Regex&
-Regex::operator=(Regex&& rhs) noexcept
-{
-	std::swap(m_iBackrefs, rhs.m_iBackrefs);
-	std::swap(m_pReg, rhs.m_pReg);
-	std::swap(m_sPattern, rhs.m_sPattern);
-	return *this;
-}
-
-Regex::~Regex()
-{
-	Release();
-}
-
-bool
-Regex::Compare(const std::string& sStr)
-{
-	int iMat[128 * 3];
-	const auto iRet = pcre_exec(static_cast<pcre*>(m_pReg),
-								nullptr,
-								sStr.data(),
-								sStr.size(),
-								0,
-								0,
-								iMat,
-								128 * 3);
-
-	if (iRet < -1)
-		RageException::Throw("Unexpected return from pcre_exec('%s'): %i.",
-							 m_sPattern.c_str(),
-							 iRet);
-
-	return iRet >= 0;
-}
-
-bool
-Regex::Compare(const std::string& sStr, std::vector<std::string>& asMatches)
-{
-	asMatches.clear();
-
-	int iMat[128 * 3];
-	const auto iRet = pcre_exec(static_cast<pcre*>(m_pReg),
-								nullptr,
-								sStr.data(),
-								sStr.size(),
-								0,
-								0,
-								iMat,
-								128 * 3);
-
-	if (iRet < -1)
-		RageException::Throw("Unexpected return from pcre_exec('%s'): %i.",
-							 m_sPattern.c_str(),
-							 iRet);
-
-	if (iRet == -1)
-		return false;
-
-	for (unsigned i = 1; i < m_iBackrefs; ++i) {
-		const auto iStart = iMat[i * 2], end = iMat[i * 2 + 1];
-		if (iStart == -1)
-			asMatches.push_back(std::string()); /* no match */
-		else
-			asMatches.push_back(sStr.substr(iStart, end - iStart));
-	}
-
-	return true;
-}
-
-// Arguments and behavior are the same are similar to
-// http://us3.php.net/manual/en/function.preg-replace.php
-bool
-Regex::Replace(const std::string& sReplacement,
-			   const std::string& sSubject,
-			   std::string& sOut)
-{
-	std::vector<std::string> asMatches;
-	if (!Compare(sSubject, asMatches))
-		return false;
-
-	sOut = sReplacement;
-
-	// TODO: optimize me by iterating only once over the string
-	for (unsigned i = 0; i < asMatches.size(); i++) {
-		auto sFrom = ssprintf("\\${%d}", i);
-		auto sTo = asMatches[i];
-		s_replace(sOut, sFrom, sTo);
-	}
-
 	return true;
 }
 
