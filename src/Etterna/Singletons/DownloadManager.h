@@ -256,6 +256,9 @@ class DownloadManager
 	std::string loginToken = "";
 
 	std::vector<std::string> newlyRankedChartkeys{};
+
+	// util
+	inline HTMLForm* GenerateHighScoreForm(HighScore* hs);
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;

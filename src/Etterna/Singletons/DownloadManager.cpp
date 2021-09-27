@@ -290,17 +290,6 @@ DownloadManager::SetClientSessionByURL(HTTPClientSession* session,
 	session->setPort(uri.getPort());
 }
 
-/*
-void
-DownloadManager::UpdateDLSpeed()
-{
-	if (gameplay)
-		MESSAGEMAN->Broadcast("PausingDownloads");
-	else
-		MESSAGEMAN->Broadcast("ResumingDownloads");
-}
-*/
-
 void
 DownloadManager::SetInGameplay(bool inGameplay)
 {
@@ -436,6 +425,17 @@ DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 			delete form;
 	}
 }
+
+/*
+void
+DownloadManager::UpdateDLSpeed()
+{
+	if (gameplay)
+		MESSAGEMAN->Broadcast("PausingDownloads");
+	else
+		MESSAGEMAN->Broadcast("ResumingDownloads");
+}
+*/
 
 bool
 DownloadManager::IsLoggedIn()
@@ -619,7 +619,7 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 	Locator::getLogger()->info("Generating single score upload request ({})",
 							   hs->GetChartKey());
 
-	HTMLForm* form = generateHighScoreForm(hs);
+	HTMLForm* form = GenerateHighScoreForm(hs);
 
 	RequestCallback callback = [this](std::istream& in,
 									  HTTPResponse& response) {
@@ -673,8 +673,16 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 					 it++) {
 					reasons.push_back(it->convert<std::string>());
 				}
+				std::ostringstream reasonstr;
+				if (!reasons.empty()) {
+					std::copy(
+					  reasons.begin(),
+					  reasons.end() - 1,
+					  std::ostream_iterator<std::string>(reasonstr, ", "));
+					reasonstr << reasons.back();
+				}
 				Locator::getLogger()->warn(
-				  "UploadSingleScore FAILED (422) - {}", reasons);
+				  "UploadSingleScore FAILED (422) - {}", reasonstr.str());
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (422 + Parse Error) - {} {}",
@@ -699,42 +707,8 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 }
 
 inline HTMLForm*
-generateHighScoreForm(HighScore* hs)
+DownloadManager::GenerateHighScoreForm(HighScore* hs)
 {
-	HTMLForm* form = new HTMLForm;
-	form->setEncoding(HTMLForm::ENCODING_URL);
-
-	form->set("key", hs->GetScoreKey());
-	form->set("chart_key", hs->GetChartKey());
-	form->set("wife", std::to_string(hs->GetSSRNormPercent()));
-	form->set("judge", std::to_string(hs->GetJudgeScale()));
-	form->set("rate", std::to_string(hs->GetMusicRate()));
-	form->set("modifiers", hs->GetModifiers());
-
-	form->set("grade", std::to_string(hs->GetGrade()));
-	form->set("max_combo", std::to_string(hs->GetMaxCombo()));
-	form->set("marvelous", std::to_string(hs->GetTapNoteScore(TNS_W1)));
-	form->set("perfect", std::to_string(hs->GetTapNoteScore(TNS_W2)));
-	form->set("great", std::to_string(hs->GetTapNoteScore(TNS_W3)));
-	form->set("good", std::to_string(hs->GetTapNoteScore(TNS_W4)));
-	form->set("bad", std::to_string(hs->GetTapNoteScore(TNS_W5)));
-	form->set("miss", std::to_string(hs->GetTapNoteScore(TNS_Miss)));
-	form->set("hit_mine", std::to_string(hs->GetTapNoteScore(TNS_HitMine)));
-
-	form->set("held", std::to_string(hs->GetHoldNoteScore(HNS_Held)));
-	form->set("let_go", std::to_string(hs->GetHoldNoteScore(HNS_LetGo)));
-	form->set("missed_hold", std::to_string(hs->GetHoldNoteScore(HNS_Missed)));
-
-	form->set("datetime", hs->GetDateTime().GetString());
-	form->set("chord_cohesion", std::to_string(hs->GetChordCohesion()));
-	form->set("calculator_version", std::to_string(hs->GetSSRCalcVersion()));
-	form->set("top_score", std::to_string(hs->GetTopScore()));
-	form->set("wife_version", std::to_string(hs->GetWifeVersion()));
-	form->set("validation_key", hs->GetValidationKey(ValidationKey_Brittle));
-	form->set("machine_guid", hs->GetMachineGuid());
-
-	Poco::JSON::Object replaydataObj;
-	Poco::JSON::Array replaydataArrObj;
 	bool success = hs->LoadReplayData();
 	const auto& offsets = hs->GetOffsetVector();
 	const auto& columns = hs->GetTrackVector();
@@ -750,27 +724,65 @@ generateHighScoreForm(HighScore* hs)
 		return nullptr;
 	}
 
+	HTMLForm* form = new HTMLForm;
+	form->setEncoding(HTMLForm::ENCODING_URL);
+
+	Poco::JSON::Object hsObject;
+
+	hsObject.set("key", hs->GetScoreKey());
+	hsObject.set("chart_key", hs->GetChartKey());
+	hsObject.set("wife", hs->GetSSRNormPercent());
+	hsObject.set("judge", hs->GetJudgeScale());
+	hsObject.set("rate", hs->GetMusicRate());
+	hsObject.set("modifiers", hs->GetModifiers());
+
+	hsObject.set("grade", static_cast<int>(hs->GetGrade()));
+	hsObject.set("max_combo", hs->GetMaxCombo());
+	hsObject.set("marvelous", hs->GetTapNoteScore(TNS_W1));
+	hsObject.set("perfect", hs->GetTapNoteScore(TNS_W2));
+	hsObject.set("great", hs->GetTapNoteScore(TNS_W3));
+	hsObject.set("good", hs->GetTapNoteScore(TNS_W4));
+	hsObject.set("bad", hs->GetTapNoteScore(TNS_W5));
+	hsObject.set("miss", hs->GetTapNoteScore(TNS_Miss));
+	hsObject.set("hit_mine", hs->GetTapNoteScore(TNS_HitMine));
+
+	hsObject.set("held", hs->GetHoldNoteScore(HNS_Held));
+	hsObject.set("let_go", hs->GetHoldNoteScore(HNS_LetGo));
+	hsObject.set("missed_hold", hs->GetHoldNoteScore(HNS_Missed));
+
+	hsObject.set("datetime", hs->GetDateTime().GetString());
+	hsObject.set("chord_cohesion", hs->GetChordCohesion());
+	hsObject.set("calculator_version", hs->GetSSRCalcVersion());
+	hsObject.set("top_score", hs->GetTopScore());
+	hsObject.set("wife_version", hs->GetWifeVersion());
+	hsObject.set("validation_key", hs->GetValidationKey(ValidationKey_Brittle));
+	hsObject.set("machine_guid", hs->GetMachineGuid());
+
+	Poco::JSON::Object replaydataObj;
+	Poco::JSON::Array replaydataArrObj;
+
 	std::vector<float> timestamps =
 	  steps->GetTimingData()->ConvertReplayNoteRowsToTimestamps(
 		rows, hs->GetMusicRate());
-
 	for (size_t i = 0; i < offsets.size(); i++) {
 		Poco::JSON::Array replaydataArrRowObj;
 		replaydataArrRowObj.add(timestamps[i]);
 		replaydataArrRowObj.add(1000.f * offsets[i]);
 		if (hs->GetReplayType() >= 2) {
 			replaydataArrRowObj.add(columns[i]);
-			replaydataArrRowObj.add(types[i]);
+			replaydataArrRowObj.add(static_cast<int>(types[i]));
 		}
 		replaydataArrRowObj.add(rows[i]);
 
 		replaydataArrObj.add(replaydataArrRowObj);
 	}
 	replaydataObj.set("data", replaydataArrObj);
-	std::ostringstream replaydataStream;
-	replaydataObj.stringify(replaydataStream);
+	hsObject.set("replay_data", replaydataObj);
 
-	form->set("replay_data", replaydataStream.str());
+	std::ostringstream hsStream;
+	hsObject.stringify(hsStream);
+
+	form->read(hsStream.str());
 	return form;
 }
 
@@ -2236,6 +2248,12 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		DLMAN->ForceUploadAllScores();
 		return 0;
 	}
+	static int UploadThisScore(T* p, lua_State* L) {
+		auto* hs = Luna<HighScore>::check(L, 1);
+
+		DLMAN->UploadSingleScore(hs);
+		return 0;
+	}
 	LunaDownloadManager()
 	{
 		ADD_METHOD(GetCountryCodes);
@@ -2276,6 +2294,8 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		ADD_METHOD(UploadScoresForPack);
 		ADD_METHOD(UploadAllScores);
 		ADD_METHOD(Logout);
+
+		ADD_METHOD(UploadThisScore);
 	}
 };
 LUA_REGISTER_CLASS(DownloadManager)
