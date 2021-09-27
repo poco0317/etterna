@@ -87,8 +87,8 @@ getCpuHash() -> uint16_t
 auto
 getMachineName() -> std::string
 {
-	LPWSTR computerName;
 	DWORD size = 128;
+	TCHAR computerName[128];
 	GetComputerName(computerName, &size);
 	return nowide::narrow(computerName);
 }
