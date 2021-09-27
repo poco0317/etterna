@@ -28,10 +28,13 @@
 
 #include <unordered_set>
 #include <algorithm>
+
 #include "Poco/URI.h"
-#include "Poco/Net/HTTPResponse.h"
 #include "Poco/Net/SSLManager.h"
 #include "Poco/Net/ConsoleCertificateHandler.h"
+
+#include "Poco/Dynamic/Var.h"
+#include "Poco/JSON/Parser.h"
 
 using namespace rapidjson;
 
@@ -59,7 +62,6 @@ static Preference<unsigned int> downloadPacksToAdditionalSongs(
   0);
 
 static const std::string TEMP_ZIP_MOUNT_POINT = "/@temp-zip/";
-static const std::string API_KEY = "adc";
 static const std::string DL_DIR = SpecialFiles::CACHE_DIR + "Downloads/";
 static const std::string wife3_rescore_upload_flag = "rescoredw3";
 
@@ -67,6 +69,7 @@ static const std::string wife3_rescore_upload_flag = "rescoredw3";
 // all paths should begin with / and end without /
 /// API root path
 static const std::string API_ROOT = "/api/client";
+static const std::string API_KEY = "testkey";
 
 static const std::string API_LOGIN = "/login";
 static const std::string API_RANKED_CHARTKEYS = "/charts/ranked";
@@ -181,8 +184,8 @@ DownloadManager::DownloadManager()
 							 "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
 	Poco::Net::SSLManager::instance().initializeClient(0, pCert, pCtx);
 
-	p_httpsClientSession = new Poco::Net::HTTPSClientSession;
-	p_httpClientSession = new Poco::Net::HTTPClientSession;
+	p_httpsClientSession = new HTTPSClientSession;
+	p_httpClientSession = new HTTPClientSession;
 
 	SetClientSessionByURL(p_httpsClientSession, serverURL);
 	SetClientSessionByURL(p_httpClientSession, serverURL);
@@ -228,7 +231,11 @@ DownloadManager::Init()
 }
 
 void
-DownloadManager::GenerateRequest(const std::string& url, const std::string requestMethod, HTMLForm* requestForm, bool https)
+DownloadManager::GenerateRequest(const std::string& url,
+								 RequestCallback callback,
+								 const std::string requestMethod,
+								 HTMLForm* requestForm,
+								 bool https)
 {
 	Poco::URI uri(url);
 	std::string path(uri.getPathAndQuery());
@@ -236,15 +243,20 @@ DownloadManager::GenerateRequest(const std::string& url, const std::string reque
 	auto port = uri.getPort();
 	if (path.empty())
 		path = "/";
-	HTTPRequest* request = new HTTPRequest(requestMethod, path, Poco::Net::HTTPMessage::HTTP_1_1);
+	HTTPRequest* request =
+	  new HTTPRequest(requestMethod, path, Poco::Net::HTTPMessage::HTTP_1_1);
+
+	// required for all requests (with our api)
 	request->setContentType("application/json");
 	request->setContentLength(0);
 
+	// when logged in, provide authorization
 	if (IsLoggedIn())
 		request->setCredentials("Bearer", loginToken);
 
-	Poco::Net::HTTPClientSession* session;
-	std::vector<std::pair<HTTPRequest*, HTMLForm*>>* requestQueue;
+	// select session and request queue based on http/https
+	HTTPClientSession* session;
+	std::vector<RequestData>* requestQueue;
 	if (https) {
 		session = p_httpsClientSession;
 		requestQueue = &apiHttpsRequests;
@@ -253,6 +265,7 @@ DownloadManager::GenerateRequest(const std::string& url, const std::string reque
 		requestQueue = &apiHttpRequests;
 	}
 
+	// if given a full url, change the host/port
 	if (!host.empty()) {
 		session->reset();
 		session->setHost(host);
@@ -261,13 +274,14 @@ DownloadManager::GenerateRequest(const std::string& url, const std::string reque
 
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
-		requestQueue->push_back({ request, requestForm });
+		requestQueue->push_back(
+		  std::make_tuple(request, requestForm, callback));
 		// The thread updates should catch this one eventually
 	}
 }
 
 void
-DownloadManager::SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
+DownloadManager::SetClientSessionByURL(HTTPClientSession* session,
 									   const std::string url)
 {
 	Poco::URI uri(url);
@@ -325,7 +339,7 @@ DownloadManager::Update(float fDeltaSeconds)
 
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
-		if (gameplay)
+		if (inGameplay)
 			return;
 		if (apiHttpRequests.empty() && apiHttpsRequests.empty())
 			return;
@@ -337,21 +351,29 @@ DownloadManager::Update(float fDeltaSeconds)
 void
 DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 {
-	std::vector<std::pair<HTTPRequest*, HTMLForm*>> reqs;
+	std::vector<RequestData> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpsRequests;
 		apiHttpsRequests.clear();
 	}
 	for (auto& p : reqs) {
-		auto& req = p.first;
-		auto& form = p.second;
-		Poco::Net::HTTPResponse response;
+		auto& req = std::get<0>(p);
+		auto& form = std::get<1>(p);
+		auto& callback = std::get<2>(p);
+		HTTPResponse response;
 		try {
-			p_httpsClientSession->sendRequest(*req);
-			p_httpsClientSession->receiveResponse(response);
+			if (form != nullptr) {
+				form->prepareSubmit(*req);
+				form->write(p_httpsClientSession->sendRequest(*req));
+			} else {
+				p_httpsClientSession->sendRequest(*req);
+			}
+
+			std::istream& respStream = p_httpsClientSession->receiveResponse(response);
+			callback(respStream, response);
 		} catch (Poco::Exception& e) {
-			Locator::getLogger()->info("EXCPETION {} {} {}",
+			Locator::getLogger()->info("HTTPS Request Exception: {} {} {}",
 									   e.className(),
 									   e.displayText(),
 									   e.message());
@@ -372,26 +394,30 @@ DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 void
 DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 {
-	std::vector<std::pair<HTTPRequest*, HTMLForm*>> reqs;
+	std::vector<RequestData> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpRequests;
 		apiHttpRequests.clear();
 	}
 	for (auto& p : reqs) {
-		auto& req = p.first;
-		auto& form = p.second;
-		Poco::Net::HTTPResponse response;
+		auto& req = std::get<0>(p);
+		auto& form = std::get<1>(p);
+		auto& callback = std::get<2>(p);
+		HTTPResponse response;
 		try {
 
-			if (form != nullptr)
+			if (form != nullptr) {
+				form->prepareSubmit(*req);
 				form->write(p_httpClientSession->sendRequest(*req));
-			else
+			} else {
 				p_httpClientSession->sendRequest(*req);
+			}
 
-			p_httpClientSession->receiveResponse(response);
+			std::istream& respStream = p_httpClientSession->receiveResponse(response);
+			callback(respStream, response);
 		} catch (Poco::Exception& e) {
-			Locator::getLogger()->info("EXCPETION {} {} {}",
+			Locator::getLogger()->info("HTTP Request Exception: {} {} {}",
 									   e.className(),
 									   e.displayText(),
 									   e.message());
@@ -425,7 +451,7 @@ DownloadManager::IsInGameplay()
 void
 DownloadManager::Login(const std::string& username, const std::string& password)
 {
-	Locator::getLogger()->trace("Generating user+pass login request ...");
+	Locator::getLogger()->info("Generating user+pass login request ...");
 
 	HTMLForm* form = new HTMLForm;
 	form->setEncoding(HTMLForm::ENCODING_URL);
@@ -433,16 +459,74 @@ DownloadManager::Login(const std::string& username, const std::string& password)
 	form->set("password", password);
 	form->set("key", API_KEY);
 
-	GenerateRequest(
-	  API_ROOT + API_LOGIN, HTTPRequest::HTTP_POST, form, apiShouldUseHttps);
+	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		std::string final_token = "";
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				// field info
+				auto access_token = ret->getValue<std::string>("access_token");
+
+				// naturally provided these but do not need
+				auto token_type = ret->getValue<std::string>("token_type");
+				auto expires_in = ret->getValue<int>("expires_in");
+
+				if (!access_token.empty()) {
+					final_token = access_token;
+				} else {
+					Locator::getLogger()->error(
+					  "Login FAILED - Parse error: Missing response token");
+				}
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "Login FAILED - Exception occurred: {} {}", e.name(), e.message());
+			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			Locator::getLogger()->info("Login FAILED - Bad credentials");
+		} else {
+			Locator::getLogger()->warn("Login FAILED - Unexpected status: {}",
+									   status);
+		}
+
+		{
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+			loginToken = final_token;
+			OnLogin();
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_LOGIN,
+					callback,
+					HTTPRequest::HTTP_POST,
+					form,
+					apiShouldUseHttps);
 }
 
 void
 DownloadManager::Login(const std::string& token)
 {
-	Locator::getLogger()->trace("Generating token login request ...");
+	Locator::getLogger()->info("Generating token login request ...");
+	// ?
+}
 
-
+void
+DownloadManager::OnLogin()
+{
+	if (IsLoggedIn()) {
+		if (ShouldUploadScores()) {
+			UploadScores();
+		}
+		MESSAGEMAN->Broadcast("LoginSuccessful");
+	} else {
+		MESSAGEMAN->Broadcast("LoginFailed");
+	}
 }
 
 bool
@@ -1310,21 +1394,6 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 				true);
 }
 */
-
-void
-DownloadManager::OnLogin()
-{
-	if (DLMAN->ShouldUploadScores()) {
-		DLMAN->UploadScores();
-
-		// ok we don't actually want to delete this yet since this is
-		// specifically for appending replaydata for a score the site does
-		// not have data for without altering the score entry in any other
-		// way, but keep disabled for now
-		// DLMAN->UpdateOnlineScoreReplayData();
-	}
-	MESSAGEMAN->Broadcast("Login");
-}
 
 /*
 void

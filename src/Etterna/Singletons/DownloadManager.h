@@ -11,11 +11,19 @@
 
 #include <deque>
 #include "Poco/Net/HTTPRequest.h"
+#include "Poco/Net/HTTPResponse.h"
 #include "Poco/Net/HTTPSClientSession.h"
 #include "Poco/Net/HTMLForm.h"
 
+using Poco::Net::HTTPSClientSession;
+using Poco::Net::HTTPClientSession;
 using Poco::Net::HTTPRequest;
+using Poco::Net::HTTPResponse;
 using Poco::Net::HTMLForm;
+
+typedef std::function<void(std::istream&, HTTPResponse)> RequestCallback;
+typedef std::tuple<HTTPRequest*, HTMLForm*, RequestCallback>
+  RequestData;
 
 class ProgressData
 {
@@ -163,14 +171,20 @@ class DownloadManager
 
 	void GenerateRequest(
 	  const std::string& url,
+	  RequestCallback callback,
 	  const std::string requestMethod = HTTPRequest::HTTP_GET,
 	  HTMLForm* requestForm = nullptr,
 	  bool https = true);
 	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 							   const std::string url);
 
+	// API Requests
 	void Login(const std::string& username, const std::string& password);
 	void Login(const std::string& token);
+	void GetRankedChartkeys();
+	void UploadSingleScore();
+	void UploadBulkScores();
+
 
 	std::vector<DownloadablePack> downloadablePacks;
 	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
@@ -227,12 +241,12 @@ class DownloadManager
 
   private:
 	/// Active HTTP requests
-	std::vector<std::pair<HTTPRequest*, HTMLForm*>> apiHttpsRequests{};
-	std::vector<std::pair<HTTPRequest*, HTMLForm*>> apiHttpRequests{};
+	std::vector<RequestData> apiHttpsRequests{};
+	std::vector<RequestData> apiHttpRequests{};
 	/// Main HTTPS Client Session
-	Poco::Net::HTTPSClientSession* p_httpsClientSession;
+	HTTPSClientSession* p_httpsClientSession;
 	/// Alternate HTTP Client Session
-	Poco::Net::HTTPClientSession* p_httpClientSession;
+	HTTPClientSession* p_httpClientSession;
 	/// Allow toggling https
 	bool apiShouldUseHttps = false;
 
