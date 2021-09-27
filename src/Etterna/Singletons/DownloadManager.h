@@ -182,7 +182,7 @@ class DownloadManager
 	void Login(const std::string& username, const std::string& password);
 	void Login(const std::string& token);
 	void GetRankedChartkeys();
-	void UploadSingleScore();
+	void UploadSingleScore(HighScore* hs);
 	void UploadBulkScores();
 
 

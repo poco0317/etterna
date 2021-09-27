@@ -566,7 +566,7 @@ DownloadManager::GetRankedChartkeys()
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
 
-				Poco::JSON::Array::Ptr data = ret->getArray("data");
+				auto data = ret->getArray("data");
 				for (auto it = data.get()->begin(); it != data.get()->end();
 					 it++) {
 					new_chartkeys.push_back(it->convert<std::string>());
@@ -611,6 +611,167 @@ DownloadManager::GetRankedChartkeys()
 					HTTPRequest::HTTP_GET,
 					form,
 					apiShouldUseHttps);
+}
+
+void
+DownloadManager::UploadSingleScore(HighScore* hs)
+{
+	Locator::getLogger()->info("Generating single score upload request ({})",
+							   hs->GetChartKey());
+
+	HTMLForm* form = generateHighScoreForm(hs);
+
+	RequestCallback callback = [this](std::istream& in,
+									  HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		std::vector<std::string> new_chartkeys;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadSingleScore FAILED (Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reason = ret->getValue<std::string>("message");
+				Locator::getLogger()->warn(
+				  "UploadSingleScore FAILED (401) - {}", reason);
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadSingleScore FAILED (401 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto errors = ret->getObject("errors");
+				std::vector<std::string> reasons;
+				auto input_value_arr = errors->getArray("input_value");
+				
+				for (auto it = input_value_arr.get()->begin();
+					 it != input_value_arr.get()->end();
+					 it++) {
+					reasons.push_back(it->convert<std::string>());
+				}
+				Locator::getLogger()->warn(
+				  "UploadSingleScore FAILED (422) - {}", reasons);
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadSingleScore FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "GetRankedChartkeys FAILED - Unexpected status: {}", status);
+		}
+
+		{
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_UPLOAD_SCORE,
+					callback,
+					HTTPRequest::HTTP_POST,
+					form,
+					apiShouldUseHttps);
+}
+
+inline HTMLForm*
+generateHighScoreForm(HighScore* hs)
+{
+	HTMLForm* form = new HTMLForm;
+	form->setEncoding(HTMLForm::ENCODING_URL);
+
+	form->set("key", hs->GetScoreKey());
+	form->set("chart_key", hs->GetChartKey());
+	form->set("wife", std::to_string(hs->GetSSRNormPercent()));
+	form->set("judge", std::to_string(hs->GetJudgeScale()));
+	form->set("rate", std::to_string(hs->GetMusicRate()));
+	form->set("modifiers", hs->GetModifiers());
+
+	form->set("grade", std::to_string(hs->GetGrade()));
+	form->set("max_combo", std::to_string(hs->GetMaxCombo()));
+	form->set("marvelous", std::to_string(hs->GetTapNoteScore(TNS_W1)));
+	form->set("perfect", std::to_string(hs->GetTapNoteScore(TNS_W2)));
+	form->set("great", std::to_string(hs->GetTapNoteScore(TNS_W3)));
+	form->set("good", std::to_string(hs->GetTapNoteScore(TNS_W4)));
+	form->set("bad", std::to_string(hs->GetTapNoteScore(TNS_W5)));
+	form->set("miss", std::to_string(hs->GetTapNoteScore(TNS_Miss)));
+	form->set("hit_mine", std::to_string(hs->GetTapNoteScore(TNS_HitMine)));
+
+	form->set("held", std::to_string(hs->GetHoldNoteScore(HNS_Held)));
+	form->set("let_go", std::to_string(hs->GetHoldNoteScore(HNS_LetGo)));
+	form->set("missed_hold", std::to_string(hs->GetHoldNoteScore(HNS_Missed)));
+
+	form->set("datetime", hs->GetDateTime().GetString());
+	form->set("chord_cohesion", std::to_string(hs->GetChordCohesion()));
+	form->set("calculator_version", std::to_string(hs->GetSSRCalcVersion()));
+	form->set("top_score", std::to_string(hs->GetTopScore()));
+	form->set("wife_version", std::to_string(hs->GetWifeVersion()));
+	form->set("validation_key", hs->GetValidationKey(ValidationKey_Brittle));
+	form->set("machine_guid", hs->GetMachineGuid());
+
+	Poco::JSON::Object replaydataObj;
+	Poco::JSON::Array replaydataArrObj;
+	bool success = hs->LoadReplayData();
+	const auto& offsets = hs->GetOffsetVector();
+	const auto& columns = hs->GetTrackVector();
+	const auto& types = hs->GetTapNoteTypeVector();
+	const auto& rows = hs->GetNoteRowVector();
+	auto steps = SONGMAN->GetStepsByChartkey(hs->GetChartKey());
+
+	success |= steps != nullptr && (offsets.size() == columns.size() ==
+									types.size() == rows.size());
+
+	if (!success) {
+		hs->UnloadReplayData();
+		return nullptr;
+	}
+
+	std::vector<float> timestamps =
+	  steps->GetTimingData()->ConvertReplayNoteRowsToTimestamps(
+		rows, hs->GetMusicRate());
+
+	for (size_t i = 0; i < offsets.size(); i++) {
+		Poco::JSON::Array replaydataArrRowObj;
+		replaydataArrRowObj.add(timestamps[i]);
+		replaydataArrRowObj.add(1000.f * offsets[i]);
+		if (hs->GetReplayType() >= 2) {
+			replaydataArrRowObj.add(columns[i]);
+			replaydataArrRowObj.add(types[i]);
+		}
+		replaydataArrRowObj.add(rows[i]);
+
+		replaydataArrObj.add(replaydataArrRowObj);
+	}
+	replaydataObj.set("data", replaydataArrObj);
+	std::ostringstream replaydataStream;
+	replaydataObj.stringify(replaydataStream);
+
+	form->set("replay_data", replaydataStream.str());
+	return form;
 }
 
 /*
