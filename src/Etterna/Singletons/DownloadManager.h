@@ -254,6 +254,8 @@ class DownloadManager
 	bool inGameplay = false;
 
 	std::string loginToken = "";
+
+	std::vector<std::string> newlyRankedChartkeys{};
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;

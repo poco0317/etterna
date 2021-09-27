@@ -35,6 +35,7 @@
 
 #include "Poco/Dynamic/Var.h"
 #include "Poco/JSON/Parser.h"
+#include "Poco/JSON/Array.h"
 
 using namespace rapidjson;
 
@@ -448,6 +449,14 @@ DownloadManager::IsInGameplay()
 	return inGameplay;
 }
 
+bool
+DownloadManager::ShouldUploadScores()
+{
+	return false;
+	// return LoggedIn() && automaticSync &&
+	//	   GamePreferences::m_AutoPlay == PC_HUMAN;
+}
+
 void
 DownloadManager::Login(const std::string& username, const std::string& password)
 {
@@ -486,8 +495,13 @@ DownloadManager::Login(const std::string& username, const std::string& password)
 				}
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
-				  "Login FAILED - Exception occurred: {} {}", e.name(), e.message());
+				  "Login FAILED - Exception occurred: {} {}",
+				  e.name(),
+				  e.message());
 			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			Locator::getLogger()->warn(
+			  "Login FAILED - Client out of date or other error");
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
 			Locator::getLogger()->info("Login FAILED - Bad credentials");
 		} else {
@@ -498,8 +512,8 @@ DownloadManager::Login(const std::string& username, const std::string& password)
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
 			loginToken = final_token;
-			OnLogin();
 		}
+		OnLogin();
 	};
 
 	GenerateRequest(API_ROOT + API_LOGIN,
@@ -523,19 +537,82 @@ DownloadManager::OnLogin()
 		if (ShouldUploadScores()) {
 			UploadScores();
 		}
+		GetRankedChartkeys();
 		MESSAGEMAN->Broadcast("LoginSuccessful");
 	} else {
 		MESSAGEMAN->Broadcast("LoginFailed");
 	}
 }
 
-bool
-DownloadManager::ShouldUploadScores()
+void
+DownloadManager::GetRankedChartkeys()
 {
-	return false;
-	//return LoggedIn() && automaticSync &&
-	//	   GamePreferences::m_AutoPlay == PC_HUMAN;
+	Locator::getLogger()->info("Generating ranked chartkeys request ...");
+
+	HTMLForm* form = new HTMLForm;
+	form->setEncoding(HTMLForm::ENCODING_URL);
+	form->set("start", "");
+	form->set("end", "");
+
+	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		std::vector<std::string> new_chartkeys;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				Poco::JSON::Array::Ptr data = ret->getArray("data");
+				for (auto it = data.get()->begin(); it != data.get()->end();
+					 it++) {
+					new_chartkeys.push_back(it->convert<std::string>());
+				}
+				Locator::getLogger()->info("Found {} newly ranked chartkeys",
+										   new_chartkeys.size());
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "GetRankedChartkeys FAILED (Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reason = ret->getValue<std::string>("message");
+				Locator::getLogger()->warn(
+				  "GetRankedChartkeys FAILED (401) - {}", reason);
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "GetRankedChartkeys FAILED (401 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "GetRankedChartkeys FAILED - Unexpected status: {}", status);
+		}
+
+		{
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+			newlyRankedChartkeys = new_chartkeys;
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_RANKED_CHARTKEYS,
+					callback,
+					HTTPRequest::HTTP_GET,
+					form,
+					apiShouldUseHttps);
 }
+
 /*
 inline void
 SetCURLPOSTScore(CURL*& curlHandle,
