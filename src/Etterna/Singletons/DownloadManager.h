@@ -303,6 +303,7 @@ class DownloadManager
 	// util
 	inline Poco::JSON::Object* GenerateHighScoreObj(HighScore* hs);
 	inline void ProcessRequest(RequestData*& data, HTTPClientSession& client);
+	inline std::string ExtractHTTP401Reasons(Poco::JSON::Object::Ptr errors);
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;

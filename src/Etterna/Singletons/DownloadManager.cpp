@@ -328,6 +328,27 @@ DownloadManager::EncodeSpaces(std::string& str)
 	return foundSpaces;
 }
 
+std::string
+DownloadManager::ExtractHTTP401Reasons(Poco::JSON::Object::Ptr errors)
+{
+	std::vector<std::string> reasons;
+	auto input_value_arr = errors->getArray("input_value");
+
+	for (auto it = input_value_arr.get()->begin();
+		 it != input_value_arr.get()->end();
+		 it++) {
+		reasons.push_back(it->convert<std::string>());
+	}
+	std::ostringstream reasonstr;
+	if (!reasons.empty()) {
+		std::copy(reasons.begin(),
+				  reasons.end() - 1,
+				  std::ostream_iterator<std::string>(reasonstr, ", "));
+		reasonstr << reasons.back();
+	}
+	return reasonstr.str();
+}
+
 void
 DownloadManager::Update(float fDeltaSeconds)
 {
@@ -628,10 +649,9 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 
 	Poco::JSON::Object* json = GenerateHighScoreObj(hs);
 
-	RequestCallback callback = [this](std::istream& in,
+	RequestCallback callback = [this, hs](std::istream& in,
 									  HTTPResponse& response) {
 		Poco::JSON::Parser parser;
-		std::vector<std::string> new_chartkeys;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
@@ -641,7 +661,30 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
 
-				
+				auto overall = ret->getValue<float>("overall");
+				auto stream = ret->getValue<float>("stream");
+				auto jumpstream = ret->getValue<float>("jumpstream");
+				auto handstream = ret->getValue<float>("handstream");
+				auto jacks = ret->getValue<float>("jacks");
+				auto chordjacks = ret->getValue<float>("chordjacks");
+				auto stamina = ret->getValue<float>("stamina");
+				auto technical = ret->getValue<float>("technical");
+
+				Locator::getLogger()->info(
+				  "Uploaded score {} - \n\tOverall {}\n\tStream {}\n\tJS "
+				  "{}\n\tHS {}\n\tJacks {}\n\tCJ {}\n\tStamina {}\n\tTech {}",
+				  hs->GetChartKey(),
+				  overall,
+				  stream,
+				  jumpstream,
+				  handstream,
+				  jacks,
+				  chordjacks,
+				  stamina,
+				  technical);
+
+				hs->AddUploadedServer(serverURL.Get());
+				hs->forceuploadedthissession = true;
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (Parse Error) - {} {}",
@@ -672,24 +715,9 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 				  res.extract<Poco::JSON::Object::Ptr>();
 
 				auto errors = ret->getObject("errors");
-				std::vector<std::string> reasons;
-				auto input_value_arr = errors->getArray("input_value");
-				
-				for (auto it = input_value_arr.get()->begin();
-					 it != input_value_arr.get()->end();
-					 it++) {
-					reasons.push_back(it->convert<std::string>());
-				}
-				std::ostringstream reasonstr;
-				if (!reasons.empty()) {
-					std::copy(
-					  reasons.begin(),
-					  reasons.end() - 1,
-					  std::ostream_iterator<std::string>(reasonstr, ", "));
-					reasonstr << reasons.back();
-				}
+				auto reasonstr = ExtractHTTP401Reasons(errors);
 				Locator::getLogger()->warn(
-				  "UploadSingleScore FAILED (422) - {}", reasonstr.str());
+				  "UploadSingleScore FAILED (422) - {}", reasonstr);
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (422 + Parse Error) - {} {}",
@@ -734,7 +762,6 @@ DownloadManager::UploadBulkScores(std::vector<HighScore*>& hsList)
 	RequestCallback callback = [this](std::istream& in,
 									  HTTPResponse& response) {
 		Poco::JSON::Parser parser;
-		std::vector<std::string> new_chartkeys;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
@@ -743,6 +770,8 @@ DownloadManager::UploadBulkScores(std::vector<HighScore*>& hsList)
 				Poco::Dynamic::Var res = parser.parse(in);
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
+
+				// nothing returned?
 
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
@@ -775,24 +804,9 @@ DownloadManager::UploadBulkScores(std::vector<HighScore*>& hsList)
 				  res.extract<Poco::JSON::Object::Ptr>();
 
 				auto errors = ret->getObject("errors");
-				std::vector<std::string> reasons;
-				auto input_value_arr = errors->getArray("input_value");
-
-				for (auto it = input_value_arr.get()->begin();
-					 it != input_value_arr.get()->end();
-					 it++) {
-					reasons.push_back(it->convert<std::string>());
-				}
-				std::ostringstream reasonstr;
-				if (!reasons.empty()) {
-					std::copy(
-					  reasons.begin(),
-					  reasons.end() - 1,
-					  std::ostream_iterator<std::string>(reasonstr, ", "));
-					reasonstr << reasons.back();
-				}
-				Locator::getLogger()->warn(
-				  "UploadBulkScores FAILED (422) - {}", reasonstr.str());
+				auto reasonstr = ExtractHTTP401Reasons(errors);
+				Locator::getLogger()->warn("UploadBulkScores FAILED (422) - {}",
+										   reasonstr);
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadBulkScores FAILED (422 + Parse Error) - {} {}",
@@ -885,92 +899,6 @@ DownloadManager::GenerateHighScoreObj(HighScore* hs)
 
 	return hsObject;
 }
-
-/*
-inline void
-SetCURLPOSTScore(CURL*& curlHandle,
-				 curl_httppost*& form,
-				 curl_httppost*& lastPtr,
-				 HighScore*& hs)
-{
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "scorekey", hs->GetScoreKey());
-	hs->GenerateValidationKeys();
-	SetCURLFormPostField(curlHandle, form, lastPtr, "ssr_norm", hs->norms);
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "max_combo", hs->GetMaxCombo());
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "valid",
-						 static_cast<int>(hs->GetEtternaValid()));
-	SetCURLFormPostField(curlHandle, form, lastPtr, "mods", hs->GetModifiers());
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "miss", hs->GetTapNoteScore(TNS_Miss));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "bad", hs->GetTapNoteScore(TNS_W5));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "good", hs->GetTapNoteScore(TNS_W4));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "great", hs->GetTapNoteScore(TNS_W3));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "perfect", hs->GetTapNoteScore(TNS_W2));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "marv", hs->GetTapNoteScore(TNS_W1));
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "datetime",
-						 string(hs->GetDateTime().GetString().c_str()));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "hitmine", hs->GetTapNoteScore(TNS_HitMine));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "held", hs->GetHoldNoteScore(HNS_Held));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "letgo", hs->GetHoldNoteScore(HNS_LetGo));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "ng", hs->GetHoldNoteScore(HNS_Missed));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "chartkey", hs->GetChartKey());
-	SetCURLFormPostField(curlHandle, form, lastPtr, "rate", hs->musics);
-	auto chart = SONGMAN->GetStepsByChartkey(hs->GetChartKey());
-	if (chart == nullptr)
-		return;
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "negsolo",
-						 chart->GetTimingData()->HasWarps() ||
-						   chart->m_StepsType != StepsType_dance_single);
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "nocc",
-						 static_cast<int>(!hs->GetChordCohesion()));
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "calc_version", hs->GetSSRCalcVersion());
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "wife_version", hs->GetWifeVersion());
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "topscore", hs->GetTopScore());
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "hash",
-						 hs->GetValidationKey(ValidationKey_Brittle));
-	SetCURLFormPostField(curlHandle, form, lastPtr, "wife", hs->GetWifeScore());
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "wifePoints", hs->GetWifePoints());
-	SetCURLFormPostField(curlHandle, form, lastPtr, "judgeScale", hs->judges);
-	SetCURLFormPostField(
-	  curlHandle, form, lastPtr, "machineGuid", hs->GetMachineGuid());
-	SetCURLFormPostField(curlHandle, form, lastPtr, "grade", hs->GetGrade());
-	SetCURLFormPostField(curlHandle,
-						 form,
-						 lastPtr,
-						 "wifeGrade",
-						 string(GradeToString(hs->GetWifeGrade()).c_str()));
-}*/
 
 void
 DownloadManager::UploadScore(HighScore* hs,
@@ -1125,8 +1053,7 @@ DownloadManager::UploadScore(HighScore* hs,
 				  diffs["Rating"].GetFloat();
 			if (hs->GetWifeVersion() == 3)
 				hs->AddUploadedServer(wife3_rescore_upload_flag);
-			hs->AddUploadedServer(serverURL.Get());
-			hs->forceuploadedthissession = true;
+
 			// HTTPRunning = response_code;// TODO: Why were we doing this?
 		} else {
 			Locator::getLogger()->trace("Score upload response malformed json "
