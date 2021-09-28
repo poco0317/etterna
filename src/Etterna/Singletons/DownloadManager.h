@@ -15,6 +15,8 @@
 #include "Poco/Net/HTTPSClientSession.h"
 #include "Poco/Net/HTMLForm.h"
 
+#include "Poco/JSON/Object.h"
+
 using Poco::Net::HTTPSClientSession;
 using Poco::Net::HTTPClientSession;
 using Poco::Net::HTTPRequest;
@@ -22,8 +24,25 @@ using Poco::Net::HTTPResponse;
 using Poco::Net::HTMLForm;
 
 typedef std::function<void(std::istream&, HTTPResponse)> RequestCallback;
-typedef std::tuple<HTTPRequest*, HTMLForm*, RequestCallback>
-  RequestData;
+
+struct RequestData
+{
+	HTTPRequest* req;
+	Poco::JSON::Object* json; // for not GET
+	HTMLForm* form; // for GET
+	RequestCallback callback;
+
+	~RequestData()
+	{
+		if (req != nullptr)
+			delete req;
+		if (json != nullptr)
+			delete json;
+		if (form != nullptr)
+			delete form;
+		// the lambda/func should clean itself up
+	}
+};
 
 class ProgressData
 {
@@ -169,18 +188,40 @@ class DownloadManager
 	void SetInGameplay(bool inGameplay);
 	void SetApiShouldUseHttps(bool state);
 
+	// Create a request
 	void GenerateRequest(
 	  const std::string& url,
 	  RequestCallback callback,
+	  Poco::JSON::Object* jsonPOST = nullptr,
+	  HTMLForm* form = nullptr,
 	  const std::string requestMethod = HTTPRequest::HTTP_GET,
-	  HTMLForm* requestForm = nullptr,
 	  bool https = true);
+	// Create a request with JSON fields attached
+	void GenerateRequest(
+	  const std::string& url,
+	  RequestCallback callback,
+	  Poco::JSON::Object* jsonPOST = nullptr,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET,
+	  bool https = true)
+	{
+		GenerateRequest(url, callback, jsonPOST, nullptr, requestMethod, https);
+	}
+	// Create a request with query params
+	void GenerateRequest(
+	  const std::string& url,
+	  RequestCallback callback,
+	  HTMLForm* form = nullptr,
+	  const std::string requestMethod = HTTPRequest::HTTP_GET,
+	  bool https = true)
+	{
+		GenerateRequest(url, callback, nullptr, form, requestMethod, https);
+	}
+
 	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 							   const std::string url);
 
 	// API Requests
 	void Login(const std::string& username, const std::string& password);
-	void Login(const std::string& token);
 	void GetRankedChartkeys();
 	void UploadSingleScore(HighScore* hs);
 	void UploadBulkScores();
@@ -241,8 +282,8 @@ class DownloadManager
 
   private:
 	/// Active HTTP requests
-	std::vector<RequestData> apiHttpsRequests{};
-	std::vector<RequestData> apiHttpRequests{};
+	std::vector<RequestData*> apiHttpsRequests{};
+	std::vector<RequestData*> apiHttpRequests{};
 	/// Main HTTPS Client Session
 	HTTPSClientSession* p_httpsClientSession;
 	/// Alternate HTTP Client Session
@@ -258,7 +299,8 @@ class DownloadManager
 	std::vector<std::string> newlyRankedChartkeys{};
 
 	// util
-	inline HTMLForm* GenerateHighScoreForm(HighScore* hs);
+	inline Poco::JSON::Object* GenerateHighScoreObj(HighScore* hs);
+	inline void ProcessRequest(RequestData*& data, HTTPClientSession& client);
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;

@@ -234,8 +234,9 @@ DownloadManager::Init()
 void
 DownloadManager::GenerateRequest(const std::string& url,
 								 RequestCallback callback,
+								 Poco::JSON::Object* jsonPOST,
+								 HTMLForm* form,
 								 const std::string requestMethod,
-								 HTMLForm* requestForm,
 								 bool https)
 {
 	Poco::URI uri(url);
@@ -257,7 +258,7 @@ DownloadManager::GenerateRequest(const std::string& url,
 
 	// select session and request queue based on http/https
 	HTTPClientSession* session;
-	std::vector<RequestData>* requestQueue;
+	std::vector<RequestData*>* requestQueue;
 	if (https) {
 		session = p_httpsClientSession;
 		requestQueue = &apiHttpsRequests;
@@ -273,11 +274,17 @@ DownloadManager::GenerateRequest(const std::string& url,
 		session->setPort(port);
 	}
 
+	RequestData* reqdata = new RequestData();
+	reqdata->req = request;
+	reqdata->json = jsonPOST;
+	reqdata->form = form;
+	reqdata->callback = callback;
+
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
-		requestQueue->push_back(
-		  std::make_tuple(request, requestForm, callback));
+		requestQueue->push_back(reqdata);
 		// The thread updates should catch this one eventually
+		// See UpdateHTTP[S]Requests
 	}
 }
 
@@ -341,90 +348,83 @@ DownloadManager::Update(float fDeltaSeconds)
 void
 DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 {
-	std::vector<RequestData> reqs;
+	std::vector<RequestData*> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpsRequests;
 		apiHttpsRequests.clear();
 	}
 	for (auto& p : reqs) {
-		auto& req = std::get<0>(p);
-		auto& form = std::get<1>(p);
-		auto& callback = std::get<2>(p);
-		HTTPResponse response;
-		try {
-			if (form != nullptr) {
-				form->prepareSubmit(*req);
-				form->write(p_httpsClientSession->sendRequest(*req));
-			} else {
-				p_httpsClientSession->sendRequest(*req);
-			}
-
-			std::istream& respStream = p_httpsClientSession->receiveResponse(response);
-			callback(respStream, response);
-		} catch (Poco::Exception& e) {
-			Locator::getLogger()->info("HTTPS Request Exception: {} {} {}",
-									   e.className(),
-									   e.displayText(),
-									   e.message());
-			p_httpsClientSession->reset();
-		}
-
-		Locator::getLogger()->info("{} {} {} {}",
-									response.getStatus(),
-									response.getContentType(),
-									response.getReason(),
-									response.getContentLength());
-
-		delete req;
-		if (form != nullptr)
-			delete form;
+		ProcessRequest(p, *p_httpsClientSession);
+		delete p;
 	}
 }
 void
 DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 {
-	std::vector<RequestData> reqs;
+	std::vector<RequestData*> reqs;
 	{
 		const std::lock_guard<std::mutex> lock(g_dlmutex);
 		reqs = apiHttpRequests;
 		apiHttpRequests.clear();
 	}
 	for (auto& p : reqs) {
-		auto& req = std::get<0>(p);
-		auto& form = std::get<1>(p);
-		auto& callback = std::get<2>(p);
-		HTTPResponse response;
-		try {
-
-			if (form != nullptr) {
-				form->prepareSubmit(*req);
-				form->write(p_httpClientSession->sendRequest(*req));
-			} else {
-				p_httpClientSession->sendRequest(*req);
-			}
-
-			std::istream& respStream = p_httpClientSession->receiveResponse(response);
-			callback(respStream, response);
-		} catch (Poco::Exception& e) {
-			Locator::getLogger()->info("HTTP Request Exception: {} {} {}",
-									   e.className(),
-									   e.displayText(),
-									   e.message());
-			p_httpClientSession->reset();
-		}
-
-		Locator::getLogger()->info("{} {} {} {}",
-									response.getStatus(),
-									response.getContentType(),
-									response.getReason(),
-									response.getContentLength());
-
-		delete req;
-		if (form != nullptr)
-			delete form;
+		ProcessRequest(p, *p_httpClientSession);
+		delete p;
 	}
 }
+
+inline void
+DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
+{
+	auto& req = data->req;
+	auto& jsonPOST = data->json;
+	auto& form = data->form;
+	auto& callback = data->callback;
+	HTTPResponse response;
+	try {
+
+		if (form != nullptr) {
+			// Usually a GET
+			// usually sends information as query params
+			// can also be very simple POSTs
+			form->prepareSubmit(*req);
+			form->write(client.sendRequest(*req));
+		} else if (jsonPOST != nullptr) {
+			// Usually a POST
+			// can send complex structured JSON
+			std::stringstream ss;
+			jsonPOST->stringify(ss);
+			req->setContentLength(ss.str().length());
+			std::ostream& os = client.sendRequest(*req);
+			jsonPOST->stringify(os);
+		} else {
+			// Any request type, no params attached
+			// usually a dumb GET
+			client.sendRequest(*req);
+		}
+
+		// Get response output
+		std::istream& respStream = client.receiveResponse(response);
+
+		// Callback handles parsing and further success checks
+		callback(respStream, response);
+
+		// TODO: TEMPORARY FOR DEBUGGING
+		Locator::getLogger()->info("{} {} {} {}",
+							response.getStatus(),
+							response.getContentType(),
+							response.getReason(),
+							response.getContentLength());
+	} catch (Poco::Exception& e) {
+		Locator::getLogger()->info("HTTP Request Exception: {} {} {}",
+								   e.className(),
+								   e.displayText(),
+								   e.message());
+		client.reset();
+	}
+}
+
 
 /*
 void
@@ -462,11 +462,10 @@ DownloadManager::Login(const std::string& username, const std::string& password)
 {
 	Locator::getLogger()->info("Generating user+pass login request ...");
 
-	HTMLForm* form = new HTMLForm;
-	form->setEncoding(HTMLForm::ENCODING_URL);
-	form->set("email", username);
-	form->set("password", password);
-	form->set("key", API_KEY);
+	Poco::JSON::Object* json = new Poco::JSON::Object();
+	json->set("email", username);
+	json->set("password", password);
+	json->set("key", API_KEY);
 
 	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
 		Poco::JSON::Parser parser;
@@ -518,16 +517,9 @@ DownloadManager::Login(const std::string& username, const std::string& password)
 
 	GenerateRequest(API_ROOT + API_LOGIN,
 					callback,
+					json,
 					HTTPRequest::HTTP_POST,
-					form,
 					apiShouldUseHttps);
-}
-
-void
-DownloadManager::Login(const std::string& token)
-{
-	Locator::getLogger()->info("Generating token login request ...");
-	// ?
 }
 
 void
@@ -551,8 +543,8 @@ DownloadManager::GetRankedChartkeys()
 
 	HTMLForm* form = new HTMLForm;
 	form->setEncoding(HTMLForm::ENCODING_URL);
-	form->set("start", "");
-	form->set("end", "");
+	form->set("start", "2021-09-26");
+	form->set("end", "2021-12-31");
 
 	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
 		Poco::JSON::Parser parser;
@@ -608,8 +600,8 @@ DownloadManager::GetRankedChartkeys()
 
 	GenerateRequest(API_ROOT + API_RANKED_CHARTKEYS,
 					callback,
-					HTTPRequest::HTTP_GET,
 					form,
+					HTTPRequest::HTTP_GET,
 					apiShouldUseHttps);
 }
 
@@ -619,7 +611,7 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 	Locator::getLogger()->info("Generating single score upload request ({})",
 							   hs->GetChartKey());
 
-	HTMLForm* form = GenerateHighScoreForm(hs);
+	Poco::JSON::Object* json = GenerateHighScoreObj(hs);
 
 	RequestCallback callback = [this](std::istream& in,
 									  HTTPResponse& response) {
@@ -701,13 +693,13 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 
 	GenerateRequest(API_ROOT + API_UPLOAD_SCORE,
 					callback,
+					json,
 					HTTPRequest::HTTP_POST,
-					form,
 					apiShouldUseHttps);
 }
 
-inline HTMLForm*
-DownloadManager::GenerateHighScoreForm(HighScore* hs)
+inline Poco::JSON::Object*
+DownloadManager::GenerateHighScoreObj(HighScore* hs)
 {
 	bool success = hs->LoadReplayData();
 	const auto& offsets = hs->GetOffsetVector();
@@ -724,43 +716,38 @@ DownloadManager::GenerateHighScoreForm(HighScore* hs)
 		return nullptr;
 	}
 
-	HTMLForm* form = new HTMLForm;
-	form->setEncoding(HTMLForm::ENCODING_URL);
+	Poco::JSON::Object* hsObject = new Poco::JSON::Object;
 
-	Poco::JSON::Object hsObject;
+	hsObject->set("key", hs->GetScoreKey());
+	hsObject->set("chart_key", hs->GetChartKey());
+	hsObject->set("wife", hs->GetSSRNormPercent());
+	hsObject->set("judge", hs->GetJudgeScale());
+	hsObject->set("rate", hs->GetMusicRate());
+	hsObject->set("modifiers", hs->GetModifiers());
 
-	hsObject.set("key", hs->GetScoreKey());
-	hsObject.set("chart_key", hs->GetChartKey());
-	hsObject.set("wife", hs->GetSSRNormPercent());
-	hsObject.set("judge", hs->GetJudgeScale());
-	hsObject.set("rate", hs->GetMusicRate());
-	hsObject.set("modifiers", hs->GetModifiers());
+	hsObject->set("grade", static_cast<int>(hs->GetGrade()));
+	hsObject->set("max_combo", hs->GetMaxCombo());
+	hsObject->set("marvelous", hs->GetTapNoteScore(TNS_W1));
+	hsObject->set("perfect", hs->GetTapNoteScore(TNS_W2));
+	hsObject->set("great", hs->GetTapNoteScore(TNS_W3));
+	hsObject->set("good", hs->GetTapNoteScore(TNS_W4));
+	hsObject->set("bad", hs->GetTapNoteScore(TNS_W5));
+	hsObject->set("miss", hs->GetTapNoteScore(TNS_Miss));
+	hsObject->set("hit_mine", hs->GetTapNoteScore(TNS_HitMine));
 
-	hsObject.set("grade", static_cast<int>(hs->GetGrade()));
-	hsObject.set("max_combo", hs->GetMaxCombo());
-	hsObject.set("marvelous", hs->GetTapNoteScore(TNS_W1));
-	hsObject.set("perfect", hs->GetTapNoteScore(TNS_W2));
-	hsObject.set("great", hs->GetTapNoteScore(TNS_W3));
-	hsObject.set("good", hs->GetTapNoteScore(TNS_W4));
-	hsObject.set("bad", hs->GetTapNoteScore(TNS_W5));
-	hsObject.set("miss", hs->GetTapNoteScore(TNS_Miss));
-	hsObject.set("hit_mine", hs->GetTapNoteScore(TNS_HitMine));
+	hsObject->set("held", hs->GetHoldNoteScore(HNS_Held));
+	hsObject->set("let_go", hs->GetHoldNoteScore(HNS_LetGo));
+	hsObject->set("missed_hold", hs->GetHoldNoteScore(HNS_Missed));
 
-	hsObject.set("held", hs->GetHoldNoteScore(HNS_Held));
-	hsObject.set("let_go", hs->GetHoldNoteScore(HNS_LetGo));
-	hsObject.set("missed_hold", hs->GetHoldNoteScore(HNS_Missed));
+	hsObject->set("datetime", hs->GetDateTime().GetString());
+	hsObject->set("chord_cohesion", hs->GetChordCohesion());
+	hsObject->set("calculator_version", hs->GetSSRCalcVersion());
+	hsObject->set("top_score", hs->GetTopScore());
+	hsObject->set("wife_version", hs->GetWifeVersion());
+	hsObject->set("validation_key", hs->GetValidationKey(ValidationKey_Brittle));
+	hsObject->set("machine_guid", hs->GetMachineGuid());
 
-	hsObject.set("datetime", hs->GetDateTime().GetString());
-	hsObject.set("chord_cohesion", hs->GetChordCohesion());
-	hsObject.set("calculator_version", hs->GetSSRCalcVersion());
-	hsObject.set("top_score", hs->GetTopScore());
-	hsObject.set("wife_version", hs->GetWifeVersion());
-	hsObject.set("validation_key", hs->GetValidationKey(ValidationKey_Brittle));
-	hsObject.set("machine_guid", hs->GetMachineGuid());
-
-	Poco::JSON::Object replaydataObj;
 	Poco::JSON::Array replaydataArrObj;
-
 	std::vector<float> timestamps =
 	  steps->GetTimingData()->ConvertReplayNoteRowsToTimestamps(
 		rows, hs->GetMusicRate());
@@ -776,14 +763,9 @@ DownloadManager::GenerateHighScoreForm(HighScore* hs)
 
 		replaydataArrObj.add(replaydataArrRowObj);
 	}
-	replaydataObj.set("data", replaydataArrObj);
-	hsObject.set("replay_data", replaydataObj);
+	hsObject->set("replay_data", replaydataArrObj);
 
-	std::ostringstream hsStream;
-	hsObject.stringify(hsStream);
-
-	form->read(hsStream.str());
-	return form;
+	return hsObject;
 }
 
 /*
