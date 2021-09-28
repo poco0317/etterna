@@ -751,27 +751,7 @@ StageStats::FinalizeScores(bool /*bSummary*/)
 	if (DLMAN->ShouldUploadScores() && !AdjustSync::IsSyncDataChanged()) {
 		Locator::getLogger()->trace("Uploading score with replaydata.");
 		hs.SetTopScore(istop2); // ayy i did it --lurker
-		auto* steps = SONGMAN->GetStepsByChartkey(hs.GetChartKey());
-		auto* td = steps->GetTimingData();
-		hs.timeStamps = td->ConvertReplayNoteRowsToTimestamps(
-		  m_player.GetNoteRowVector(), hs.GetMusicRate());
-		DLMAN->UploadScoreWithReplayData(&hs);
-		hs.timeStamps.clear();
-		hs.timeStamps.shrink_to_fit();
-
-		// mega hack to stop non-pbs from overwriting pbs on eo (it happens rate
-		// specific), we're just going to also upload whatever the pb for the
-		// rate is now, since the site only tracks the best score per rate.
-		// If there's no more replaydata on disk for the old pb this could maybe
-		// be a problem and perhaps the better solution would be to check what
-		// is listed on the site for this rate before uploading the score just
-		// achieved but idk someone else can look into that
-
-		// this _should_ be sound since addscore handles all re-evaluation of
-		// top score flags and the setting of pbptrs
-		DLMAN->UploadScoreWithReplayDataFromDisk(SCOREMAN->GetChartPBAt(
-		  pSteps->GetChartKey(),
-		  GAMESTATE->m_SongOptions.GetCurrent().m_fMusicRate));
+		DLMAN->UploadSingleScore(&hs);
 	}
 	if (NSMAN->loggedIn) {
 		NSMAN->ReportHighScore(&hs, m_player);

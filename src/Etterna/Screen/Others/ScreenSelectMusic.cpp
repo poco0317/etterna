@@ -1711,20 +1711,22 @@ class LunaScreenSelectMusic : public Luna<ScreenSelectMusic>
 
 		GAMESTATE->m_gameplayMode.Set(GameplayMode_Replay);
 		auto nd = GAMESTATE->m_pCurSteps->GetNoteData();
+		auto* td = GAMESTATE->m_pCurSteps->GetTimingData();
 
 		// we get timestamps not noterows when getting online replays from the
 		// site, since order is deterministic we'll just auto set the noterows
 		// from the existing, if the score was cc off then we need to fill in
 		// extra rows for each tap in the chord -mina
-		auto timestamps = hs->GetCopyOfSetOnlineReplayTimestampVector();
+		
 		auto noterows = hs->GetNoteRowVector();
+		auto timestamps =
+		  td->ConvertReplayNoteRowsToTimestamps(noterows, hs->GetMusicRate());
 
 		// Construct noterows from given timestamps if timestamps are given
 		// alone
 		if (!timestamps.empty() && noterows.empty()) {
 			GAMESTATE->SetProcessedTimingData(
 			  GAMESTATE->m_pCurSteps->GetTimingData());
-			auto* td = GAMESTATE->m_pCurSteps->GetTimingData();
 			auto nerv = nd.BuildAndGetNerv(td);
 			auto sdifs = td->BuildAndGetEtaner(nerv);
 			std::vector<int> noterows;

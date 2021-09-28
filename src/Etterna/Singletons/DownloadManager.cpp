@@ -488,7 +488,7 @@ DownloadManager::ShouldUploadScores()
 }
 
 void
-DownloadManager::Login(const std::string& username, const std::string& password)
+DownloadManager::LoginRequest(const std::string& username, const std::string& password)
 {
 	Locator::getLogger()->info("Generating user+pass login request ...");
 
@@ -567,7 +567,7 @@ DownloadManager::OnLogin()
 }
 
 void
-DownloadManager::GetRankedChartkeys(const Poco::DateTime start, const Poco::DateTime end)
+DownloadManager::GetRankedChartkeysRequest(const Poco::DateTime start, const Poco::DateTime end)
 {
 	Locator::getLogger()->info("Generating ranked chartkeys request ...");
 
@@ -642,7 +642,7 @@ DownloadManager::GetRankedChartkeys(const Poco::DateTime start, const Poco::Date
 }
 
 void
-DownloadManager::UploadSingleScore(HighScore* hs)
+DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 {
 	Locator::getLogger()->info("Generating single score upload request ({})",
 							   hs->GetChartKey());
@@ -742,7 +742,7 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 }
 
 void
-DownloadManager::UploadBulkScores(std::vector<HighScore*>& hsList)
+DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 {
 	Locator::getLogger()->info(
 	  "Generating bulk score upload request ({} scores)", hsList.size());
@@ -900,193 +900,6 @@ DownloadManager::GenerateHighScoreObj(HighScore* hs)
 	return hsObject;
 }
 
-void
-DownloadManager::UploadScore(HighScore* hs,
-							 std::function<void()> callback,
-							 bool load_from_disk)
-{
-	/*
-	Locator::getLogger()->trace("Creating UploadScore request");
-	if (!LoggedIn()) {
-		Locator::getLogger()->trace(
-		  "Attempted to upload score when not logged in (scorekey: \"{}\")",
-		  hs->GetScoreKey().c_str());
-		callback();
-		return;
-	}
-
-	if (load_from_disk)
-		hs->LoadReplayData();
-
-	string replayString;
-	const auto& offsets = hs->GetOffsetVector();
-	const auto& columns = hs->GetTrackVector();
-	const auto& types = hs->GetTapNoteTypeVector();
-	const auto& rows = hs->GetNoteRowVector();
-	if (!offsets.empty()) {
-		replayString = "[";
-		auto steps = SONGMAN->GetStepsByChartkey(hs->GetChartKey());
-		if (steps == nullptr) {
-			Locator::getLogger()->trace("Attempted to upload score with no loaded steps "
-					   "(scorekey: \"{}\" chartkey: \"{}\")",
-					   hs->GetScoreKey().c_str(),
-					   hs->GetChartKey().c_str());
-			return;
-		}
-		std::vector<float> timestamps =
-		  steps->GetTimingData()->ConvertReplayNoteRowsToTimestamps(
-			rows, hs->GetMusicRate());
-		for (size_t i = 0; i < offsets.size(); i++) {
-			replayString += "[";
-			replayString += std::to_string(timestamps[i]) + ",";
-			replayString += std::to_string(1000.f * offsets[i]) + ",";
-			if (hs->GetReplayType() == 2) {
-				replayString += to_string(columns[i]) + ",";
-				replayString += to_string(types[i]) + ",";
-			}
-			replayString += to_string(rows[i]);
-			replayString += "],";
-		}
-		replayString =
-		  replayString.substr(0, replayString.size() - 1); // remove ","
-		replayString += "]";
-		if (load_from_disk)
-			hs->UnloadReplayData();
-	} else {
-		// this should never be true unless we are using the manual forceupload
-		// functions
-		replayString = "[]";
-	}
-
-	auto done = [this, hs, callback, load_from_disk](HTTPRequest& req) {
-		long response_code;
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("Score upload response json parse error (error: \"{}\" "
-					   "response body: \"{}\")",
-					   rapidjson::GetParseError_En(d.GetParseError()),
-					   req.result.c_str());
-			callback();
-			return;
-		}
-		if (d.HasMember("errors")) {
-			auto onStatus = [hs,
-							 response_code,
-							 load_from_disk,
-							 &callback,
-							 &req](int status) {
-				if (status == 22) {
-					Locator::getLogger()->trace("Score upload response contains error, retrying "
-							   "(http status: {} error status: {} response "
-							   "body: \"{}\")",
-							   response_code,
-							   status,
-							   req.result.c_str());
-					DLMAN->StartSession(
-					  DLMAN->sessionUser,
-					  DLMAN->sessionPass,
-					  [hs, callback, load_from_disk](bool logged) {
-						  if (logged) {
-							  DLMAN->UploadScore(hs, callback, load_from_disk);
-						  }
-					  });
-					return true;
-				} else if (status == 404 || status == 405 || status == 406) {
-					if (hs->GetWifeVersion() == 3)
-						hs->AddUploadedServer(wife3_rescore_upload_flag);
-					hs->AddUploadedServer(serverURL.Get());
-					hs->forceuploadedthissession = true;
-				}
-				// We don't log 406s because those are "not a a pb"
-				// Which are normal, unless we're using verbose logging
-				if (status != 406 || PREFSMAN->m_verbose_log > 1)
-					Locator::getLogger()->trace(
-					  "Score upload response contains error "
-					  "(http status: {} error status: {} response body: "
-					  "\"{}\" score key: \"{}\")",
-					  response_code,
-					  status,
-					  req.result.c_str(),
-					  hs->GetScoreKey().c_str());
-				return false;
-			};
-			if (d["errors"].IsArray()) {
-				for (auto& error : d["errors"].GetArray()) {
-					if (!error["status"].IsInt())
-						continue;
-					int status = error["status"].GetInt();
-					if (onStatus(status))
-						return;
-				}
-			} else if (d["errors"].HasMember("status") &&
-					   d["errors"]["status"].IsInt()) {
-				if (onStatus(d["errors"]["status"].GetInt()))
-					return;
-			} else {
-				Locator::getLogger()->trace("Score upload response contains error and we failed "
-						   "to recognize it"
-						   "(http status: {} response body: \"{}\")",
-						   response_code,
-						   req.result.c_str());
-			}
-			callback();
-			return;
-		}
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("type") && d["data"]["type"].IsString() &&
-			std::strcmp(d["data"]["type"].GetString(), "ssrResults") == 0 &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("diff") &&
-			d["data"]["attributes"]["diff"].IsObject()) {
-			auto& diffs = d["data"]["attributes"]["diff"];
-			FOREACH_ENUM(Skillset, ss)
-			{
-				auto str = SkillsetToString(ss);
-				if (ss != Skill_Overall && diffs.HasMember(str.c_str()) &&
-					diffs[str.c_str()].IsNumber())
-					(DLMAN->sessionRatings)[ss] +=
-					  diffs[str.c_str()].GetFloat();
-			}
-			if (diffs.HasMember("Rating") && diffs["Rating"].IsNumber())
-				(DLMAN->sessionRatings)[Skill_Overall] +=
-				  diffs["Rating"].GetFloat();
-			if (hs->GetWifeVersion() == 3)
-				hs->AddUploadedServer(wife3_rescore_upload_flag);
-
-			// HTTPRunning = response_code;// TODO: Why were we doing this?
-		} else {
-			Locator::getLogger()->trace("Score upload response malformed json "
-					   "(http status: {} response body: \"{}\")",
-					   response_code,
-					   req.result.c_str());
-		}
-		callback();
-	};
-	HTTPRequest* req = new HTTPRequest(
-	  done, [callback](HTTPRequest& req) { callback(); });
-	Locator::getLogger()->trace("Finished creating UploadScore request");
-	*/
-}
-
-// this is for new/live played scores that have replaydata in memory
-void
-DownloadManager::UploadScoreWithReplayData(HighScore* hs)
-{
-	this->UploadScore(
-	  hs, []() {}, false /* (Without replay data loading from disk)*/);
-}
-
-// for older scores or newer scores that failed to upload using the above
-// function we should probably do some refactoring of this
-void
-DownloadManager::UploadScoreWithReplayDataFromDisk(HighScore* hs,
-												   std::function<void()> callback)
-{
-	this->UploadScore(
-	  hs, callback, true /* (With replay data loading from disk)*/);
-}
-
 // This function begins uploading the given list (deque) of scores
 // It does so one score at a time, sequentially (But without blocking)
 // So as to not spam the server with possibly hundreds or thousands of scores
@@ -1107,7 +920,7 @@ uploadSequentially()
 	if (!DLMAN->ScoreUploadSequentialQueue.empty()) {
 		auto hs = DLMAN->ScoreUploadSequentialQueue.front();
 		DLMAN->ScoreUploadSequentialQueue.pop_front();
-		DLMAN->UploadScoreWithReplayDataFromDisk(hs, uploadSequentially);
+		//DLMAN->UploadScoreWithReplayDataFromDisk(hs, uploadSequentially);
 	}
 }
 
@@ -2255,8 +2068,8 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int SendReplayDataForOldScore(T* p, lua_State* L)
 	{
-		DLMAN->UploadScoreWithReplayDataFromDisk(
-		  SCOREMAN->GetScoresByKey().at(SArg(1)));
+		//DLMAN->UploadScoreWithReplayDataFromDisk(
+		//  SCOREMAN->GetScoresByKey().at(SArg(1)));
 		// DLMAN->UpdateOnlineScoreReplayData(SArg(1));
 		return 0;
 	}

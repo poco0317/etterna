@@ -221,13 +221,30 @@ class DownloadManager
 							   const std::string url);
 
 	// API Requests
-	void Login(const std::string& username, const std::string& password);
+  private:
+	void LoginRequest(const std::string& username, const std::string& password);
+	void GetRankedChartkeysRequest(
+	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
+	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31));
+	void UploadSingleScoreRequest(HighScore* hs);
+	void UploadBulkScoresRequest(std::vector<HighScore*>& hsList);
+
+	// External Facing API Request Generators
+  public:
+	void Login(const std::string& username, const std::string& password)
+	{
+		LoginRequest(username, password);
+	}
 	void GetRankedChartkeys(
 	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
-	  const Poco::DateTime = Poco::DateTime(9999, 12, 31));
-	void UploadSingleScore(HighScore* hs);
-	void UploadBulkScores(std::vector<HighScore*>& hsList);
-
+	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31))
+	{
+		GetRankedChartkeysRequest(start, end);
+	}
+	void UploadSingleScore(HighScore* hs) { UploadSingleScoreRequest(hs); }
+	void UploadBulkScores(std::vector<HighScore*>& hsList){
+		UploadBulkScoresRequest(hsList);
+	}
 
 	std::vector<DownloadablePack> downloadablePacks;
 	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
@@ -251,14 +268,6 @@ class DownloadManager
 	bool InstallSmzip(const std::string& sZipFile);
 
 	bool EncodeSpaces(std::string& str);
-
-	void UploadScore(HighScore* hs,
-					 std::function<void()> callback,
-					 bool load_from_disk);
-	void UploadScoreWithReplayData(HighScore* hs);
-	void UploadScoreWithReplayDataFromDisk(
-	  HighScore* hs,
-	  std::function<void()> callback = []() {});
 
 	bool currentrateonly = false;
 	bool topscoresonly = true;
