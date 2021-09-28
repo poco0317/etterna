@@ -537,14 +537,20 @@ DownloadManager::OnLogin()
 }
 
 void
-DownloadManager::GetRankedChartkeys()
+DownloadManager::GetRankedChartkeys(const Poco::DateTime start, const Poco::DateTime end)
 {
 	Locator::getLogger()->info("Generating ranked chartkeys request ...");
 
 	HTMLForm* form = new HTMLForm;
 	form->setEncoding(HTMLForm::ENCODING_URL);
-	form->set("start", "2021-09-26");
-	form->set("end", "2021-12-31");
+
+	std::string startstr =
+	  fmt::format("{}-{}-{}", start.year(), start.month(), start.day());
+	std::string endstr =
+	  fmt::format("{}-{}-{}", end.year(), end.month(), end.day());
+
+	form->set("start", startstr);
+	form->set("end", endstr);
 
 	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
 		Poco::JSON::Parser parser;

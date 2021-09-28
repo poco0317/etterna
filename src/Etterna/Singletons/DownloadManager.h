@@ -222,7 +222,9 @@ class DownloadManager
 
 	// API Requests
 	void Login(const std::string& username, const std::string& password);
-	void GetRankedChartkeys();
+	void GetRankedChartkeys(
+	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
+	  const Poco::DateTime = Poco::DateTime(9999, 12, 31));
 	void UploadSingleScore(HighScore* hs);
 	void UploadBulkScores();
 
