@@ -226,7 +226,7 @@ class DownloadManager
 	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
 	  const Poco::DateTime = Poco::DateTime(9999, 12, 31));
 	void UploadSingleScore(HighScore* hs);
-	void UploadBulkScores();
+	void UploadBulkScores(std::vector<HighScore*>& hsList);
 
 
 	std::vector<DownloadablePack> downloadablePacks;

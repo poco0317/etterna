@@ -689,7 +689,110 @@ DownloadManager::UploadSingleScore(HighScore* hs)
 			}
 		} else {
 			Locator::getLogger()->warn(
-			  "GetRankedChartkeys FAILED - Unexpected status: {}", status);
+			  "UploadSingleScore FAILED - Unexpected status: {}", status);
+		}
+
+		{
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_UPLOAD_SCORE,
+					callback,
+					json,
+					HTTPRequest::HTTP_POST,
+					apiShouldUseHttps);
+}
+
+void
+DownloadManager::UploadBulkScores(std::vector<HighScore*>& hsList)
+{
+	Locator::getLogger()->info(
+	  "Generating bulk score upload request ({} scores)", hsList.size());
+
+	Poco::JSON::Object* json = new Poco::JSON::Object;
+	Poco::JSON::Array dataArr;
+	for (auto& hs : hsList) {
+		// wow this is really bad
+		Poco::JSON::Object* tmp = GenerateHighScoreObj(hs);
+		Poco::JSON::Object hsObj = *tmp;
+		delete tmp;
+
+		dataArr.add(hsObj);
+	}
+	json->set("data", dataArr);
+
+	RequestCallback callback = [this](std::istream& in,
+									  HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		std::vector<std::string> new_chartkeys;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadBulkScores FAILED (Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reason = ret->getValue<std::string>("message");
+				Locator::getLogger()->warn(
+				  "UploadBulkScores FAILED (401) - {}", reason);
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadBulkScores FAILED (401 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto errors = ret->getObject("errors");
+				std::vector<std::string> reasons;
+				auto input_value_arr = errors->getArray("input_value");
+
+				for (auto it = input_value_arr.get()->begin();
+					 it != input_value_arr.get()->end();
+					 it++) {
+					reasons.push_back(it->convert<std::string>());
+				}
+				std::ostringstream reasonstr;
+				if (!reasons.empty()) {
+					std::copy(
+					  reasons.begin(),
+					  reasons.end() - 1,
+					  std::ostream_iterator<std::string>(reasonstr, ", "));
+					reasonstr << reasons.back();
+				}
+				Locator::getLogger()->warn(
+				  "UploadBulkScores FAILED (422) - {}", reasonstr.str());
+			} catch (Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UploadBulkScores FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "UploadBulkScores FAILED - Unexpected status: {}", status);
 		}
 
 		{
@@ -708,10 +811,10 @@ inline Poco::JSON::Object*
 DownloadManager::GenerateHighScoreObj(HighScore* hs)
 {
 	bool success = hs->LoadReplayData();
-	const auto& offsets = hs->GetOffsetVector();
-	const auto& columns = hs->GetTrackVector();
-	const auto& types = hs->GetTapNoteTypeVector();
-	const auto& rows = hs->GetNoteRowVector();
+	const auto& offsets = hs->GetCopyOfOffsetVector();
+	const auto& columns = hs->GetCopyOfTrackVector();
+	const auto& types = hs->GetCopyOfTapNoteTypeVector();
+	const auto& rows = hs->GetCopyOfNoteRowVector();
 	auto steps = SONGMAN->GetStepsByChartkey(hs->GetChartKey());
 
 	success |= steps != nullptr && (offsets.size() == columns.size() ==
