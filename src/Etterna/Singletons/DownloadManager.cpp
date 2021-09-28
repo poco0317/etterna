@@ -381,6 +381,15 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 	auto& jsonPOST = data->json;
 	auto& form = data->form;
 	auto& callback = data->callback;
+
+	if (form != nullptr && jsonPOST != nullptr) {
+		Locator::getLogger()->warn(
+		  "A request to {} contained both HTMLForm and JSON data. It was "
+		  "sent "
+		  "as HTMLForm. This is a programming mistake. Report to developer",
+		  req->getURI());
+	}
+
 	HTTPResponse response;
 	try {
 
