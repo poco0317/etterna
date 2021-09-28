@@ -68,9 +68,9 @@ LyricsLoader::LoadFromLRCFile(const std::string& sPath, Song& out)
 		}
 		ASSERT(matches.size() == 3);
 
-		auto& sValueName =
+		auto sValueName =
 		  extractRegexMatch(line, matches[1].offset, matches[1].length);
-		auto& sValueData =
+		auto sValueData =
 		  extractRegexMatch(line, matches[2].offset, matches[2].length);
 		StripCrnl(sValueData);
 
