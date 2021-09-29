@@ -111,6 +111,10 @@ class ScoreManager
 	auto GetAllPBPtrs(const std::string& profileID =
 						PROFILEMAN->GetProfile(PLAYER_1)->m_sProfileID)
 	  -> const std::vector<vector<HighScore*>>;
+	auto GetAllChartPBPtrs(const std::string& ck,
+						   const std::string& profileID =
+							 PROFILEMAN->GetProfile(PLAYER_1)->m_sProfileID)
+	  -> const std::vector<vector<HighScore*>>;
 
 	auto GetChartPBAt(const std::string& ck,
 					  float rate,

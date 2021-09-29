@@ -342,6 +342,7 @@ ScoresForChart::GetAllScores() -> const std::vector<HighScore*>
 }
 
 // is there any reason for this to be nested and not just a single vector?
+// no there is not
 auto
 ScoreManager::GetAllPBPtrs(const std::string& profileID)
   -> const std::vector<vector<HighScore*>>
@@ -356,6 +357,20 @@ ScoreManager::GetAllPBPtrs(const std::string& profileID)
 
 	return vec;
 }
+
+auto
+ScoreManager::GetAllChartPBPtrs(const std::string& ck,
+								const std::string& profileID)
+  -> const std::vector<std::vector<HighScore*>>
+{
+	std::vector<std::vector<HighScore*>> vec;
+	if (KeyHasScores(ck, profileID) && SONGMAN->IsChartLoaded(ck)) {
+		vec.emplace_back(pscores.at(profileID).at(ck).GetAllPBPtrs());
+	}
+
+	return vec;
+}
+
 
 auto
 ScoreManager::GetChartPBAt(const std::string& ck,
@@ -530,7 +545,7 @@ ScoreManager::RecalculateSSRs(LoadingWindow* ld)
 				hs->NormalizeJudgments();
 
 				auto remarried = false;
-				if (hs->GetWifeVersion() != 3 && !hs->GetChordCohesion() &&
+				if (hs->GetWifeVersion() < cur_wife_version && !hs->GetChordCohesion() &&
 					hs->HasReplayData()) {
 					steps->GetNoteData(nd);
 					const auto maxpoints = nd.WifeTotalScoreCalc(td);
@@ -1128,7 +1143,7 @@ ScoresAtRate::LoadFromNode(const XNode* node,
 		// don't include cc check here, we want cc scores to filter into the
 		// recalc, just not the rescore
 		const auto getremarried =
-		  scores[sk].GetWifeVersion() != 3 && scores[sk].HasReplayData();
+		  scores[sk].GetWifeVersion() < cur_wife_version && scores[sk].HasReplayData();
 
 		// check to see if a file does not have normalized judgments
 		// this will pile up but only for cases of large amounts of scores
