@@ -77,12 +77,15 @@ struct HighScoreImpl
 	std::vector<HoldReplayResult> vHoldReplayDataVector;
 	std::vector<float> vOnlineReplayTimestampVector;
 	std::vector<int> vRescoreJudgeVector;
-	unsigned int iMaxCombo; // maximum combo obtained [SM5 alpha 1a+]
+	unsigned int iMaxCombo;
 	std::string sModifiers;
-	DateTime dateTime; // return value of time() for when the highscore object
-					   // was created (immediately after achieved)
-	std::string sPlayerGuid;  // who made this high score
-	std::string sMachineGuid; // where this high score was made
+	/// return value of time() for when the highscore object
+	/// was created (immediately after achieved)
+	DateTime dateTime;
+	/// who made this high score
+	std::string sPlayerGuid;
+	/// where this high score was made
+	std::string sMachineGuid;
 	std::string countryCode;
 	int iProductID;
 	int iTapNoteScores[NUM_TapNoteScore]{};
@@ -108,9 +111,11 @@ struct HighScoreImpl
 
 	auto WriteReplayData() -> bool;
 	auto WriteInputData() -> bool;
-	int ReplayType; // 0 = no loaded replay, 1 = basic, 2 = full; currently
-					// unused but here for when we need it (not to be confused
-					// with hasreplay()) -mina
+
+	/// 0 = no loaded replay, 1 = basic, 2 = full; currently
+	/// unused but here for when we need it (not to be confused
+	/// with hasreplay())
+	int ReplayType;
 
 	bool is39import = false;
 	int WifeVersion = 0;
@@ -889,8 +894,10 @@ HighScore::HasReplayData() -> bool
 {
 	const auto fullpath = FULL_REPLAY_DIR + m_Impl->ScoreKey;
 	const auto basicpath = BASIC_REPLAY_DIR + m_Impl->ScoreKey;
-	if (DoesFileExist(fullpath)) { // check for full replays first then default
-								   // to basic replays -mina
+
+	// check for full replays first then default
+	// to basic replays
+	if (DoesFileExist(fullpath)) {
 		return true;
 	}
 	return DoesFileExist(basicpath);

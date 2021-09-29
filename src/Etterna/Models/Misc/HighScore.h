@@ -189,6 +189,8 @@ struct HighScore
 	std::string avatar;
 	std::string countryCode;
 	bool forceuploadedthissession = false;
+	// either in queue or in .. transmit
+	bool beingUploaded = false;
 	int norms = 0;
 	int musics = 0;
 	int judges = 0;
