@@ -335,11 +335,11 @@ DownloadManager::ExtractFromJSONArray(Poco::JSON::Array::Ptr arr)
 	std::ostringstream out;
 	for (size_t i = 0; i < arr->size(); i++) {
 		if (arr->isArray(i)) {
-			out << i << " : " << ExtractFromJSONArray(arr->getArray(i));
+			out << "\n" << i << " : " << ExtractFromJSONArray(arr->getArray(i));
 		} else if (arr->isNull(i)) {
 			// impossible?
 		} else if (arr->isObject(i)) {
-			out << i << " : " << ExtractFromJSONObject(arr->getObject(i));
+			out << "\n" << i << " : " << ExtractFromJSONObject(arr->getObject(i));
 		} else {
 			// a value?
 			try {
