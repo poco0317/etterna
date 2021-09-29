@@ -249,7 +249,7 @@ getCpuHash()
 }
 #endif // !DARWIN
 
-string
+std::string
 getMachineName()
 {
 	static struct utsname u;
@@ -259,7 +259,7 @@ getMachineName()
 		return "unknown";
 	}
 
-	return string(u.nodename);
+	return std::string(u.nodename);
 }
 #endif
 
