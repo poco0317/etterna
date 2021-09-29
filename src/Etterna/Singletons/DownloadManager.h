@@ -196,6 +196,37 @@ class DownloadManager
 	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
 							   const std::string url);
 
+	// External Facing API Request Generators
+	void Login(const std::string& username, const std::string& password)
+	{
+		LoginRequest(username, password);
+	}
+	void Logout();
+	void GetRankedChartkeys(
+	  bool uploadAfterResponse = false,
+	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
+	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31))
+	{
+		GetRankedChartkeysRequest(uploadAfterResponse, start, end);
+	}
+
+	// The Score Upload Function
+	void UploadScore(HighScore* hs);
+
+	// Mass score upload functions
+	void UploadAllPBs(bool forceReupload);
+	void UploadPBsForChart(const std::string& ck, bool forceReupload = false);
+	void UploadPBsForPack(const std::string& pack, bool forceReupload = false);
+	void ForceUploadPBsForChart(const std::string& ck)
+	{
+		UploadPBsForChart(ck, true);
+	}
+	void ForceUploadPBsForPack(const std::string& pack)
+	{
+		UploadPBsForPack(pack, true);
+	}
+	void ForceUploadAllPBs() { UploadAllPBs(true); }
+
   private:
 	// Events
 	bool OnLogin();
@@ -238,77 +269,6 @@ class DownloadManager
 	void UploadSingleScoreRequest(HighScore* hs);
 	void UploadBulkScoresRequest(std::vector<HighScore*>& hsList);
 
-  public:
-	// External Facing API Request Generators
-	void Login(const std::string& username, const std::string& password)
-	{
-		LoginRequest(username, password);
-	}
-	void Logout();
-	void GetRankedChartkeys(
-	  bool uploadAfterResponse = false,
-	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
-	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31))
-	{
-		GetRankedChartkeysRequest(uploadAfterResponse, start, end);
-	}
-
-	// The Score Upload Function
-	void UploadScore(HighScore* hs);
-
-	// Mass score upload functions
-	void UploadAllPBs(bool forceReupload);
-	void UploadPBsForChart(const std::string& ck, bool forceReupload = false);
-	void UploadPBsForPack(const std::string& pack, bool forceReupload = false);
-	void ForceUploadPBsForChart(const std::string& ck)
-	{
-		UploadPBsForChart(ck, true);
-	}
-	void ForceUploadPBsForPack(const std::string& pack)
-	{
-		UploadPBsForPack(pack, true);
-	}
-	void ForceUploadAllPBs()
-	{
-		UploadAllPBs(true);
-	}
-
-
-
-
-	////////// OLD ///////////////////////////////////
-	std::vector<DownloadablePack> downloadablePacks;
-	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
-	std::set<std::string> unrankedCharts;
-	std::vector<std::string> countryCodes;
-	/// Leaderboard ranks for logged in user by skillset
-	std::map<Skillset, int> sessionRanks;
-	std::map<Skillset, double> sessionRatings;
-	std::map<Skillset, std::vector<OnlineTopScore>> topScores;
-
-	bool InstallSmzip(const std::string& sZipFile);
-
-	bool EncodeSpaces(std::string& str);
-
-	bool currentrateonly = false;
-	bool topscoresonly = true;
-	bool ccoffonly = false;
-	OnlineTopScore GetTopSkillsetScore(unsigned int rank,
-									   Skillset ss,
-									   bool& result);
-	float GetSkillsetRating(Skillset ss);
-	int GetSkillsetRank(Skillset ss);
-
-	/// (pack,isMirror)
-	std::deque<std::pair<DownloadablePack*, bool>> DownloadQueue;
-	std::deque<HighScore*> ScoreUploadSequentialQueue;
-	unsigned int sequentialScoreUploadTotalWorkload{ 0 };
-	const int maxPacksToDownloadAtOnce = 1;
-	const float DownloadCooldownTime = 5.f;
-	float timeSinceLastDownload = 0.f;
-	////////// /// ///////////////////////////////////
-
-  private:
 	/// Active HTTP requests
 	std::vector<RequestData*> apiHttpsRequests{};
 	std::vector<RequestData*> apiHttpRequests{};
@@ -347,6 +307,39 @@ class DownloadManager
 			ResetScoreAfterUploadFailure(hs);
 		}
 	}
+
+  public:
+	////////// OLD ///////////////////////////////////
+	std::vector<DownloadablePack> downloadablePacks;
+	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
+	std::set<std::string> unrankedCharts;
+	std::vector<std::string> countryCodes;
+	/// Leaderboard ranks for logged in user by skillset
+	std::map<Skillset, int> sessionRanks;
+	std::map<Skillset, double> sessionRatings;
+	std::map<Skillset, std::vector<OnlineTopScore>> topScores;
+
+	bool InstallSmzip(const std::string& sZipFile);
+
+	bool EncodeSpaces(std::string& str);
+
+	bool currentrateonly = false;
+	bool topscoresonly = true;
+	bool ccoffonly = false;
+	OnlineTopScore GetTopSkillsetScore(unsigned int rank,
+									   Skillset ss,
+									   bool& result);
+	float GetSkillsetRating(Skillset ss);
+	int GetSkillsetRank(Skillset ss);
+
+	/// (pack,isMirror)
+	std::deque<std::pair<DownloadablePack*, bool>> DownloadQueue;
+	std::deque<HighScore*> ScoreUploadSequentialQueue;
+	unsigned int sequentialScoreUploadTotalWorkload{ 0 };
+	const int maxPacksToDownloadAtOnce = 1;
+	const float DownloadCooldownTime = 5.f;
+	float timeSinceLastDownload = 0.f;
+	////////// /// ///////////////////////////////////
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;
