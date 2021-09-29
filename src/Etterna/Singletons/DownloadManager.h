@@ -308,6 +308,8 @@ class DownloadManager
 			ResetScoreAfterUploadFailure(hs);
 		}
 	}
+	inline std::string ExtractFromJSONObject(Poco::JSON::Object::Ptr obj);
+	inline std::string ExtractFromJSONArray(Poco::JSON::Array::Ptr arr);
 
   public:
 	////////// OLD ///////////////////////////////////

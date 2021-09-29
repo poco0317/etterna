@@ -329,36 +329,81 @@ DownloadManager::EncodeSpaces(std::string& str)
 	return foundSpaces;
 }
 
+inline std::string
+DownloadManager::ExtractFromJSONArray(Poco::JSON::Array::Ptr arr)
+{
+	std::ostringstream out;
+	for (size_t i = 0; i < arr->size(); i++) {
+		if (arr->isArray(i)) {
+			out << i << " : " << ExtractFromJSONArray(arr->getArray(i));
+		} else if (arr->isNull(i)) {
+			// impossible?
+		} else if (arr->isObject(i)) {
+			out << i << " : " << ExtractFromJSONObject(arr->getObject(i));
+		} else {
+			// a value?
+			try {
+				// please
+				out << "\n" << i << " : " << arr->getElement<std::string>(i);
+			} catch (...) {
+				try {
+					// please work
+					out << "\n" << i << " : " << arr->getElement<int>(i);
+				} catch (...) {
+					// i beg
+					try {
+						out << "\n" << i << " : " << arr->getElement<float>(i);
+					} catch (...) {
+						out << "\n<invalid>";
+					}
+				}
+			}
+		}
+	}
+	return out.str();
+}
+
+inline std::string
+DownloadManager::ExtractFromJSONObject(Poco::JSON::Object::Ptr obj)
+{
+	std::ostringstream out;
+	auto& keys = obj->getNames();
+	for (auto& k : keys) {
+		if (obj->isArray(k)) {
+			// arr
+			out << k << " : " << ExtractFromJSONArray(obj->getArray(k));
+		} else if (obj->isNull(k)) {
+			// this shouldnt really ever happen
+		} else if (obj->isObject(k)) {
+			// obj
+			out << k << " : " << ExtractFromJSONObject(obj->getObject(k));
+		} else {
+			// a value?
+			try {
+				// please
+				out << "\n" << k << " : " << obj->getValue<std::string>(k);
+			} catch (...) {
+				try {
+					// please work
+					out << "\n" << k << " : " << obj->getValue<int>(k);
+				} catch (...) {
+					// i beg
+					try {
+						out << "\n" << k << " : " << obj->getValue<float>(k);
+					} catch (...) {
+						out << "\n<invalid>";
+					}
+				}
+			}
+		}
+	}
+	return out.str();
+}
+
 std::string
 DownloadManager::ExtractHTTP422Reasons(Poco::JSON::Object::Ptr errors)
 {
-	std::vector<std::string> reasons;
-	auto keys = errors->getNames();
-	for (auto& k : keys) {
-		try {
-			auto input_value_arr = errors->getArray(k);
-
-			for (auto it = input_value_arr.get()->begin();
-				 it != input_value_arr.get()->end();
-				 it++) {
-				reasons.push_back(it->convert<std::string>());
-			}
-		} catch (Poco::Exception& e) {
-			Locator::getLogger()->warn("ExtractHTTP422Reasons tried to get "
-									   "array for {} but errored: {} - {}",
-									   k,
-									   e.name(),
-									   e.message());
-		}
-	}
-	std::ostringstream reasonstr;
-	if (!reasons.empty()) {
-		std::copy(reasons.begin(),
-				  reasons.end() - 1,
-				  std::ostream_iterator<std::string>(reasonstr, "\n "));
-		reasonstr << reasons.back();
-	}
-	return reasonstr.str();
+	return ExtractFromJSONObject(errors);
 }
 
 void
@@ -759,8 +804,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
 
-				auto errors = ret->getObject("errors");
-				auto reasonstr = ExtractHTTP422Reasons(errors);
+				auto reasonstr = ExtractHTTP422Reasons(ret);
 				Locator::getLogger()->warn(
 				  "UploadSingleScore FAILED (422) - {}", reasonstr);
 			} catch (Poco::Exception& e) {
@@ -795,8 +839,9 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 	  "Generating bulk score upload request ({} "
 	  "scores dividing into {} chunks)",
 	  hsList.size(),
-	  std::ceil(static_cast<float>(hsList.size()) /
-				static_cast<float>(UPLOAD_SCORE_BULK_CHUNK_SIZE)));
+	  static_cast<int>(
+		std::ceil(static_cast<float>(hsList.size()) /
+				  static_cast<float>(UPLOAD_SCORE_BULK_CHUNK_SIZE))));
 
 	std::vector<HighScore*> hsCompiling;
 	for (auto it = hsList.begin(); it != hsList.end(); it++) {
@@ -879,8 +924,7 @@ DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> h
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
 
-				auto errors = ret->getObject("errors");
-				auto reasonstr = ExtractHTTP422Reasons(errors);
+				auto reasonstr = ExtractHTTP422Reasons(ret);
 				Locator::getLogger()->warn("UploadBulkScores FAILED (422) - {}",
 										   reasonstr);
 			} catch (Poco::Exception& e) {
