@@ -133,6 +133,7 @@ class Profile
 		m_fPlayerSkillsets[ss] = 0.F;
 
 		m_LastPlayedDate.Init();
+		m_lastRankedChartkeyCheck.Init();
 
 		FOREACH_ENUM(Difficulty, i)
 		m_iNumSongsPlayedByDifficulty[i] = 0;
@@ -203,6 +204,8 @@ class Profile
 	float m_fPlayerSkillsets[NUM_Skillset]{};
 	/** @brief Is this a brand new profile? */
 	bool m_bNewProfile{ false };
+
+	mutable DateTime m_lastRankedChartkeyCheck;
 
 	// seriously why is this not a thing -mina
 	std::string profiledir;
