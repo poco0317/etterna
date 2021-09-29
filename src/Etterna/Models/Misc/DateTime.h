@@ -104,6 +104,7 @@ struct DateTime
 
 	/** @brief Set up a default date and time. */
 	DateTime();
+	DateTime(tm tm);
 	/** @brief Initialize the date and time. */
 	void Init();
 
@@ -165,6 +166,9 @@ struct DateTime
 
 	/** @brief Remove the time portion from the date. */
 	void StripTime();
+
+	/// remove a day
+	void Yesterday();
 
 	/**
 	 * @brief Retrieve a string representation of the current date and time.

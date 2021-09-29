@@ -16,6 +16,39 @@ DateTime::Init()
 	ZERO(*this);
 }
 
+DateTime::DateTime(tm tm)
+{
+	Init();
+	// added macro for more indirection and frustration
+#define COPY_M(v) v = tm.v;
+	COPY_M(tm_year);
+	COPY_M(tm_mon);
+	COPY_M(tm_mday);
+	COPY_M(tm_hour);
+	COPY_M(tm_min);
+	COPY_M(tm_sec);
+#undef COPY_M
+}
+
+void
+DateTime::Yesterday()
+{
+	tm now;
+	now.tm_year = tm_year;
+	now.tm_mday = tm_mday;
+	now.tm_mon = tm_mon;
+	now.tm_hour = tm_hour;
+	now.tm_min = tm_min;
+	now.tm_sec = tm_sec;
+	auto t = GetYesterday(now);
+	tm_year = t.tm_year;
+	tm_mday = t.tm_mday;
+	tm_mon = t.tm_mon;
+	tm_sec = t.tm_sec;
+	tm_min = t.tm_min;
+	tm_hour = t.tm_hour;
+}
+
 bool
 DateTime::operator<(const DateTime& other) const
 {
