@@ -65,6 +65,7 @@ static Preference<unsigned int> downloadPacksToAdditionalSongs(
 static const std::string TEMP_ZIP_MOUNT_POINT = "/@temp-zip/";
 static const std::string DL_DIR = SpecialFiles::CACHE_DIR + "Downloads/";
 static const std::string wife3_rescore_upload_flag = "rescoredw3";
+static const size_t UPLOAD_SCORE_BULK_CHUNK_SIZE = 100;
 
 // endpoint construction constants
 // all paths should begin with / and end without /
@@ -791,7 +792,29 @@ void
 DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 {
 	Locator::getLogger()->info(
-	  "Generating bulk score upload request ({} scores)", hsList.size());
+	  "Generating bulk score upload request ({} "
+	  "scores dividing into {} chunks)",
+	  hsList.size(),
+	  std::ceil(static_cast<float>(hsList.size()) /
+				static_cast<float>(UPLOAD_SCORE_BULK_CHUNK_SIZE)));
+
+	std::vector<HighScore*> hsCompiling;
+	for (auto it = hsList.begin(); it != hsList.end(); it++) {
+		hsCompiling.emplace_back(*it);
+		if (hsCompiling.size() >= UPLOAD_SCORE_BULK_CHUNK_SIZE) {
+			UploadBulkScoresRequestInternal(hsCompiling);
+			hsCompiling.clear();
+			hsCompiling.shrink_to_fit();
+		}
+	}
+	if (!hsCompiling.empty()) {
+		UploadBulkScoresRequestInternal(hsCompiling);
+	}
+}
+
+void
+DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> hsList)
+{
 
 	Poco::JSON::Object* json = new Poco::JSON::Object;
 	Poco::JSON::Array dataArr;

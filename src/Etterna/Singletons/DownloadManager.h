@@ -268,6 +268,7 @@ class DownloadManager
 	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31));
 	void UploadSingleScoreRequest(HighScore* hs);
 	void UploadBulkScoresRequest(std::vector<HighScore*>& hsList);
+	void UploadBulkScoresRequestInternal(const std::vector<HighScore*> hsList);
 
 	/// Active HTTP requests
 	std::vector<RequestData*> apiHttpsRequests{};
