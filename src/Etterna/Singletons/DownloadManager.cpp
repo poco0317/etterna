@@ -872,7 +872,7 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 			  "UploadBulkScores FAILED - Unexpected status: {}", status);
 		}
 
-		if (true || success)
+		if (success)
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
 
@@ -887,7 +887,7 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 		}
 	};
 
-	GenerateRequest(API_ROOT + API_UPLOAD_SCORE,
+	GenerateRequest(API_ROOT + API_UPLOAD_SCORE_BULK,
 					callback,
 					json,
 					HTTPRequest::HTTP_POST,
