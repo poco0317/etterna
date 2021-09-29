@@ -254,7 +254,7 @@ DownloadManager::GenerateRequest(const std::string& url,
 
 	// when logged in, provide authorization
 	if (IsLoggedIn())
-		request->setCredentials("Bearer", loginToken);
+		request->setCredentials("Bearer", sessionToken);
 
 	// select session and request queue based on http/https
 	HTTPClientSession* session;
@@ -329,21 +329,32 @@ DownloadManager::EncodeSpaces(std::string& str)
 }
 
 std::string
-DownloadManager::ExtractHTTP401Reasons(Poco::JSON::Object::Ptr errors)
+DownloadManager::ExtractHTTP422Reasons(Poco::JSON::Object::Ptr errors)
 {
 	std::vector<std::string> reasons;
-	auto input_value_arr = errors->getArray("input_value");
+	auto keys = errors->getNames();
+	for (auto& k : keys) {
+		try {
+			auto input_value_arr = errors->getArray(k);
 
-	for (auto it = input_value_arr.get()->begin();
-		 it != input_value_arr.get()->end();
-		 it++) {
-		reasons.push_back(it->convert<std::string>());
+			for (auto it = input_value_arr.get()->begin();
+				 it != input_value_arr.get()->end();
+				 it++) {
+				reasons.push_back(it->convert<std::string>());
+			}
+		} catch (Poco::Exception& e) {
+			Locator::getLogger()->warn("ExtractHTTP422Reasons tried to get "
+									   "array for {} but errored: {} - {}",
+									   k,
+									   e.name(),
+									   e.message());
+		}
 	}
 	std::ostringstream reasonstr;
 	if (!reasons.empty()) {
 		std::copy(reasons.begin(),
 				  reasons.end() - 1,
-				  std::ostream_iterator<std::string>(reasonstr, ", "));
+				  std::ostream_iterator<std::string>(reasonstr, "\n "));
 		reasonstr << reasons.back();
 	}
 	return reasonstr.str();
@@ -470,7 +481,7 @@ DownloadManager::UpdateDLSpeed()
 bool
 DownloadManager::IsLoggedIn()
 {
-	return !loginToken.empty();
+	return !sessionToken.empty();
 }
 
 bool
@@ -540,7 +551,7 @@ DownloadManager::LoginRequest(const std::string& username, const std::string& pa
 
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
-			loginToken = final_token;
+			sessionToken = final_token;
 		}
 		OnLogin();
 	};
@@ -552,22 +563,43 @@ DownloadManager::LoginRequest(const std::string& username, const std::string& pa
 					apiShouldUseHttps);
 }
 
-void
+bool
 DownloadManager::OnLogin()
 {
 	if (IsLoggedIn()) {
-		if (ShouldUploadScores()) {
-			UploadScores();
+		auto* prof = PROFILEMAN->GetProfile(PLAYER_1);
+		if (prof != nullptr) {
+			auto lastCheckDT = prof->m_lastRankedChartkeyCheck;
+			Poco::DateTime pocoDT = Poco::DateTime(
+			  lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
+
+			// pass only 1 date, which sets the start of the range
+			// so it searches [start, inf]
+			GetRankedChartkeys(true, pocoDT);
 		}
-		GetRankedChartkeys();
 		MESSAGEMAN->Broadcast("LoginSuccessful");
+		return true;
 	} else {
 		MESSAGEMAN->Broadcast("LoginFailed");
+		return false;
 	}
 }
 
 void
-DownloadManager::GetRankedChartkeysRequest(const Poco::DateTime start, const Poco::DateTime end)
+DownloadManager::Logout()
+{
+	if (IsLoggedIn()) {
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+
+		sessionToken = "";
+		// This is called on a shutdown, after MessageManager is gone
+		if (MESSAGEMAN != nullptr)
+			MESSAGEMAN->Broadcast("LogOut");
+	}
+}
+
+void
+DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco::DateTime start, const Poco::DateTime end)
 {
 	Locator::getLogger()->info("Generating ranked chartkeys request ...");
 
@@ -582,9 +614,9 @@ DownloadManager::GetRankedChartkeysRequest(const Poco::DateTime start, const Poc
 	form->set("start", startstr);
 	form->set("end", endstr);
 
-	RequestCallback callback = [this](std::istream& in, HTTPResponse& response) {
+	RequestCallback callback = [this, uploadAfterResponse](std::istream& in, HTTPResponse& response) {
 		Poco::JSON::Parser parser;
-		std::vector<std::string> new_chartkeys;
+		std::unordered_set<std::string> new_chartkeys;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
@@ -597,7 +629,7 @@ DownloadManager::GetRankedChartkeysRequest(const Poco::DateTime start, const Poc
 				auto data = ret->getArray("data");
 				for (auto it = data.get()->begin(); it != data.get()->end();
 					 it++) {
-					new_chartkeys.push_back(it->convert<std::string>());
+					new_chartkeys.emplace(it->convert<std::string>());
 				}
 				Locator::getLogger()->info("Found {} newly ranked chartkeys",
 										   new_chartkeys.size());
@@ -632,6 +664,10 @@ DownloadManager::GetRankedChartkeysRequest(const Poco::DateTime start, const Poc
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
 			newlyRankedChartkeys = new_chartkeys;
 		}
+		if (uploadAfterResponse) {
+			UploadAllPBs(false);
+		}
+
 	};
 
 	GenerateRequest(API_ROOT + API_RANKED_CHARTKEYS,
@@ -652,10 +688,12 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 	RequestCallback callback = [this, hs](std::istream& in,
 									  HTTPResponse& response) {
 		Poco::JSON::Parser parser;
+		bool success = false;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
 			try {
+				/*
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
 				Poco::JSON::Object::Ptr ret =
@@ -682,16 +720,21 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				  chordjacks,
 				  stamina,
 				  technical);
+				*/
+				Locator::getLogger()->info("Score {} uploaded",
+										   hs->GetScoreKey());
 
-				hs->AddUploadedServer(serverURL.Get());
-				hs->forceuploadedthissession = true;
+				UpdateScoreAfterUploadSuccess(hs);
+				success = true;
 			} catch (Poco::Exception& e) {
+				ResetScoreAfterUploadFailure(hs);
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (Parse Error) - {} {}",
 				  e.name(),
 				  e.message());
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			ResetScoreAfterUploadFailure(hs);
 			try {
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
@@ -708,6 +751,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				  e.message());
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			ResetScoreAfterUploadFailure(hs);
 			try {
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
@@ -715,7 +759,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				  res.extract<Poco::JSON::Object::Ptr>();
 
 				auto errors = ret->getObject("errors");
-				auto reasonstr = ExtractHTTP401Reasons(errors);
+				auto reasonstr = ExtractHTTP422Reasons(errors);
 				Locator::getLogger()->warn(
 				  "UploadSingleScore FAILED (422) - {}", reasonstr);
 			} catch (Poco::Exception& e) {
@@ -725,10 +769,12 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				  e.message());
 			}
 		} else {
+			ResetScoreAfterUploadFailure(hs);
 			Locator::getLogger()->warn(
 			  "UploadSingleScore FAILED - Unexpected status: {}", status);
 		}
 
+		if (success)
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
 		}
@@ -759,27 +805,33 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 	}
 	json->set("data", dataArr);
 
-	RequestCallback callback = [this](std::istream& in,
+	RequestCallback callback = [this, hsList](std::istream& in,
 									  HTTPResponse& response) {
 		Poco::JSON::Parser parser;
+		bool success = false;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
 			try {
+				/*
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
 
 				// nothing returned?
-
+				*/
+				UpdateBulkScoresAfterUploadSuccess(hsList);
+				success = true;
 			} catch (Poco::Exception& e) {
+				ResetBulkScoresAfterUploadFailure(hsList);
 				Locator::getLogger()->error(
 				  "UploadBulkScores FAILED (Parse Error) - {} {}",
 				  e.name(),
 				  e.message());
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			ResetBulkScoresAfterUploadFailure(hsList);
 			try {
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
@@ -797,6 +849,7 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 			}
 		} else if (status ==
 				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			ResetBulkScoresAfterUploadFailure(hsList);
 			try {
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
@@ -804,7 +857,7 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 				  res.extract<Poco::JSON::Object::Ptr>();
 
 				auto errors = ret->getObject("errors");
-				auto reasonstr = ExtractHTTP401Reasons(errors);
+				auto reasonstr = ExtractHTTP422Reasons(errors);
 				Locator::getLogger()->warn("UploadBulkScores FAILED (422) - {}",
 										   reasonstr);
 			} catch (Poco::Exception& e) {
@@ -814,12 +867,23 @@ DownloadManager::UploadBulkScoresRequest(std::vector<HighScore*>& hsList)
 				  e.message());
 			}
 		} else {
+			ResetBulkScoresAfterUploadFailure(hsList);
 			Locator::getLogger()->warn(
 			  "UploadBulkScores FAILED - Unexpected status: {}", status);
 		}
 
+		if (true || success)
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
+
+			auto* prof = PROFILEMAN->GetProfile(PLAYER_1);
+			// reset profile check date to latest score chunk date
+			// (if it is new enough)
+			auto lastDT = hsList.back()->GetDateTime();
+			lastDT.Yesterday();
+			if (prof->m_lastRankedChartkeyCheck < lastDT)
+				prof->m_lastRankedChartkeyCheck = lastDT;
+			// this wont save until you save your profile
 		}
 	};
 
@@ -847,6 +911,9 @@ DownloadManager::GenerateHighScoreObj(HighScore* hs)
 		hs->UnloadReplayData();
 		return nullptr;
 	}
+	// leaving replay data loaded here is a bad idea
+	// it gets unloaded eventually but for thousands of scores
+	// it adds up
 
 	Poco::JSON::Object* hsObject = new Poco::JSON::Object;
 
@@ -924,143 +991,174 @@ uploadSequentially()
 	}
 }
 
-bool
-DownloadManager::UploadScores()
-{
-	// First we accumulate scores that have not been uploaded and have
-	// replay data. There is no reason to upload updated calc versions to the
-	// site anymore - the site uses its own calc and afaik ignores the provided
-	// values, we only need to upload scores that have not been uploaded, and
-	// scores that have been rescored from wife2 to wife3
-	auto scores = SCOREMAN->GetAllPBPtrs();
-	auto& newly_rescored = SCOREMAN->rescores;
-	std::vector<HighScore*> toUpload;
-	for (auto& vec : scores) {
-		for (auto& s : vec) {
-			// probably not worth uploading fails, they get rescored now
-			if (s->GetGrade() == Grade_Failed)
-				continue;
-			// handle rescores, ignore upload check
-			if (newly_rescored.count(s))
-				toUpload.push_back(s);
-			// ok so i think we probably do need an upload flag for wife3
-			// resyncs, and to actively check it, since if people rescore
-			// everything, play 1 song and close their game or whatever,
-			// rescore list won't be built again and scores won't auto
-			// sync
-			else if (s->GetWifeVersion() == 3 &&
-					 !s->IsUploadedToServer(wife3_rescore_upload_flag))
-				toUpload.push_back(s);
-			// normal behavior, upload scores that haven't been uploaded and
-			// have replays
-			else if (!s->IsUploadedToServer(serverURL.Get()) &&
-					 s->HasReplayData())
-				toUpload.push_back(s);
-		}
-	}
 
-	if (!toUpload.empty())
-		Locator::getLogger()->trace("Updating online scores. (Uploading {} scores)",
-				   toUpload.size());
-	else
+inline void
+DownloadManager::ResetScoreAfterUploadFailure(HighScore* hs)
+{
+	// the purpose of this is to undo the actions of CanUploadScore
+	// it should only be called in the event of an error
+	hs->beingUploaded = false;
+}
+
+inline void
+DownloadManager::UpdateScoreAfterUploadSuccess(HighScore* hs)
+{
+	// the purpose of this is to confirm a score is uploaded
+	// an uploaded score should not be reuploaded
+	hs->AddUploadedServer(serverURL);
+	hs->forceuploadedthissession = false;
+}
+
+inline bool
+DownloadManager::CanUploadScore(HighScore* hs, bool forceReupload)
+{
+	// the force bool does not let you upload all scores
+	// force lets reuploads go through
+
+	// worse than D (means it's a fail but ... you never know)
+	if (hs->GetGrade() > Grade_Tier16)
 		return false;
 
-	bool was_not_uploading_already = this->ScoreUploadSequentialQueue.empty();
-	if (was_not_uploading_already)
-		this->sequentialScoreUploadTotalWorkload = toUpload.size();
-	else
-		this->sequentialScoreUploadTotalWorkload += toUpload.size();
-	this->ScoreUploadSequentialQueue.insert(
-	  this->ScoreUploadSequentialQueue.end(), toUpload.begin(), toUpload.end());
-	if (was_not_uploading_already)
-		uploadSequentially();
+	// old
+	if (hs->GetWifeVersion() < cur_wife_version)
+		return false;
+
+	// need replay
+	if (!hs->HasReplayData())
+		return false;
+
+	// invalid score
+	if (!hs->GetEtternaValid())
+		return false;
+
+	// invalider score
+	if (hs->GetChordCohesion())
+		return false;
+
+	// cannot upload a score twice
+	if (!forceReupload && hs->IsUploadedToServer(serverURL))
+		return false;
+
+	// shouldnt upload an unranked file
+	if (!forceReupload && newlyRankedChartkeys.count(hs->GetChartKey()) == 0)
+		return false;
+
+	// no double reuploads
+	// this will stop accidentally queueing the same score
+	// multiple times in a session
+	// (and on purpose)
+	// will be set true if upload is successful
+	if (hs->forceuploadedthissession)
+		return false;
+
+	// no double queues
+	if (hs->beingUploaded)
+		return false;
+
+	// set true on a force upload
+	// will also be set true if upload is successful
+	hs->forceuploadedthissession = forceReupload;
+
+	// set this true for all scores that pass through here.
+	// if any error occurs with the request, this is unset
+	// that will allow a score to pass through again.
+	hs->beingUploaded = true;
 
 	return true;
 }
 
-// manual upload function that will upload all scores for a chart
-// that skips some of the constraints of the auto uploaders
 void
-DownloadManager::ForceUploadScoresForChart(const std::string& ck, bool startnow)
+DownloadManager::UploadScore(HighScore* hs)
 {
-	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
-	auto cs = SCOREMAN->GetScoresForChart(ck);
-	if (cs) {
-		auto& test = cs->GetAllScores();
-		for (auto& s : test)
-			if (!s->forceuploadedthissession) {
-				if (s->GetGrade() != Grade_Failed) {
-					// don't add stuff we're already uploading
-					auto res =
-					  std::find(this->ScoreUploadSequentialQueue.begin(),
-								this->ScoreUploadSequentialQueue.end(),
-								s);
-					if (res != this->ScoreUploadSequentialQueue.end())
-						continue;
+	// there is no reason to force upload a single score...
+	// unless..
+	if (CanUploadScore(hs, false))
+		UploadSingleScoreRequest(hs);
+}
 
-					this->ScoreUploadSequentialQueue.push_back(s);
-					this->sequentialScoreUploadTotalWorkload += 1;
-				}
-			}
+void
+DownloadManager::UploadAllPBs(bool forceReupload)
+{
+	auto scores = SCOREMAN->GetAllPBPtrs();
+	std::vector<HighScore*> toUpload;
+	for (auto& vec : scores) {
+		for (auto& s : vec) {
+			if (CanUploadScore(s, forceReupload))
+				toUpload.push_back(s);
+		}
 	}
 
-	if (startnow) {
-		this->sequentialScoreUploadTotalWorkload =
-		  this->ScoreUploadSequentialQueue.size();
-		Locator::getLogger()->trace("Starting sequential upload of {} scores",
-				   this->ScoreUploadSequentialQueue.size());
-		uploadSequentially();
+	// sort all scores by date set
+	// as bulk upload happens, the check date is set to the last upload time of the chunk
+	std::sort(toUpload.begin(), toUpload.end(), [](HighScore* a, HighScore* b) {
+		return a->GetDateTime() < b->GetDateTime();
+	});
+
+	if (!toUpload.empty()) {
+		Locator::getLogger()->info(
+		  "UploadAllPBs: uploading {} scores - {} to {}",
+		  toUpload.size(),
+		  toUpload.front()->GetDateTime().GetString(),
+		  toUpload.back()->GetDateTime().GetString());
+
+		UploadBulkScoresRequest(toUpload);
+	} else {
+		Locator::getLogger()->info("UploadAllPBs: no scores to upload");
 	}
 }
-// wrapper for packs
+
 void
-DownloadManager::ForceUploadScoresForPack(const std::string& pack,
-										  bool startnow)
+DownloadManager::UploadPBsForChart(const std::string& ck, bool forceReupload)
 {
-	startnow = startnow && this->ScoreUploadSequentialQueue.empty();
+	std::vector<HighScore*> toUpload;
+
+	auto scores = SCOREMAN->GetAllChartPBPtrs(ck);
+	for (auto& vec : scores) {
+		for (auto& s : vec) {
+			if (CanUploadScore(s, forceReupload))
+				toUpload.push_back(s);
+		}
+	}
+
+	if (!toUpload.empty()) {
+		Locator::getLogger()->info(
+		  "ForceUploadPBsForChart: uploading {} scores - {} to {}",
+		  toUpload.size(),
+		  toUpload.front()->GetDateTime().GetString(),
+		  toUpload.back()->GetDateTime().GetString());
+
+		UploadBulkScoresRequest(toUpload);
+	} else {
+		Locator::getLogger()->info("ForceUploadPBsForChart: no scores to upload");
+	}
+}
+
+void
+DownloadManager::UploadPBsForPack(const std::string& pack, bool forceReupload)
+{
+	std::vector<HighScore*> toUpload;
 	auto songs = SONGMAN->GetSongs(pack);
 	for (auto so : songs)
-		for (auto c : so->GetAllSteps())
-			ForceUploadScoresForChart(c->GetChartKey(), false);
+		for (auto c : so->GetAllSteps()) {
+			auto scores = SCOREMAN->GetAllChartPBPtrs(c->GetChartKey());
+			for (auto& v : scores)
+				for (auto& s : v)
+					if (CanUploadScore(s, forceReupload))
+						toUpload.push_back(s);
+		}
 
-	if (startnow) {
-		this->sequentialScoreUploadTotalWorkload =
-		  this->ScoreUploadSequentialQueue.size();
-		Locator::getLogger()->trace("Starting sequential upload of {} scores",
-				   this->ScoreUploadSequentialQueue.size());
-		uploadSequentially();
+	if (!toUpload.empty()) {
+		Locator::getLogger()->info(
+		  "ForceUploadPBsForPack: uploading {} scores - {} to {}",
+		  toUpload.size(),
+		  toUpload.front()->GetDateTime().GetString(),
+		  toUpload.back()->GetDateTime().GetString());
+
+		UploadBulkScoresRequest(toUpload);
+	} else {
+		Locator::getLogger()->info("ForceUploadPBsForPack: no scores to upload");
 	}
 }
-void
-DownloadManager::ForceUploadAllScores()
-{
-	bool not_already_uploading = this->ScoreUploadSequentialQueue.empty();
-
-	auto songs = SONGMAN->GetSongs(GROUP_ALL);
-	for (auto so : songs)
-		for (auto c : so->GetAllSteps())
-			ForceUploadScoresForChart(c->GetChartKey(), false);
-
-	if (not_already_uploading) {
-		this->sequentialScoreUploadTotalWorkload =
-		  this->ScoreUploadSequentialQueue.size();
-		Locator::getLogger()->trace("Starting sequential upload of {} scores",
-				   this->ScoreUploadSequentialQueue.size());
-		uploadSequentially();
-	}
-}
-/*
-void
-DownloadManager::EndSession()
-{
-	sessionUser = sessionPass = authToken = "";
-	topScores.clear();
-	sessionRatings.clear();
-	// This is called on a shutdown, after MessageManager is gone
-	if (MESSAGEMAN != nullptr)
-		MESSAGEMAN->Broadcast("LogOut");
-}
-*/
 
 OnlineTopScore
 DownloadManager::GetTopSkillsetScore(unsigned int rank,
@@ -1485,66 +1583,6 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 }
 */
 
-/*
-void
-DownloadManager::StartSession(
-  string user,
-  string pass,
-  std::function<void(bool loggedIn)> callback = [](bool) {})
-{
-	
-	string url = serverURL.Get() + "/login";
-	if (loggingIn || user.empty()) {
-		return;
-	}
-	DLMAN->loggingIn = true;
-	EndSessionIfExists();
-
-	
-	CURLFormPostField(curlHandle, form, lastPtr, "username", user.c_str());
-	CURLFormPostField(curlHandle, form, lastPtr, "password", pass.c_str());
-	CURLFormPostField(
-	  curlHandle, form, lastPtr, "clientData", CLIENT_DATA_KEY.c_str());
-	
-	auto done = [user, pass, callback](HTTPRequest& req) {
-		Document d;
-		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace(
-			  "StartSession Error: Malformed request response: {}", req.result);
-			MESSAGEMAN->Broadcast("LoginFailed");
-			DLMAN->loggingIn = false;
-			return;
-		}
-
-		// Site 404s when login fails
-		if (d.HasMember("errors") && d["errors"].IsArray()) {
-			DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
-			MESSAGEMAN->Broadcast("LoginFailed");
-			DLMAN->loggingIn = false;
-		}
-
-		if (d.HasMember("data") && d["data"].IsObject() &&
-			d["data"].HasMember("attributes") &&
-			d["data"]["attributes"].IsObject() &&
-			d["data"]["attributes"].HasMember("accessToken") &&
-			d["data"]["attributes"]["accessToken"].IsString()) {
-			DLMAN->authToken =
-			  d["data"]["attributes"]["accessToken"].GetString();
-			DLMAN->sessionUser = user;
-			DLMAN->sessionPass = pass;
-		} else {
-			DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
-		}
-		DLMAN->OnLogin();
-		callback(DLMAN->LoggedIn());
-	};
-	req->Failed = [](HTTPRequest& req) {
-		DLMAN->authToken = DLMAN->sessionUser = DLMAN->sessionPass = "";
-		MESSAGEMAN->Broadcast("LoginFailed");
-		DLMAN->loggingIn = false;
-	};
-}
-*/
 int
 DownloadManager::GetSkillsetRank(Skillset ss)
 {
@@ -1614,18 +1652,6 @@ Download::Failed()
 	Message msg("DownloadFailed");
 	msg.SetParam("pack", LuaReference::CreateFromPush(*p_Pack));
 	MESSAGEMAN->Broadcast(msg);
-}
-/// Try to find in the Haystack the Needle - ignore case
-bool
-findStringIC(const std::string& strHaystack, const std::string& strNeedle)
-{
-	auto it = std::search(
-	  strHaystack.begin(),
-	  strHaystack.end(),
-	  strNeedle.begin(),
-	  strNeedle.end(),
-	  [](char ch1, char ch2) { return toupper(ch1) == toupper(ch2); });
-	return (it != strHaystack.end());
 }
 
 // lua start
@@ -2075,23 +2101,23 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int UploadScoresForChart(T* p, lua_State* L)
 	{
-		DLMAN->ForceUploadScoresForChart(SArg(1));
+		DLMAN->ForceUploadPBsForChart(SArg(1));
 		return 0;
 	}
 	static int UploadScoresForPack(T* p, lua_State* L)
 	{
-		DLMAN->ForceUploadScoresForPack(SArg(1));
+		DLMAN->ForceUploadPBsForPack(SArg(1));
 		return 0;
 	}
 	static int UploadAllScores(T* p, lua_State* L)
 	{
-		DLMAN->ForceUploadAllScores();
+		DLMAN->ForceUploadAllPBs();
 		return 0;
 	}
 	static int UploadThisScore(T* p, lua_State* L) {
 		auto* hs = Luna<HighScore>::check(L, 1);
 
-		DLMAN->UploadSingleScore(hs);
+		DLMAN->UploadScore(hs);
 		return 0;
 	}
 	LunaDownloadManager()

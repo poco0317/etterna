@@ -9,7 +9,7 @@
 #include "RageUtil/File/RageFileManager.h"
 #include "Etterna/Models/Misc/Difficulty.h"
 
-#include <deque>
+#include <unordered_set>
 #include "Poco/Net/HTTPRequest.h"
 #include "Poco/Net/HTTPResponse.h"
 #include "Poco/Net/HTTPSClientSession.h"
@@ -176,19 +176,31 @@ class DownloadManager
 	DownloadManager();
 	~DownloadManager();
 
+	// Upkeep
 	void Init();
 	void Update(float fDeltaSeconds);
 	void UpdateHTTPSRequests(float fDeltaSeconds);
 	void UpdateHTTPRequests(float fDeltaSeconds);
 
+	// Lua external access
+	void PushSelf(lua_State* L);
+
+	// State getters
 	bool IsLoggedIn();
 	bool IsInGameplay();
 	bool ShouldUploadScores();
 
+	// State setters
 	void SetInGameplay(bool inGameplay);
 	void SetApiShouldUseHttps(bool state);
+	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
+							   const std::string url);
 
-	// Create a request
+  private:
+	// Events
+	bool OnLogin();
+
+	/// Create a request
 	void GenerateRequest(
 	  const std::string& url,
 	  RequestCallback callback,
@@ -196,7 +208,7 @@ class DownloadManager
 	  HTMLForm* form = nullptr,
 	  const std::string requestMethod = HTTPRequest::HTTP_GET,
 	  bool https = true);
-	// Create a request with JSON fields attached
+	/// Create a request with JSON fields attached
 	void GenerateRequest(
 	  const std::string& url,
 	  RequestCallback callback,
@@ -206,7 +218,7 @@ class DownloadManager
 	{
 		GenerateRequest(url, callback, jsonPOST, nullptr, requestMethod, https);
 	}
-	// Create a request with query params
+	/// Create a request with query params
 	void GenerateRequest(
 	  const std::string& url,
 	  RequestCallback callback,
@@ -217,35 +229,54 @@ class DownloadManager
 		GenerateRequest(url, callback, nullptr, form, requestMethod, https);
 	}
 
-	void SetClientSessionByURL(Poco::Net::HTTPClientSession* session,
-							   const std::string url);
-
-	// API Requests
-  private:
+	// Specialized API Requests
 	void LoginRequest(const std::string& username, const std::string& password);
 	void GetRankedChartkeysRequest(
+	  bool uploadAfterResponse = false,
 	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
 	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31));
 	void UploadSingleScoreRequest(HighScore* hs);
 	void UploadBulkScoresRequest(std::vector<HighScore*>& hsList);
 
-	// External Facing API Request Generators
   public:
+	// External Facing API Request Generators
 	void Login(const std::string& username, const std::string& password)
 	{
 		LoginRequest(username, password);
 	}
+	void Logout();
 	void GetRankedChartkeys(
+	  bool uploadAfterResponse = false,
 	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
 	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31))
 	{
-		GetRankedChartkeysRequest(start, end);
-	}
-	void UploadSingleScore(HighScore* hs) { UploadSingleScoreRequest(hs); }
-	void UploadBulkScores(std::vector<HighScore*>& hsList){
-		UploadBulkScoresRequest(hsList);
+		GetRankedChartkeysRequest(uploadAfterResponse, start, end);
 	}
 
+	// The Score Upload Function
+	void UploadScore(HighScore* hs);
+
+	// Mass score upload functions
+	void UploadAllPBs(bool forceReupload);
+	void UploadPBsForChart(const std::string& ck, bool forceReupload = false);
+	void UploadPBsForPack(const std::string& pack, bool forceReupload = false);
+	void ForceUploadPBsForChart(const std::string& ck)
+	{
+		UploadPBsForChart(ck, true);
+	}
+	void ForceUploadPBsForPack(const std::string& pack)
+	{
+		UploadPBsForPack(pack, true);
+	}
+	void ForceUploadAllPBs()
+	{
+		UploadAllPBs(true);
+	}
+
+
+
+
+	////////// OLD ///////////////////////////////////
 	std::vector<DownloadablePack> downloadablePacks;
 	std::map<std::string, std::vector<OnlineScore>> chartLeaderboards;
 	std::set<std::string> unrankedCharts;
@@ -254,16 +285,6 @@ class DownloadManager
 	std::map<Skillset, int> sessionRanks;
 	std::map<Skillset, double> sessionRatings;
 	std::map<Skillset, std::vector<OnlineTopScore>> topScores;
-
-	void OnLogin();
-	/// Uploads all scores not yet uploaded to current
-	bool UploadScores();
-	/// forced upload wrapper for charts
-	void ForceUploadScoresForChart(const std::string& ck, bool startnow = true);
-	/// forced upload wrapper for packs
-	void ForceUploadScoresForPack(const std::string& pack,
-								  bool startnow = true);
-	void ForceUploadAllScores();
 
 	bool InstallSmzip(const std::string& sZipFile);
 
@@ -278,8 +299,6 @@ class DownloadManager
 	float GetSkillsetRating(Skillset ss);
 	int GetSkillsetRank(Skillset ss);
 
-	/// most recent single score upload result
-	std::string mostrecentresult = "";
 	/// (pack,isMirror)
 	std::deque<std::pair<DownloadablePack*, bool>> DownloadQueue;
 	std::deque<HighScore*> ScoreUploadSequentialQueue;
@@ -287,9 +306,7 @@ class DownloadManager
 	const int maxPacksToDownloadAtOnce = 1;
 	const float DownloadCooldownTime = 5.f;
 	float timeSinceLastDownload = 0.f;
-
-	// Lua
-	void PushSelf(lua_State* L);
+	////////// /// ///////////////////////////////////
 
   private:
 	/// Active HTTP requests
@@ -305,14 +322,31 @@ class DownloadManager
 	bool initialized = false;
 	bool inGameplay = false;
 
-	std::string loginToken = "";
+	std::string sessionToken = "";
 
-	std::vector<std::string> newlyRankedChartkeys{};
+	std::unordered_set<std::string> newlyRankedChartkeys;
 
 	// util
 	inline Poco::JSON::Object* GenerateHighScoreObj(HighScore* hs);
 	inline void ProcessRequest(RequestData*& data, HTTPClientSession& client);
-	inline std::string ExtractHTTP401Reasons(Poco::JSON::Object::Ptr errors);
+	inline std::string ExtractHTTP422Reasons(Poco::JSON::Object::Ptr errors);
+	inline bool CanUploadScore(HighScore* hs, bool forceReupload);
+	inline void UpdateScoreAfterUploadSuccess(HighScore* hs);
+	inline void UpdateBulkScoresAfterUploadSuccess(
+	  const std::vector<HighScore*>& hsList)
+	{
+		for (auto& hs : hsList) {
+			UpdateScoreAfterUploadSuccess(hs);
+		}
+	}
+	inline void ResetScoreAfterUploadFailure(HighScore* hs);
+	inline void ResetBulkScoresAfterUploadFailure(
+	  const std::vector<HighScore*>& hsList)
+	{
+		for (auto& hs : hsList) {
+			ResetScoreAfterUploadFailure(hs);
+		}
+	}
 };
 
 extern std::shared_ptr<DownloadManager> DLMAN;

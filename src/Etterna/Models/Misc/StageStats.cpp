@@ -751,7 +751,7 @@ StageStats::FinalizeScores(bool /*bSummary*/)
 	if (DLMAN->ShouldUploadScores() && !AdjustSync::IsSyncDataChanged()) {
 		Locator::getLogger()->trace("Uploading score with replaydata.");
 		hs.SetTopScore(istop2); // ayy i did it --lurker
-		DLMAN->UploadSingleScore(&hs);
+		DLMAN->UploadScore(&hs);
 	}
 	if (NSMAN->loggedIn) {
 		NSMAN->ReportHighScore(&hs, m_player);
