@@ -23,7 +23,7 @@ using Poco::Net::HTTPRequest;
 using Poco::Net::HTTPResponse;
 using Poco::Net::HTMLForm;
 
-typedef std::function<void(std::istream&, HTTPResponse)> RequestCallback;
+typedef std::function<void(std::istream&, HTTPResponse&)> RequestCallback;
 
 struct RequestData
 {

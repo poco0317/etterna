@@ -1677,7 +1677,7 @@ inline std::string
 DownloadManager::ExtractFromJSONObject(Poco::JSON::Object::Ptr obj)
 {
 	std::ostringstream out;
-	auto& keys = obj->getNames();
+	auto keys = obj->getNames();
 	for (auto& k : keys) {
 		if (obj->isArray(k)) {
 			// arr
