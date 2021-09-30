@@ -648,7 +648,7 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 			newlyRankedChartkeys = new_chartkeys;
 		}
 		if (uploadAfterResponse) {
-			UploadAllPBs(false);
+			UploadAllPBs(false, true);
 		}
 
 	};
@@ -1019,10 +1019,6 @@ DownloadManager::CanUploadScore(HighScore* hs, bool forceReupload)
 	if (!forceReupload && hs->IsUploadedToServer(serverURL))
 		return false;
 
-	// shouldnt upload an unranked file
-	if (!forceReupload && newlyRankedChartkeys.count(hs->GetChartKey()) == 0)
-		return false;
-
 	// no double reuploads
 	// this will stop accidentally queueing the same score
 	// multiple times in a session
@@ -1057,12 +1053,25 @@ DownloadManager::UploadScore(HighScore* hs)
 }
 
 void
-DownloadManager::UploadAllPBs(bool forceReupload)
+DownloadManager::UploadAllPBs(bool forceReupload, bool initialScoreSync)
 {
+	std::unordered_set<std::string> rankedChartkeyFilter;
+	if (initialScoreSync)
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		rankedChartkeyFilter = newlyRankedChartkeys;
+		newlyRankedChartkeys.clear();
+	}
+
 	auto scores = SCOREMAN->GetAllPBPtrs();
 	std::vector<HighScore*> toUpload;
 	for (auto& vec : scores) {
 		for (auto& s : vec) {
+			if (initialScoreSync) {
+				// dont sync unranked scores
+				if (rankedChartkeyFilter.count(s->GetChartKey()) == 0)
+					continue;
+			}
 			if (CanUploadScore(s, forceReupload))
 				toUpload.push_back(s);
 		}

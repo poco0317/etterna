@@ -218,7 +218,7 @@ class DownloadManager
 	void UploadScore(HighScore* hs);
 
 	// Mass score upload functions
-	void UploadAllPBs(bool forceReupload);
+	void UploadAllPBs(bool forceReupload, bool initialScoreSync = false);
 	void UploadPBsForChart(const std::string& ck, bool forceReupload = false);
 	void UploadPBsForPack(const std::string& pack, bool forceReupload = false);
 	void ForceUploadPBsForChart(const std::string& ck)

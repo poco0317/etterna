@@ -895,6 +895,11 @@ HighScore::HasReplayData() -> bool
 	const auto fullpath = FULL_REPLAY_DIR + m_Impl->ScoreKey;
 	const auto basicpath = BASIC_REPLAY_DIR + m_Impl->ScoreKey;
 
+	// if the data is also readily available
+	if (!m_Impl->vOffsetVector.empty() && !m_Impl->vNoteRowVector.empty() &&
+		!m_Impl->vTrackVector.empty() && !m_Impl->vTapNoteTypeVector.empty())
+		return true;
+
 	// check for full replays first then default
 	// to basic replays
 	if (DoesFileExist(fullpath)) {
