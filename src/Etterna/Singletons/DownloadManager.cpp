@@ -534,16 +534,18 @@ DownloadManager::OnLogin()
 		auto* prof = PROFILEMAN->GetProfile(PLAYER_1);
 		if (prof != nullptr) {
 			auto lastCheckDT = prof->m_lastRankedChartkeyCheck;
+			// have to add 1990 here because DateTime doesnt track properly
 			Poco::DateTime pocoDT = Poco::DateTime(
-			  lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
+			  1990 + lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
 
 			// pass only 1 date, which sets the start of the range
 			// so it searches [start, inf]
 			GetRankedChartkeys(true, pocoDT);
 		}
 		MESSAGEMAN->Broadcast("LoginSuccessful");
+	} else {
+		MESSAGEMAN->Broadcast("LoginFailed");
 	}
-	MESSAGEMAN->Broadcast("LoginFailed");
 }
 
 std::string

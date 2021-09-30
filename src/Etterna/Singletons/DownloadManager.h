@@ -209,7 +209,7 @@ class DownloadManager
 	void GetRankedChartkeys(
 	  bool uploadAfterResponse = false,
 	  const Poco::DateTime start = Poco::DateTime(1990, 1, 1),
-	  const Poco::DateTime end = Poco::DateTime(9999, 12, 31))
+	  const Poco::DateTime end = Poco::DateTime(3000, 12, 31))
 	{
 		GetRankedChartkeysRequest(uploadAfterResponse, start, end);
 	}
