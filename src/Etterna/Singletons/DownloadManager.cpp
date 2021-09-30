@@ -1063,13 +1063,29 @@ DownloadManager::UploadAllPBs(bool forceReupload, bool initialScoreSync)
 		newlyRankedChartkeys.clear();
 	}
 
+	auto* prof = PROFILEMAN->GetProfile(PLAYER_1);
+	DateTime checkDT;
+	DateTime defaultDT;
+	if (prof != nullptr)
+		checkDT = prof->m_lastRankedChartkeyCheck;
+
 	auto scores = SCOREMAN->GetAllPBPtrs();
 	std::vector<HighScore*> toUpload;
 	for (auto& vec : scores) {
 		for (auto& s : vec) {
 			if (initialScoreSync) {
+				bool mustBeNewlyRanked = true;
+				// for any ranked or unranked file
+				// if it was set between now and the last time we checked
+				// go ahead and try it out
+				// this date gets reset to the most recent successful upload
+				// the first check here is so that first time initial syncs
+				// dont attempt to send 50000 unranked uploads
+				if (checkDT != defaultDT && checkDT < s->GetDateTime())
+					mustBeNewlyRanked = false;
 				// dont sync unranked scores
-				if (rankedChartkeyFilter.count(s->GetChartKey()) == 0)
+				if (mustBeNewlyRanked &&
+					rankedChartkeyFilter.count(s->GetChartKey()) == 0)
 					continue;
 			}
 			if (CanUploadScore(s, forceReupload))
