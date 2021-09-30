@@ -312,100 +312,6 @@ DownloadManager::SetApiShouldUseHttps(bool state)
 	this->apiShouldUseHttps = state;
 }
 
-bool
-DownloadManager::EncodeSpaces(std::string& str)
-{
-
-	// Parse spaces (curl doesnt parse them properly)
-	bool foundSpaces = false;
-	size_t index = str.find(' ', 0);
-	while (index != std::string::npos) {
-
-		str.erase(index, 1);
-		str.insert(index, "%20");
-		index = str.find(' ', index);
-		foundSpaces = true;
-	}
-	return foundSpaces;
-}
-
-inline std::string
-DownloadManager::ExtractFromJSONArray(Poco::JSON::Array::Ptr arr)
-{
-	std::ostringstream out;
-	for (size_t i = 0; i < arr->size(); i++) {
-		if (arr->isArray(i)) {
-			out << "\n" << i << " : " << ExtractFromJSONArray(arr->getArray(i));
-		} else if (arr->isNull(i)) {
-			// impossible?
-		} else if (arr->isObject(i)) {
-			out << "\n" << i << " : " << ExtractFromJSONObject(arr->getObject(i));
-		} else {
-			// a value?
-			try {
-				// please
-				out << "\n" << i << " : " << arr->getElement<std::string>(i);
-			} catch (...) {
-				try {
-					// please work
-					out << "\n" << i << " : " << arr->getElement<int>(i);
-				} catch (...) {
-					// i beg
-					try {
-						out << "\n" << i << " : " << arr->getElement<float>(i);
-					} catch (...) {
-						out << "\n<invalid>";
-					}
-				}
-			}
-		}
-	}
-	return out.str();
-}
-
-inline std::string
-DownloadManager::ExtractFromJSONObject(Poco::JSON::Object::Ptr obj)
-{
-	std::ostringstream out;
-	auto& keys = obj->getNames();
-	for (auto& k : keys) {
-		if (obj->isArray(k)) {
-			// arr
-			out << k << " : " << ExtractFromJSONArray(obj->getArray(k));
-		} else if (obj->isNull(k)) {
-			// this shouldnt really ever happen
-		} else if (obj->isObject(k)) {
-			// obj
-			out << k << " : " << ExtractFromJSONObject(obj->getObject(k));
-		} else {
-			// a value?
-			try {
-				// please
-				out << "\n" << k << " : " << obj->getValue<std::string>(k);
-			} catch (...) {
-				try {
-					// please work
-					out << "\n" << k << " : " << obj->getValue<int>(k);
-				} catch (...) {
-					// i beg
-					try {
-						out << "\n" << k << " : " << obj->getValue<float>(k);
-					} catch (...) {
-						out << "\n<invalid>";
-					}
-				}
-			}
-		}
-	}
-	return out.str();
-}
-
-std::string
-DownloadManager::ExtractHTTP422Reasons(Poco::JSON::Object::Ptr errors)
-{
-	return ExtractFromJSONObject(errors);
-}
-
 void
 DownloadManager::Update(float fDeltaSeconds)
 {
@@ -1719,6 +1625,101 @@ Download::Failed()
 	Message msg("DownloadFailed");
 	msg.SetParam("pack", LuaReference::CreateFromPush(*p_Pack));
 	MESSAGEMAN->Broadcast(msg);
+}
+
+bool
+DownloadManager::EncodeSpaces(std::string& str)
+{
+
+	// Parse spaces (curl doesnt parse them properly)
+	bool foundSpaces = false;
+	size_t index = str.find(' ', 0);
+	while (index != std::string::npos) {
+
+		str.erase(index, 1);
+		str.insert(index, "%20");
+		index = str.find(' ', index);
+		foundSpaces = true;
+	}
+	return foundSpaces;
+}
+
+inline std::string
+DownloadManager::ExtractFromJSONArray(Poco::JSON::Array::Ptr arr)
+{
+	std::ostringstream out;
+	for (size_t i = 0; i < arr->size(); i++) {
+		if (arr->isArray(i)) {
+			out << "\n" << i << " : " << ExtractFromJSONArray(arr->getArray(i));
+		} else if (arr->isNull(i)) {
+			// impossible?
+		} else if (arr->isObject(i)) {
+			out << "\n"
+				<< i << " : " << ExtractFromJSONObject(arr->getObject(i));
+		} else {
+			// a value?
+			try {
+				// please
+				out << "\n" << i << " : " << arr->getElement<std::string>(i);
+			} catch (...) {
+				try {
+					// please work
+					out << "\n" << i << " : " << arr->getElement<int>(i);
+				} catch (...) {
+					// i beg
+					try {
+						out << "\n" << i << " : " << arr->getElement<float>(i);
+					} catch (...) {
+						out << "\n<invalid>";
+					}
+				}
+			}
+		}
+	}
+	return out.str();
+}
+
+inline std::string
+DownloadManager::ExtractFromJSONObject(Poco::JSON::Object::Ptr obj)
+{
+	std::ostringstream out;
+	auto& keys = obj->getNames();
+	for (auto& k : keys) {
+		if (obj->isArray(k)) {
+			// arr
+			out << k << " : " << ExtractFromJSONArray(obj->getArray(k));
+		} else if (obj->isNull(k)) {
+			// this shouldnt really ever happen
+		} else if (obj->isObject(k)) {
+			// obj
+			out << k << " : " << ExtractFromJSONObject(obj->getObject(k));
+		} else {
+			// a value?
+			try {
+				// please
+				out << "\n" << k << " : " << obj->getValue<std::string>(k);
+			} catch (...) {
+				try {
+					// please work
+					out << "\n" << k << " : " << obj->getValue<int>(k);
+				} catch (...) {
+					// i beg
+					try {
+						out << "\n" << k << " : " << obj->getValue<float>(k);
+					} catch (...) {
+						out << "\n<invalid>";
+					}
+				}
+			}
+		}
+	}
+	return out.str();
+}
+
+std::string
+DownloadManager::ExtractHTTP422Reasons(Poco::JSON::Object::Ptr errors)
+{
+	return ExtractFromJSONObject(errors);
 }
 
 // lua start
