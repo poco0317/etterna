@@ -189,6 +189,8 @@ class DownloadManager
 	bool IsLoggedIn();
 	bool IsInGameplay();
 	bool ShouldUploadScores();
+	std::string GetSessionUser();
+	std::string GetSessionToken();
 
 	// State setters
 	void SetInGameplay(bool inGameplay);

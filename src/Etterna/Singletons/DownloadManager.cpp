@@ -450,6 +450,18 @@ DownloadManager::ShouldUploadScores()
 	//	   GamePreferences::m_AutoPlay == PC_HUMAN;
 }
 
+std::string
+DownloadManager::GetSessionUser()
+{
+	return sessionUser;
+}
+
+std::string
+DownloadManager::GetSessionToken()
+{
+	return sessionToken;
+}
+
 void
 DownloadManager::LoginRequest(const std::string& username, const std::string& password)
 {
@@ -1725,7 +1737,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
   public:
 	static int GetCountryCodes(T* p, lua_State* L)
 	{
-		auto& codes = DLMAN->countryCodes;
+		auto& codes = p->countryCodes;
 		LuaHelpers::CreateTableFromArray(codes, L);
 		return 1;
 	}
@@ -1736,7 +1748,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetAllPacks(T* p, lua_State* L)
 	{
-		std::vector<DownloadablePack>& packs = DLMAN->downloadablePacks;
+		std::vector<DownloadablePack>& packs = p->downloadablePacks;
 		lua_createtable(L, packs.size(), 0);
 		for (unsigned i = 0; i < packs.size(); ++i) {
 			packs[i].PushSelf(L);
@@ -1746,7 +1758,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetDownloadingPacks(T* p, lua_State* L)
 	{
-		std::vector<DownloadablePack>& packs = DLMAN->downloadablePacks;
+		std::vector<DownloadablePack>& packs = p->downloadablePacks;
 		std::vector<DownloadablePack*> dling;
 		for (auto& pack : packs) {
 			if (pack.downloading)
@@ -1770,18 +1782,17 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetUsername(T* p, lua_State* L)
 	{
-		lua_pushstring(L, "");
+		lua_pushstring(L, p->GetSessionUser().c_str());
 		return 1;
 	}
 	static int GetSkillsetRank(T* p, lua_State* L)
 	{
-		lua_pushnumber(L, DLMAN->GetSkillsetRank(Enum::Check<Skillset>(L, 1)));
+		lua_pushnumber(L, p->GetSkillsetRank(Enum::Check<Skillset>(L, 1)));
 		return 1;
 	}
 	static int GetSkillsetRating(T* p, lua_State* L)
 	{
-		lua_pushnumber(L,
-					   DLMAN->GetSkillsetRating(Enum::Check<Skillset>(L, 1)));
+		lua_pushnumber(L, p->GetSkillsetRating(Enum::Check<Skillset>(L, 1)));
 		return 1;
 	}
 	static int GetDownloads(T* p, lua_State* L)
@@ -1801,24 +1812,24 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int IsLoggedIn(T* p, lua_State* L)
 	{
-		lua_pushboolean(L, false);
+		lua_pushboolean(L, p->IsLoggedIn());
 		return 1;
 	}
 	static int Login(T* p, lua_State* L)
 	{
-		DLMAN->Login(SArg(1), SArg(2));
+		p->Login(SArg(1), SArg(2));
 		return 0;
 	}
 	static int LoginWithToken(T* p, lua_State* L)
 	{
 		std::string user = SArg(1);
 		std::string token = SArg(2);
-		DLMAN->LoginWithToken(token, user);
+		p->LoginWithToken(token, user);
 		return 0;
 	}
 	static int Logout(T* p, lua_State* L)
 	{
-		DLMAN->Logout();
+		p->Logout();
 		return 0;
 	}
 	static int GetLastVersion(T* p, lua_State* L)
@@ -1836,7 +1847,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		int rank = IArg(1);
 		auto ss = Enum::Check<Skillset>(L, 2);
 		bool result;
-		auto onlineScore = DLMAN->GetTopSkillsetScore(rank, ss, result);
+		auto onlineScore = p->GetTopSkillsetScore(rank, ss, result);
 		if (!result) {
 			lua_pushnil(L);
 			return 1;
@@ -1861,8 +1872,8 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	static int GetTopChartScoreCount(T* p, lua_State* L)
 	{
 		std::string ck = SArg(1);
-		if (DLMAN->chartLeaderboards.count(ck))
-			lua_pushnumber(L, DLMAN->chartLeaderboards[ck].size());
+		if (p->chartLeaderboards.count(ck))
+			lua_pushnumber(L, p->chartLeaderboards[ck].size());
 		else
 			lua_pushnumber(L, 0);
 		return 1;
@@ -1872,13 +1883,13 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		std::string chartkey = SArg(1);
 		int rank = IArg(2);
 		int index = rank - 1;
-		if (index < 0 || !DLMAN->chartLeaderboards.count(chartkey) ||
+		if (index < 0 || !p->chartLeaderboards.count(chartkey) ||
 			index >=
-			  static_cast<int>(DLMAN->chartLeaderboards[chartkey].size())) {
+			  static_cast<int>(p->chartLeaderboards[chartkey].size())) {
 			lua_pushnil(L);
 			return 1;
 		}
-		auto& score = DLMAN->chartLeaderboards[chartkey][index];
+		auto& score = p->chartLeaderboards[chartkey][index];
 		lua_createtable(
 		  L, 0, 17 + NUM_Skillset + (score.replayData.empty() ? 0 : 1));
 		FOREACH_ENUM(Skillset, ss)
@@ -1988,7 +1999,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int GetToken(T* p, lua_State* L)
 	{
-		lua_pushstring(L, "token");
+		lua_pushstring(L, p->GetSessionToken().c_str());
 		return 1;
 	}
 
@@ -2040,7 +2051,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		// allow another request for those -- if it gets ranked during a session
 		std::string chart = SArg(1);
 		LuaReference ref;
-		auto& leaderboardScores = DLMAN->chartLeaderboards[chart];
+		auto& leaderboardScores = p->chartLeaderboards[chart];
 		if (lua_isfunction(L, 2)) {
 			lua_pushvalue(L, 2);
 			ref.SetFromStack(L);
@@ -2073,7 +2084,7 @@ class LunaDownloadManager : public Luna<DownloadManager>
 		std::vector<HighScore*> filteredLeaderboardScores;
 		std::unordered_set<std::string> userswithscores;
 		auto ck = SArg(1);
-		auto& leaderboardScores = DLMAN->chartLeaderboards[ck];
+		auto& leaderboardScores = p->chartLeaderboards[ck];
 		std::string country = "";
 		if (!lua_isnoneornil(L, 2)) {
 			country = SArg(2);

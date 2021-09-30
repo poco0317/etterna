@@ -57,7 +57,7 @@ local translated_info = {
 	NoReplayData = THEME:GetString("TabScore", "NoReplayData"),
 	ShowReplay = THEME:GetString("TabScore", "ShowReplay"),
 	ShowEval = THEME:GetString("TabScore", "ShowEval"),
-	UploadReplay = THEME:GetString("TabScore", "UploadReplay"),
+	UploadScore = THEME:GetString("TabScore", "UploadScore"),
 	UploadAllScoreChart=THEME:GetString("TabScore", "UploadAllScoreChart"),
 	UploadAllScorePack=THEME:GetString("TabScore", "UploadAllScorePack"),
 	UploadAllScore=THEME:GetString("TabScore", "UploadAllScore"),
@@ -798,7 +798,7 @@ l[#l + 1] =
 		end,
 		DisplayCommand = function(self)
 			if hasReplayData then
-				self:settext(translated_info["UploadReplay"])
+				self:settext(translated_info["UploadScore"])
 			else
 				self:settext("")
 			end
@@ -809,8 +809,7 @@ l[#l + 1] =
 		MouseLeftClickMessageCommand = function(self)
 			if nestedTab == 1 then
 				if getTabIndex() == 2 and isOver(self) and DLMAN:IsLoggedIn() then
-					DLMAN:SendReplayDataForOldScore(score:GetScoreKey())
-					ms.ok(translated_info["UploadingReplay"]) --should have better feedback -mina
+					DLMAN:UploadThisScore(score)
 				elseif getTabIndex() == 2 and isOver(self) and not DLMAN:IsLoggedIn() then
 					ms.ok(translated_info["NotLoggedIn"])
 				end
