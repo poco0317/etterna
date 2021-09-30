@@ -201,6 +201,8 @@ class DownloadManager
 	{
 		LoginRequest(username, password);
 	}
+	void LoginWithToken(const std::string& sessionToken,
+						const std::string& username);
 	void Logout();
 	void GetRankedChartkeys(
 	  bool uploadAfterResponse = false,
@@ -229,7 +231,8 @@ class DownloadManager
 
   private:
 	// Events
-	bool OnLogin();
+	void OnLogin();
+	std::string OnAuthFailure(std::istream& responseData);
 
 	/// Create a request
 	void GenerateRequest(
@@ -284,6 +287,7 @@ class DownloadManager
 	bool inGameplay = false;
 
 	std::string sessionToken = "";
+	std::string sessionUser = "";
 
 	std::unordered_set<std::string> newlyRankedChartkeys;
 

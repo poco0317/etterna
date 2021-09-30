@@ -495,7 +495,8 @@ DownloadManager::LoginRequest(const std::string& username, const std::string& pa
 			Locator::getLogger()->warn(
 			  "Login FAILED - Client out of date or other error");
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
-			Locator::getLogger()->info("Login FAILED - Bad credentials");
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->info("Login FAILED - {}", reason);
 		} else {
 			Locator::getLogger()->warn("Login FAILED - Unexpected status: {}",
 									   status);
@@ -515,7 +516,7 @@ DownloadManager::LoginRequest(const std::string& username, const std::string& pa
 					apiShouldUseHttps);
 }
 
-bool
+void
 DownloadManager::OnLogin()
 {
 	if (IsLoggedIn()) {
@@ -530,20 +531,49 @@ DownloadManager::OnLogin()
 			GetRankedChartkeys(true, pocoDT);
 		}
 		MESSAGEMAN->Broadcast("LoginSuccessful");
-		return true;
-	} else {
-		MESSAGEMAN->Broadcast("LoginFailed");
-		return false;
 	}
+	MESSAGEMAN->Broadcast("LoginFailed");
+}
+
+std::string
+DownloadManager::OnAuthFailure(std::istream& responseData)
+{
+	// basically just force you to log out for now
+	// this can be modified to handle specific 401 response "subtypes"
+	// that is why the json is given
+	// parsed result turned into object
+	/*
+	Poco::JSON::Parser parser;
+	Poco::Dynamic::Var res = parser.parse(responseData);
+	Poco::JSON::Object::Ptr ret = res.extract<Poco::JSON::Object::Ptr>();
+	...
+	*/
+
+	Logout();
+
+	return std::string("Authorization Failure");
+}
+
+void
+DownloadManager::LoginWithToken(const std::string& sessionToken, const std::string& username)
+{
+	{
+		const std::lock_guard<std::mutex> lock(g_dlmutex);
+		this->sessionToken = sessionToken;
+		sessionUser = username;
+	}
+	OnLogin();
 }
 
 void
 DownloadManager::Logout()
 {
 	if (IsLoggedIn()) {
-		const std::lock_guard<std::mutex> lock(g_dlmutex);
-
-		sessionToken = "";
+		{
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+			sessionToken = "";
+			sessionUser = "";
+		}
 		// This is called on a shutdown, after MessageManager is gone
 		if (MESSAGEMAN != nullptr)
 			MESSAGEMAN->Broadcast("LogOut");
@@ -592,21 +622,9 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 				  e.message());
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
-			try {
-				// parsed result turned into object
-				Poco::Dynamic::Var res = parser.parse(in);
-				Poco::JSON::Object::Ptr ret =
-				  res.extract<Poco::JSON::Object::Ptr>();
-
-				auto reason = ret->getValue<std::string>("message");
-				Locator::getLogger()->warn(
-				  "GetRankedChartkeys FAILED (401) - {}", reason);
-			} catch (Poco::Exception& e) {
-				Locator::getLogger()->error(
-				  "GetRankedChartkeys FAILED (401 + Parse Error) - {} {}",
-				  e.name(),
-				  e.message());
-			}
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("GetRankedChartkeys FAILED (401) - {}",
+									   reason);
 		} else {
 			Locator::getLogger()->warn(
 			  "GetRankedChartkeys FAILED - Unexpected status: {}", status);
@@ -687,21 +705,9 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
 			ResetScoreAfterUploadFailure(hs);
-			try {
-				// parsed result turned into object
-				Poco::Dynamic::Var res = parser.parse(in);
-				Poco::JSON::Object::Ptr ret =
-				  res.extract<Poco::JSON::Object::Ptr>();
-
-				auto reason = ret->getValue<std::string>("message");
-				Locator::getLogger()->warn(
-				  "UploadSingleScore FAILED (401) - {}", reason);
-			} catch (Poco::Exception& e) {
-				Locator::getLogger()->error(
-				  "UploadSingleScore FAILED (401 + Parse Error) - {} {}",
-				  e.name(),
-				  e.message());
-			}
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("UploadSingleScore FAILED (401) - {}",
+									   reason);
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
 			ResetScoreAfterUploadFailure(hs);
 			try {
@@ -806,21 +812,9 @@ DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> h
 			}
 		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
 			ResetBulkScoresAfterUploadFailure(hsList);
-			try {
-				// parsed result turned into object
-				Poco::Dynamic::Var res = parser.parse(in);
-				Poco::JSON::Object::Ptr ret =
-				  res.extract<Poco::JSON::Object::Ptr>();
-
-				auto reason = ret->getValue<std::string>("message");
-				Locator::getLogger()->warn(
-				  "UploadBulkScores FAILED (401) - {}", reason);
-			} catch (Poco::Exception& e) {
-				Locator::getLogger()->error(
-				  "UploadBulkScores FAILED (401 + Parse Error) - {} {}",
-				  e.name(),
-				  e.message());
-			}
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("UploadBulkScores FAILED (401) - {}",
+									   reason);
 		} else if (status ==
 				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
 			ResetBulkScoresAfterUploadFailure(hsList);
@@ -1812,25 +1806,19 @@ class LunaDownloadManager : public Luna<DownloadManager>
 	}
 	static int Login(T* p, lua_State* L)
 	{
-		std::string user = SArg(1);
-		std::string pass = SArg(2);
-		//DLMAN->StartSession(user, pass);
+		DLMAN->Login(SArg(1), SArg(2));
 		return 0;
 	}
 	static int LoginWithToken(T* p, lua_State* L)
 	{
 		std::string user = SArg(1);
 		std::string token = SArg(2);
-		//DLMAN->EndSessionIfExists();
-		//DLMAN->authToken = token;
-		//DLMAN->sessionUser = user;
-		//DLMAN->sessionPass = "";
-		//DLMAN->OnLogin();
+		DLMAN->LoginWithToken(token, user);
 		return 0;
 	}
 	static int Logout(T* p, lua_State* L)
 	{
-		//DLMAN->EndSessionIfExists();
+		DLMAN->Logout();
 		return 0;
 	}
 	static int GetLastVersion(T* p, lua_State* L)
