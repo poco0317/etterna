@@ -612,6 +612,7 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 	RequestCallback callback = [this, uploadAfterResponse](std::istream& in, HTTPResponse& response) {
 		Poco::JSON::Parser parser;
 		std::unordered_set<std::string> new_chartkeys;
+		bool success = false;
 
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
@@ -628,6 +629,7 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 				}
 				Locator::getLogger()->info("Found {} newly ranked chartkeys",
 										   new_chartkeys.size());
+				success = true;
 			} catch (Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "GetRankedChartkeys FAILED (Parse Error) - {} {}",
@@ -643,11 +645,12 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 			  "GetRankedChartkeys FAILED - Unexpected status: {}", status);
 		}
 
+		if (success)
 		{
 			const std::lock_guard<std::mutex> lock(g_dlmutex);
 			newlyRankedChartkeys = new_chartkeys;
 		}
-		if (uploadAfterResponse) {
+		if (success && uploadAfterResponse) {
 			UploadAllPBs(false, true);
 		}
 
