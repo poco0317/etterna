@@ -445,9 +445,8 @@ DownloadManager::IsInGameplay()
 bool
 DownloadManager::ShouldUploadScores()
 {
-	return false;
-	// return LoggedIn() && automaticSync &&
-	//	   GamePreferences::m_AutoPlay == PC_HUMAN;
+	return IsLoggedIn() && automaticSync &&
+		   GamePreferences::m_AutoPlay == PC_HUMAN;
 }
 
 std::string
