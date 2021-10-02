@@ -29,7 +29,6 @@
 #include <unordered_set>
 #include <algorithm>
 
-#include "Poco/URI.h"
 #include "Poco/Net/SSLManager.h"
 #include "Poco/Net/ConsoleCertificateHandler.h"
 
@@ -186,12 +185,6 @@ DownloadManager::DownloadManager()
 							 "ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH");
 	Poco::Net::SSLManager::instance().initializeClient(0, pCert, pCtx);
 
-	p_httpsClientSession = new HTTPSClientSession;
-	p_httpClientSession = new HTTPClientSession;
-
-	SetClientSessionByURL(p_httpsClientSession, serverURL);
-	SetClientSessionByURL(p_httpClientSession, serverURL);
-
 	g_Shutdown = false;
 	DownloadManagerThread.SetName("DownloadManager thread");
 	DownloadManagerThread.Create(DownloadManager_Thread, this);
@@ -218,11 +211,6 @@ DownloadManager::~DownloadManager()
 	DownloadManagerThread.Wait();
 
 	EmptyTempDLFileDir();
-
-	if (p_httpsClientSession != nullptr)
-		delete p_httpsClientSession;
-	if (p_httpClientSession != nullptr)
-		delete p_httpClientSession;
 }
 
 void
@@ -242,8 +230,6 @@ DownloadManager::GenerateRequest(const std::string& url,
 {
 	Poco::URI uri(url);
 	std::string path(uri.getPathAndQuery());
-	auto host = uri.getHost();
-	auto port = uri.getPort();
 	if (path.empty())
 		path = "/";
 	HTTPRequest* request =
@@ -257,25 +243,16 @@ DownloadManager::GenerateRequest(const std::string& url,
 	if (IsLoggedIn())
 		request->setCredentials("Bearer", sessionToken);
 
-	// select session and request queue based on http/https
-	HTTPClientSession* session;
+	// select request queue based on http/https
 	std::vector<RequestData*>* requestQueue;
 	if (https) {
-		session = p_httpsClientSession;
 		requestQueue = &apiHttpsRequests;
 	} else {
-		session = p_httpClientSession;
 		requestQueue = &apiHttpRequests;
 	}
 
-	// if given a full url, change the host/port
-	if (!host.empty()) {
-		session->reset();
-		session->setHost(host);
-		session->setPort(port);
-	}
-
 	RequestData* reqdata = new RequestData();
+	reqdata->uri = uri;
 	reqdata->req = request;
 	reqdata->json = jsonPOST;
 	reqdata->form = form;
@@ -339,7 +316,9 @@ DownloadManager::UpdateHTTPSRequests(float fDeltaSeconds)
 		apiHttpsRequests.clear();
 	}
 	for (auto& p : reqs) {
-		ProcessRequest(p, *p_httpsClientSession);
+		Poco::Net::HTTPSClientSession sess;
+		SetClientSessionByURL(&sess, serverURL);
+		ProcessRequest(p, sess);
 		delete p;
 	}
 }
@@ -353,7 +332,9 @@ DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 		apiHttpRequests.clear();
 	}
 	for (auto& p : reqs) {
-		ProcessRequest(p, *p_httpClientSession);
+		Poco::Net::HTTPClientSession sess;
+		SetClientSessionByURL(&sess, serverURL);
+		ProcessRequest(p, sess);
 		delete p;
 	}
 }
@@ -361,10 +342,20 @@ DownloadManager::UpdateHTTPRequests(float fDeltaSeconds)
 inline void
 DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 {
+	auto& uri = data->uri;
 	auto& req = data->req;
 	auto& jsonPOST = data->json;
 	auto& form = data->form;
 	auto& callback = data->callback;
+
+	// if given a full url, change the host/port
+	auto host = uri.getHost();
+	auto port = uri.getPort();
+	if (!host.empty()) {
+		client.reset();
+		client.setHost(host);
+		client.setPort(port);
+	}
 
 	if (form != nullptr && jsonPOST != nullptr) {
 		Locator::getLogger()->warn(
@@ -376,7 +367,6 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 
 	HTTPResponse response;
 	try {
-
 		if (form != nullptr) {
 			// Usually a GET
 			// usually sends information as query params
@@ -403,6 +393,9 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 		// Callback handles parsing and further success checks
 		callback(respStream, response);
 
+		// Make double sure the request is gone through
+		client.flushRequest();
+
 		// TODO: TEMPORARY FOR DEBUGGING
 		Locator::getLogger()->info("{} {} {} {}",
 							response.getStatus(),
@@ -414,6 +407,7 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 								   e.className(),
 								   e.displayText(),
 								   e.message());
+		client.flushRequest();
 		client.reset();
 	}
 }

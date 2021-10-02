@@ -10,6 +10,7 @@
 #include "Etterna/Models/Misc/Difficulty.h"
 
 #include <unordered_set>
+#include "Poco/URI.h"
 #include "Poco/Net/HTTPRequest.h"
 #include "Poco/Net/HTTPResponse.h"
 #include "Poco/Net/HTTPSClientSession.h"
@@ -27,6 +28,7 @@ typedef std::function<void(std::istream&, HTTPResponse&)> RequestCallback;
 
 struct RequestData
 {
+	Poco::URI uri;
 	HTTPRequest* req;
 	Poco::JSON::Object* json; // for not GET
 	HTMLForm* form; // for GET
@@ -278,10 +280,6 @@ class DownloadManager
 	/// Active HTTP requests
 	std::vector<RequestData*> apiHttpsRequests{};
 	std::vector<RequestData*> apiHttpRequests{};
-	/// Main HTTPS Client Session
-	HTTPSClientSession* p_httpsClientSession;
-	/// Alternate HTTP Client Session
-	HTTPClientSession* p_httpClientSession;
 	/// Allow toggling https
 	bool apiShouldUseHttps = false;
 
