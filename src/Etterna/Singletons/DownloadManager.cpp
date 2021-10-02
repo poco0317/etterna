@@ -390,7 +390,7 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 			jsonPOST->stringify(ss);
 			req->setContentLength(ss.str().length());
 			std::ostream& os = client.sendRequest(*req);
-			jsonPOST->stringify(os);
+			os << ss.rdbuf();
 		} else {
 			// Any request type, no params attached
 			// usually a dumb GET
