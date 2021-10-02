@@ -536,7 +536,7 @@ DownloadManager::OnLogin()
 			auto lastCheckDT = prof->m_lastRankedChartkeyCheck;
 			// have to add 1990 here because DateTime doesnt track properly
 			Poco::DateTime pocoDT = Poco::DateTime(
-			  1990 + lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
+			  1900 + lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
 
 			// pass only 1 date, which sets the start of the range
 			// so it searches [start, inf]
@@ -596,16 +596,14 @@ DownloadManager::Logout()
 void
 DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco::DateTime start, const Poco::DateTime end)
 {
-	Locator::getLogger()->info("Generating ranked chartkeys request ...");
-
-	HTMLForm* form = new HTMLForm;
-	form->setEncoding(HTMLForm::ENCODING_URL);
-
 	std::string startstr =
 	  fmt::format("{}-{}-{}", start.year(), start.month(), start.day());
 	std::string endstr =
 	  fmt::format("{}-{}-{}", end.year(), end.month(), end.day());
+	Locator::getLogger()->info("Generating ranked chartkeys request {} to {}", startstr, endstr);
 
+	HTMLForm* form = new HTMLForm;
+	form->setEncoding(HTMLForm::ENCODING_URL);
 	form->set("start", startstr);
 	form->set("end", endstr);
 
