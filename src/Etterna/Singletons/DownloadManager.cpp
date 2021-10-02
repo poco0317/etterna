@@ -677,26 +677,25 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
 			try {
-				/*
+				
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
 				Poco::JSON::Object::Ptr ret =
 				  res.extract<Poco::JSON::Object::Ptr>();
+				auto data = ret->getObject("data");
 
-				auto overall = ret->getValue<float>("overall");
-				auto stream = ret->getValue<float>("stream");
-				auto jumpstream = ret->getValue<float>("jumpstream");
-				auto handstream = ret->getValue<float>("handstream");
-				auto jacks = ret->getValue<float>("jacks");
-				auto chordjacks = ret->getValue<float>("chordjacks");
-				auto stamina = ret->getValue<float>("stamina");
-				auto technical = ret->getValue<float>("technical");
+				auto stream = data->getValue<float>("stream");
+				auto jumpstream = data->getValue<float>("jumpstream");
+				auto handstream = data->getValue<float>("handstream");
+				auto jacks = data->getValue<float>("jacks");
+				auto chordjacks = data->getValue<float>("chordjacks");
+				auto stamina = data->getValue<float>("stamina");
+				auto technical = data->getValue<float>("technical");
 
 				Locator::getLogger()->info(
-				  "Uploaded score {} - \n\tOverall {}\n\tStream {}\n\tJS "
+				  "Uploaded score {} - \n\tStream {}\n\tJS "
 				  "{}\n\tHS {}\n\tJacks {}\n\tCJ {}\n\tStamina {}\n\tTech {}",
 				  hs->GetChartKey(),
-				  overall,
 				  stream,
 				  jumpstream,
 				  handstream,
@@ -704,7 +703,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				  chordjacks,
 				  stamina,
 				  technical);
-				*/
+				
 				Locator::getLogger()->info("Score {} uploaded",
 										   hs->GetScoreKey());
 
@@ -807,14 +806,46 @@ DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> h
 		auto status = response.getStatus();
 		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
 			try {
-				/*
+				
 				// parsed result turned into object
 				Poco::Dynamic::Var res = parser.parse(in);
-				Poco::JSON::Object::Ptr ret =
+				Poco::JSON::Object::Ptr data =
 				  res.extract<Poco::JSON::Object::Ptr>();
+				//auto data = ret->getObject("data");
 
-				// nothing returned?
-				*/
+				auto ratingObj = data->getObject("playerRating");
+				auto failedUploads = data->getArray("failedUploads");
+
+				auto stream = ratingObj->getValue<float>("stream");
+				auto jumpstream = ratingObj->getValue<float>("jumpstream");
+				auto handstream = ratingObj->getValue<float>("handstream");
+				auto jacks = ratingObj->getValue<float>("jacks");
+				auto chordjacks = ratingObj->getValue<float>("chordjacks");
+				auto stamina = ratingObj->getValue<float>("stamina");
+				auto technical = ratingObj->getValue<float>("technical");
+
+				Locator::getLogger()->info(
+				  "Successfully uploaded {}/{} bulk scores - New player rating:"
+				  "\n\tStream {}\n\tJS "
+				  "{}\n\tHS {}\n\tJacks {}\n\tCJ {}\n\tStamina {}\n\tTech {}",
+				  hsList.size() - failedUploads->size(),
+				  hsList.size(),
+				  stream,
+				  jumpstream,
+				  handstream,
+				  jacks,
+				  chordjacks,
+				  stamina,
+				  technical);
+
+				if (failedUploads->size() > 0) {
+					auto failstr = ExtractFromJSONArray(failedUploads);
+					Locator::getLogger()->info(" Failed uploads: {}{}", failedUploads->size(), failstr);
+				} else {
+					Locator::getLogger()->info(" No failed uploads");
+				}
+				
+				
 				UpdateBulkScoresAfterUploadSuccess(hsList);
 				success = true;
 			} catch (Poco::Exception& e) {
