@@ -409,7 +409,7 @@ DownloadManager::ProcessRequest(RequestData*& data, HTTPClientSession& client)
 							response.getContentType(),
 							response.getReason(),
 							response.getContentLength());
-	} catch (Poco::Exception& e) {
+	} catch (const Poco::Exception& e) {
 		Locator::getLogger()->info("HTTP Request Exception: {} {} {}",
 								   e.className(),
 								   e.displayText(),
@@ -496,7 +496,7 @@ DownloadManager::LoginRequest(const std::string& username, const std::string& pa
 					Locator::getLogger()->error(
 					  "Login FAILED - Parse error: Missing response token");
 				}
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "Login FAILED - Exception occurred: {} {}",
 				  e.name(),
@@ -628,7 +628,7 @@ DownloadManager::GetRankedChartkeysRequest(bool uploadAfterResponse, const Poco:
 				Locator::getLogger()->info("Found {} newly ranked chartkeys",
 										   new_chartkeys.size());
 				success = true;
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "GetRankedChartkeys FAILED (Parse Error) - {} {}",
 				  e.name(),
@@ -709,7 +709,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 
 				UpdateScoreAfterUploadSuccess(hs);
 				success = true;
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				ResetScoreAfterUploadFailure(hs);
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (Parse Error) - {} {}",
@@ -732,7 +732,7 @@ DownloadManager::UploadSingleScoreRequest(HighScore* hs)
 				auto reasonstr = ExtractHTTP422Reasons(ret);
 				Locator::getLogger()->warn(
 				  "UploadSingleScore FAILED (422) - {}", reasonstr);
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadSingleScore FAILED (422 + Parse Error) - {} {}",
 				  e.name(),
@@ -848,7 +848,7 @@ DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> h
 				
 				UpdateBulkScoresAfterUploadSuccess(hsList);
 				success = true;
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				ResetBulkScoresAfterUploadFailure(hsList);
 				Locator::getLogger()->error(
 				  "UploadBulkScores FAILED (Parse Error) - {} {}",
@@ -872,7 +872,7 @@ DownloadManager::UploadBulkScoresRequestInternal(const std::vector<HighScore*> h
 				auto reasonstr = ExtractHTTP422Reasons(ret);
 				Locator::getLogger()->warn("UploadBulkScores FAILED (422) - {}",
 										   reasonstr);
-			} catch (Poco::Exception& e) {
+			} catch (const Poco::Exception& e) {
 				Locator::getLogger()->error(
 				  "UploadBulkScores FAILED (422 + Parse Error) - {} {}",
 				  e.name(),
