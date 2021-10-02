@@ -365,8 +365,12 @@ XMLProfile::LoadEttGeneralDataFromNode(const XNode* pNode)
 						 loadingProfile->m_iTotalGameplaySeconds);
 	pNode->GetChildValue("LastPlayedDate", s);
 	loadingProfile->m_LastPlayedDate.FromString(s);
-	pNode->GetChildValue("LastRankedChartkeyCheck", s);
-	loadingProfile->m_lastRankedChartkeyCheck.FromString(s);
+
+	// not resetting s causes this to be equivalent to LastPlayedDate
+	// only in cases where the node does not exist
+	// so make sure it exists
+	if (pNode->GetChildValue("LastRankedChartkeyCheck", s))
+		loadingProfile->m_lastRankedChartkeyCheck.FromString(s);
 	pNode->GetChildValue("TotalDancePoints",
 						 loadingProfile->m_iTotalDancePoints);
 	pNode->GetChildValue("NumToasties", loadingProfile->m_iNumToasties);
