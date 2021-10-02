@@ -527,10 +527,19 @@ DownloadManager::OnLogin()
 	if (IsLoggedIn()) {
 		auto* prof = PROFILEMAN->GetProfile(PLAYER_1);
 		if (prof != nullptr) {
+			auto rightNow = DateTime();
 			auto lastCheckDT = prof->m_lastRankedChartkeyCheck;
+			if (lastCheckDT.tm_year == rightNow.tm_year && lastCheckDT.tm_mon == rightNow.tm_mon && lastCheckDT.tm_mday == rightNow.tm_mday) {
+				// 1900-01-01
+				lastCheckDT.tm_year = 0;
+				lastCheckDT.tm_mon = 0;
+				lastCheckDT.tm_mday = 1;
+			}
 			// have to add 1990 here because DateTime doesnt track properly
+			// also have to add 1 because for some reason a DateTime month is [0,11]
+			// but a DateTime day is [1,31]
 			Poco::DateTime pocoDT = Poco::DateTime(
-			  1900 + lastCheckDT.tm_year, lastCheckDT.tm_mon, lastCheckDT.tm_mday);
+			  1900 + lastCheckDT.tm_year, lastCheckDT.tm_mon + 1, lastCheckDT.tm_mday);
 
 			// pass only 1 date, which sets the start of the range
 			// so it searches [start, inf]
