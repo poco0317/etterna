@@ -258,7 +258,6 @@ namespace GameLoop {
             GAMESTATE->Update(fDeltaTime);
             SCREENMAN->Update(fDeltaTime);
             NSMAN->Update(fDeltaTime);
-            DLMAN->Update(fDeltaTime);
 
             /* Important: Process input AFTER updating game logic, or input will be
              * acting on song beat from last frame */
