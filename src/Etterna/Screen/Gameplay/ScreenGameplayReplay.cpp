@@ -95,8 +95,7 @@ ScreenGameplayReplay::Init()
 
 ScreenGameplayReplay::~ScreenGameplayReplay()
 {
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("ScreenGameplayReplay::~ScreenGameplayReplay()");
+	Locator::getLogger()->debug("ScreenGameplayReplay::~ScreenGameplayReplay()");
 
 	if (!GAMESTATE->m_bRestartedGameplay) {
 		GAMESTATE->m_pPlayerState->m_PlayerOptions.Init();
@@ -228,9 +227,7 @@ ScreenGameplayReplay::Input(const InputEventPlus& input) -> bool
 				  input.type == IET_REPEAT) ||
 				 (input.DeviceI.device != DEVICE_KEYBOARD &&
 				  INPUTFILTER->GetSecsHeld(input.DeviceI) >= 1.0F))) {
-				if (PREFSMAN->m_verbose_log > 1) {
-					Locator::getLogger()->trace("Player {} went back", input.pn + 1);
-				}
+				Locator::getLogger()->info("Player {} went back", input.pn + 1);
 				BeginBackingOutFromGameplay();
 			} else if (PREFSMAN->m_bDelayedBack &&
 					   input.type == IET_FIRST_PRESS) {
@@ -286,7 +283,7 @@ ScreenGameplayReplay::SaveStats()
 void
 ScreenGameplayReplay::StageFinished(bool bBackedOut)
 {
-	Locator::getLogger()->trace("Finishing Stage");
+	Locator::getLogger()->info("Finishing Stage");
 	if (bBackedOut) {
 		GAMESTATE->CancelStage();
 		return;
@@ -302,7 +299,7 @@ ScreenGameplayReplay::StageFinished(bool bBackedOut)
 
 	STATSMAN->CalcAccumPlayedStageStats();
 	GAMESTATE->FinishStage();
-	Locator::getLogger()->trace("Done Finishing Stage");
+	Locator::getLogger()->info("Done Finishing Stage");
 }
 
 auto

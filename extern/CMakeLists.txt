@@ -28,6 +28,10 @@ set(CLANG_FORMAT_CMD OFF CACHE BOOL "" FORCE)   # Disable discord clang-format
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)     # Disable discord examples
 add_subdirectory(discord-rpc)
 
+## plog
+set(PLOG_BUILD_SAMPLES OFF)
+add_subdirectory(plog)
+
 # Poco Libraries
 set(FORCE_OPENSSL ON CACHE BOOL "" FORCE)      # Require OpenSSL
 set(ENABLE_NETSSL ON CACHE BOOL "" FORCE)      # For HTTPS
@@ -63,7 +67,6 @@ add_subdirectory(glew-1.5.8)
 add_subdirectory(zlib)
 add_subdirectory(mad-0.15.1b)
 add_subdirectory(fmt)
-add_subdirectory(plog)
 add_subdirectory(boost/nowide)
 add_subdirectory(filesystem)
 

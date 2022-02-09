@@ -33,12 +33,9 @@ EnumDevicesCallback(const DIDEVICEINSTANCE* pdidInstance, void* pContext)
 {
 	DIDevice device;
 
-//	if (PREFSMAN->m_verbose_log > 1)
-//		Locator::getLogger()->info("DInput: Enumerating device - Type: {} Instance Name: \"{}\" "
-//			"Product Name: \"{}\"",
-//			pdidInstance->dwDevType,
-//			pdidInstance->tszInstanceName,
-//			nowide::narrow(pdidInstance->tszProductName).c_str());
+	Locator::getLogger()->info("DInput: Enumerating device - Type: {0:#x} Instance Name: \"{1}\" "
+		"Product Name: \"{2}\"",
+		pdidInstance->dwDevType, pdidInstance->tszInstanceName, pdidInstance->tszProductName);
 
 	switch (GET_DIDEVICE_TYPE(pdidInstance->dwDevType)) {
 		case DI8DEVTYPE_JOYSTICK:
@@ -139,8 +136,7 @@ GetNumJoysticksSlow()
 
 InputHandler_DInput::InputHandler_DInput()
 {
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("InputHandler_DInput::InputHandler_DInput()");
+	Locator::getLogger()->debug("InputHandler_DInput::InputHandler_DInput()");
 
 	CheckForDirectInputDebugMode();
 
@@ -157,8 +153,7 @@ InputHandler_DInput::InputHandler_DInput()
 		RageException::Throw(
 		  hr_ssprintf(hr, "InputHandler_DInput: DirectInputCreate").c_str());
 
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_KEYBOARD)");
+	Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_KEYBOARD)");
 	hr = g_dinput->EnumDevices(
 	  DI8DEVCLASS_KEYBOARD, EnumDevicesCallback, nullptr, DIEDFL_ATTACHEDONLY);
 	if (hr != DI_OK)
@@ -166,8 +161,7 @@ InputHandler_DInput::InputHandler_DInput()
 		  hr_ssprintf(hr, "InputHandler_DInput: IDirectInput::EnumDevices")
 			.c_str());
 
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_JOYSTICK)");
+	Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_JOYSTICK)");
 	hr = g_dinput->EnumDevices(
 	  DI8DEVCLASS_GAMECTRL, EnumDevicesCallback, nullptr, DIEDFL_ATTACHEDONLY);
 	if (hr != DI_OK)
@@ -176,8 +170,7 @@ InputHandler_DInput::InputHandler_DInput()
 			.c_str());
 
 	// mouse
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_MOUSE)");
+	Locator::getLogger()->trace("InputHandler_DInput: IDirectInput::EnumDevices(DIDEVTYPE_MOUSE)");
 	hr = g_dinput->EnumDevices(
 	  DI8DEVCLASS_POINTER, EnumDevicesCallback, nullptr, DIEDFL_ATTACHEDONLY);
 	if (hr != DI_OK)
@@ -194,13 +187,11 @@ InputHandler_DInput::InputHandler_DInput()
 		continue;
 	}
 
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->info("Found {} DirectInput devices:", Devices.size());
+	Locator::getLogger()->info("Found {} DirectInput devices:", Devices.size());
 	for (unsigned i = 0; i < Devices.size(); ++i) {
-		if (PREFSMAN->m_verbose_log > 1)
-			Locator::getLogger()->info("   {}: '{}' axes: {}, hats: {}, buttons: {} ({})",
-					  i, Devices[i].m_sName.c_str(), Devices[i].axes, Devices[i].hats,
-					  Devices[i].buttons, Devices[i].buffered ? "buffered" : "unbuffered");
+		Locator::getLogger()->info("   {}: '{}' axes: {}, hats: {}, buttons: {} ({})",
+					i, Devices[i].m_sName.c_str(), Devices[i].axes, Devices[i].hats,
+					Devices[i].buttons, Devices[i].buffered ? "buffered" : "unbuffered");
 	}
 
 	m_iLastSeenNumHidDevices = GetNumHidDevices();
@@ -225,11 +216,9 @@ InputHandler_DInput::ShutdownThread()
 {
 	m_bShutdown = true;
 	if (m_InputThread.IsCreated()) {
-		if (PREFSMAN->m_verbose_log > 1)
-			Locator::getLogger()->trace("Shutting down DirectInput thread ...");
+		Locator::getLogger()->info("Shutting down DirectInput thread ...");
 		m_InputThread.Wait();
-		if (PREFSMAN->m_verbose_log > 1)
-			Locator::getLogger()->trace("DirectInput thread shut down.");
+		Locator::getLogger()->info("DirectInput thread shut down.");
 	}
 	m_bShutdown = false;
 }
@@ -531,7 +520,8 @@ InputHandler_DInput::UpdateBuffered(
 	}
 
 	if (hr != DI_OK) {
-		Locator::getLogger()->trace(hr_ssprintf(hr, "UpdateBuffered: IDirectInputDevice2_GetDeviceData"));
+		Locator::getLogger()->trace("{}", hr_ssprintf(
+		  hr, "UpdateBuffered: IDirectInputDevice2_GetDeviceData"));
 		return;
 	}
 
@@ -814,7 +804,8 @@ void
 InputHandler_DInput::InputThreadMain()
 {
 	if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST))
-		Locator::getLogger()->warn(werr_ssprintf(GetLastError(), "Failed to set DirectInput thread priority"));
+		Locator::getLogger()->warn("{}", werr_ssprintf(
+		  GetLastError(), "Failed to set DirectInput thread priority"));
 
 	// Enable priority boosting.
 	SetThreadPriorityBoost(GetCurrentThread(), FALSE);
@@ -841,7 +832,8 @@ InputHandler_DInput::InputThreadMain()
 
 			int ret = WaitForSingleObjectEx(Handle, 50, true);
 			if (ret == -1) {
-				Locator::getLogger()->trace(werr_ssprintf(GetLastError(), "WaitForSingleObjectEx failed"));
+				Locator::getLogger()->trace("{}", werr_ssprintf(
+				  GetLastError(), "WaitForSingleObjectEx failed"));
 				continue;
 			}
 

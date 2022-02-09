@@ -189,9 +189,6 @@ Calc::CalcMain(const std::vector<NoteInfo>& NoteInfo,
 		}
 	}
 
-	auto length_density_scaler =
-	  std::max(grindscaler.at(left_hand), grindscaler.at(right_hand));
-
 	// final output is the average of all skillset values of all iterations
 	// also applies the grindscaler
 	// (at the time of writing there is only 1 iteration)
@@ -202,9 +199,24 @@ Calc::CalcMain(const std::vector<NoteInfo>& NoteInfo,
 		for (auto& ssvals : all_skillset_values) {
 			iteration_ss_vals.push_back(ssvals[i]);
 		}
-		output[i] = mean(iteration_ss_vals) * length_density_scaler;
+		output[i] = mean(iteration_ss_vals);
 		iteration_ss_vals.clear();
 	}
+	// lighten grindscaler for jack files only
+	Skillset highest_final_ss = Skill_Overall;
+	auto highest_final_ssv = -1.F;
+	for (size_t i = 0; i < output.size(); i++) {
+		if (i == Skill_Overall)
+			continue;
+		if (output[i] > highest_final_ssv) {
+			highest_final_ss = static_cast<Skillset>(i);
+			highest_final_ssv = output[i];
+		}
+	}
+	if (highest_final_ss == Skill_JackSpeed || highest_final_ss == Skill_Chordjack)
+		grindscaler = fastsqrt(grindscaler);
+	for (auto& ssv : output)
+		ssv *= grindscaler;
 	return output;
 }
 
@@ -293,11 +305,14 @@ JackStamAdjust(const float x, Calc& calc, const int hand)
 	static const auto stam_mag = 23.F;
 	static const auto stam_fscale = 750.F;
 	static const auto stam_prop = 0.49424F;
+	// mod hard floor
 	auto stam_floor = 0.95F;
-	auto mod = 0.95F;
+	auto mod = 1.F;
 
 	auto avs2 = 0.F;
-	const auto super_stam_ceil = 1.09F;
+
+	// mod hard cap
+	const auto super_stam_ceil = 1.01F;
 
 	const auto& diff = calc.jack_diff.at(hand);
 	std::vector<std::pair<float, float>> output(diff.size());
@@ -473,7 +488,8 @@ Calc::InitializeHands(const std::vector<NoteInfo>& NoteInfo,
 		InitAdjDiff(*this, hand);
 
 		// post pattern mod smoothing for cj
-		Smooth(base_adj_diff.at(hand).at(Skill_Chordjack), 1.F, numitv);
+		// (Chordjack related tuning done: this is disabled for now)
+		// Smooth(base_adj_diff.at(hand).at(Skill_Chordjack), 1.F, numitv);
 	}
 
 	// debug info loop
@@ -755,9 +771,9 @@ Calc::InitAdjDiff(Calc& calc, const int& hand)
 		CJ,
 		CJDensity,
 		// CJOHJump // SQRTD BELOW
-		Chains,
+		CJOHAnchor,
 		VOHTrill,
-		WideRangeAnchor,
+		// WideRangeAnchor,
 	  	FlamJam, // you may say, why? why not?
 	  },
 
@@ -974,7 +990,7 @@ MinaSDCalcDebug(
 	}
 }
 
-int mina_calc_version = 461;
+int mina_calc_version = 472;
 auto
 GetCalcVersion() -> int
 {

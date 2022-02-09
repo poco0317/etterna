@@ -23,7 +23,7 @@ local steplength = 0
 local graphVecs = {}
 local jackdiffs = {}
 local ssrs = {}
-local grindscaler = {Left = 0, Right = 0}
+local grindscaler = 0
 local activeModGroup = 1
 local activeDiffGroup = 1
 local debugstrings
@@ -312,7 +312,7 @@ local debugGroups = {
         TotalPatternMod = true,
     },
     {   -- Group 10
-        Chains = true,
+        CJOHAnchor = true,
     },
     {   -- Group 11
         Chaos = true,
@@ -689,7 +689,7 @@ o[#o + 1] = Def.Quad {
 }
 
 -- graph bg
-o[#o + 1] = Def.Quad {
+o[#o + 1] = UIElements.QuadButton(1, 1) .. {
     InitCommand = function(self)
         self:zoomto(plotWidth, plotHeight):diffuse(color("#232323")):diffusealpha(
             bgalpha
@@ -697,7 +697,9 @@ o[#o + 1] = Def.Quad {
         topgraph = self
     end,
     DoTheThingCommand = function(self)
-        self:visible(song ~= nil)
+        local visible = song ~= nil
+        self:visible(visible)
+        self:z(visible and 5 or -5) -- higher button z has priority (to block musicwheel button clicking)
     end,
     HighlightCommand = function(self)
 		local bar = self:GetParent():GetChild("GraphSeekBar")
@@ -749,7 +751,7 @@ o[#o+1] = LoadFont("Common Normal") .. {
 }
 
 -- second bg
-o[#o + 1] = Def.Quad {
+o[#o + 1] = UIElements.QuadButton(1, 1) .. {
     Name = "G2BG",
     InitCommand = function(self)
         self:y(plotHeight + 5)
@@ -759,7 +761,9 @@ o[#o + 1] = Def.Quad {
         bottomgraph = self
     end,
     DoTheThingCommand = function(self)
-        self:visible(song ~= nil)
+        local visible = song ~= nil
+        self:visible(visible)
+        self:z(visible and 5 or -5) -- higher button z has priority (to block musicwheel button clicking)
     end,
     HighlightCommand = function(self)
 		local bar = self:GetParent():GetChild("Seek2")
@@ -886,7 +890,7 @@ local modnames = {
     --"cjj",
     "cjd",
     "hsd",
-    "chains",
+    "cjohanch",
     "ohj",
     --"ohjbp",
     --"ohjpc",
@@ -946,7 +950,7 @@ local modColors = {
 	--color("1,0,0"),			-- red			= chordjack jack
 	color("1,1,0"),			-- yellow		= cjdensity
     color("1,1,0"),         -- yello        = hsdensity
-    color(".1,.3,.9"),      -- something    = chains
+    color(".1,.3,.9"),      -- something    = CJOHAnchor
     color("1,0.4,0"),       -- orange2		= ohjump
 	--color("1,1,1"),			-- ohjbp
 	--color("1,1,1"),			-- ohjpc
@@ -1137,7 +1141,7 @@ o[#o + 1] = LoadFont("Common Normal") .. {
                 local reqpoints = tappoints * 0.93
                 self:settextf("Upper Bound: %.2f  |  Loss Sum L: %5.2f  |  Loss Sum R: %5.2f  |  Pt AfterLoss/Req/Max: %5.2f/%5.2f/%5.2f", lowerGraphMaxJack*0.9, jackLossSumLeft, jackLossSumRight, afterloss, reqpoints, maxpoints)
             else
-                self:settextf("Upper Bound: %.4f  |  Grindscaler: %5.2f   (L: %5.2f  R: %5.2f)", lowerGraphMax, math.max(grindscaler["Left"], grindscaler["Right"]), grindscaler["Left"], grindscaler["Right"])
+                self:settextf("Upper Bound: %.4f  |  Grindscaler: %5.2f", lowerGraphMax, grindscaler)
             end
         end
     end,

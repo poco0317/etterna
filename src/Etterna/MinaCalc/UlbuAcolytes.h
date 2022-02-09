@@ -10,13 +10,16 @@
  * patterns have lower enps than streams, streams default to 1 and chordstreams
  * start lower, stam is a special case and may use normalizers again */
 static const std::array<float, NUM_Skillset> basescalers = {
-	0.F, 0.93F, 0.885F, 0.84F, 0.93F, 0.91F, 0.8F, 0.83F
+	0.F, 0.93F, 0.885F, 0.84F, 0.93F, 1.02F, 0.785F, 0.83F
 };
 
 static const std::string calc_params_xml = "Save/calc params.xml";
 static const std::array<unsigned, num_hands> hand_col_ids = { 3, 12 };
 constexpr float interval_span = 0.5F;
 
+/// smoothing function to reduce spikes and holes in a given vector
+/// biases vector beginning towards neutral
+/// uses an average of 3 continuous elements
 inline void
 Smooth(std::vector<float>& input,
 	   const float neutral,
@@ -33,6 +36,9 @@ Smooth(std::vector<float>& input,
 	}
 }
 
+/// smoothing function to reduce spikes and holes in a given vector.
+/// biases vector beginning towards neutral
+/// uses an average of 2 continuous elements
 inline void
 MSSmooth(std::vector<float>& input,
 		 const float neutral,

@@ -3,6 +3,7 @@
 #include "ScreenManager.h"
 #include "Etterna/Models/Misc/Preference.h"
 #include "Core/Services/Locator.hpp"
+#include "Core/Platform/Platform.hpp"
 #include "RageUtil/File/RageFile.h"
 #include "DownloadManager.h"
 #include "GameState.h"
@@ -1232,14 +1233,18 @@ DownloadManager::RequestReplayData(const string& scoreid,
 
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("Malformed replay data request response: {}", req.result);
+			Locator::getLogger()->error(
+			  "Malformed replay data request response: {}", req.result);
 			return;
 		}
 		if (d.HasMember("errors")) {
 			StringBuffer buffer;
 			Writer<StringBuffer> writer(buffer);
 			d.Accept(writer);
-			Locator::getLogger()->trace("Replay data request failed for {} (Response: {})", scoreid, buffer.GetString());
+			Locator::getLogger()->error(
+			  "Replay data request failed for {} (Response: {})",
+			  scoreid,
+			  buffer.GetString());
 			return;
 		}
 
@@ -1256,7 +1261,13 @@ DownloadManager::RequestReplayData(const string& scoreid,
 				  std::make_pair(note[0].GetFloat(), note[1].GetFloat()));
 
 				timestamps.push_back(note[0].GetFloat());
-				offsets.push_back(note[1].GetFloat() / 1000.f);
+				// horrid temp hack --
+				// EO keeps misses as 180ms bads for not a great reason
+				// convert them back to misses here
+				auto offset = note[1].GetFloat() / 1000.F;
+				if (offset == .18F)
+					offset = 1.F;
+				offsets.push_back(offset);
 				if (note.Size() == 3 &&
 					note[2].IsInt()) { // pre-0.6 with noterows
 					rows.push_back(note[2].GetInt());
@@ -1346,7 +1357,9 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 	auto done = [chartkey, ref](HTTPRequest& req, CURLMsg*) {
 		Document d;
 		if (d.Parse(req.result.c_str()).HasParseError()) {
-			Locator::getLogger()->trace("RequestChartLeaderBoard Error: Malformed request response: {}", req.result);
+			Locator::getLogger()->error(
+			  "RequestChartLeaderBoard Error: Malformed request response: {}",
+			  req.result);
 			return;
 		}
 		std::vector<OnlineScore>& vec = DLMAN->chartLeaderboards[chartkey];
@@ -1378,7 +1391,7 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 					StringBuffer buffer;
 					Writer<StringBuffer> writer(buffer);
 					score_obj.Accept(writer);
-					Locator::getLogger()->trace(
+					Locator::getLogger()->warn(
 					  "Malformed score in chart leaderboard (chart: {}): {}",
 					  chartkey,
 					  buffer.GetString());
@@ -1511,8 +1524,7 @@ DownloadManager::RequestChartLeaderBoard(const string& chartkey,
 						tmp.wifeversion = 3;
 					else
 						tmp.wifeversion = 2;
-				}
-				else
+				} else
 					tmp.wifeversion = 2;
 
 				auto& ssrs = score["skillsets"];
@@ -1676,6 +1688,7 @@ Download::~Download()
 void
 Download::Install()
 {
+	Core::Platform::requestUserAttention();
 	Message* msg;
 	if (!DLMAN->InstallSmzip(m_TempFileName))
 		msg = new Message("DownloadFailed");
@@ -2363,8 +2376,8 @@ class LunaDownloadablePack : public Luna<DownloadablePack>
 	static int GetDownload(T* p, lua_State* L)
 	{
 		if (p->downloading) {
-			// using GetDownload on a download started by a Mirror isn't keyed by the Mirror url
-			// have to check both
+			// using GetDownload on a download started by a Mirror isn't keyed
+			// by the Mirror url have to check both
 			auto u = p->url;
 			auto m = p->mirror;
 			/*

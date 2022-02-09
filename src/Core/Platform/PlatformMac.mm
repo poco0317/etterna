@@ -192,4 +192,10 @@ namespace Core::Platform {
         Locator::getLogger()->warn("Core::Platform::unboostPriority not implemented");
 		return true;
     }
+
+    bool requestUserAttention()
+    {
+		[NSApp requestUserAttention:NSInformationalRequest];
+        return true;
+    }
 }

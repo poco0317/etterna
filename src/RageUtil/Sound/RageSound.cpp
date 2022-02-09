@@ -188,10 +188,9 @@ RageSound::Load(const std::string& sSoundFilePath,
 				bool bPrecache,
 				const RageSoundLoadParams* pParams)
 {
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("RageSound: Load \"{}\" (precache: {})",
-				   sSoundFilePath.c_str(),
-				   bPrecache);
+	Locator::getLogger()->debug("RageSound: Load \"{}\" (precache: {})",
+		sSoundFilePath.c_str(),
+		bPrecache);
 
 	if (pParams == nullptr) {
 		static const RageSoundLoadParams Defaults;
@@ -345,7 +344,16 @@ RageSound::GetDataToPlay(float* pBuffer,
 		RageSoundUtil::ConvertMonoToStereoInPlace(pBuffer, iFramesStored);
 	if (soundPlayCallback != nullptr) {
 		std::lock_guard<std::mutex> guard(recentSamplesMutex);
-		if (!soundPlayCallback->IsNil() && soundPlayCallback->IsSet()) {
+		// checking to see that the lua function exists
+		// also check to see that the source exists
+		// if the source exists, the sound is still valid
+		// why check to see that the source exists?
+		// the above lock has a chance to race:
+		//  lock is grabbed at ~RageSound, and source is nulled
+		//  lock is released, and then this code is executed
+		//  so if the source disappears before the lock is released, bad.
+		if (!soundPlayCallback->IsNil() && soundPlayCallback->IsSet() &&
+			  m_pSource != nullptr) {
 			unsigned int currentSamples = recentPCMSamples.size();
 			auto samplesToCopy =
 			  std::min(iFramesStored * m_pSource->GetNumChannels(),
@@ -353,9 +361,12 @@ RageSound::GetDataToPlay(float* pBuffer,
 			auto until = pBuffer + samplesToCopy;
 			copy(pBuffer, until, back_inserter(recentPCMSamples));
 			if (recentPCMSamples.size() >= recentPCMSamplesBufferSize) {
-				mufft_execute_plan_1d(fftPlan, fftBuffer.data(), recentPCMSamples.data());
-				recentPCMSamples.clear();
-				pendingPlayBackCall = true;
+				if (fftPlan != nullptr) {
+					mufft_execute_plan_1d(
+					  fftPlan, fftBuffer.data(), recentPCMSamples.data());
+					recentPCMSamples.clear();
+					pendingPlayBackCall = true;
+				}
 			}
 		}
 	}
@@ -415,9 +426,8 @@ RageSound::StartPlaying(float fGiven, bool forcedTime)
 	/* If m_StartTime is in the past, then we probably set a start time but took
 	 * too long loading.  We don't want that; log it, since it can be unobvious.
 	 */
-	if (!m_Param.m_StartTime.IsZero() && m_Param.m_StartTime.Ago() > 0 &&
-		PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("Sound \"{}\" has a start time {} seconds in the past",
+	if (!m_Param.m_StartTime.IsZero() && m_Param.m_StartTime.Ago() > 0)
+		Locator::getLogger()->debug("Sound \"{}\" has a start time {} seconds in the past",
 				   GetLoadedFilePath().c_str(),
 				   m_Param.m_StartTime.Ago());
 
@@ -858,6 +868,9 @@ RageSound::ActuallySetPlayBackCallback(const std::shared_ptr<LuaReference>& f,
 	fftBuffer.resize(recentPCMSamplesBufferSize / 2 + 1, {});
 	if (fftPlan) mufft_free_plan_1d(fftPlan);
 	fftPlan = mufft_create_plan_1d_r2c(recentPCMSamplesBufferSize, MUFFT_FLAG_CPU_ANY);
+	if (!fftPlan)
+		Locator::getLogger()->warn(
+		  "Failed to set playback callback in mufft...");
 }
 
 void

@@ -38,8 +38,7 @@ DIDevice::Open()
 {
 	m_sName = ConvertACPToUTF8(nowide::narrow(JoystickInst.tszProductName));
 
-	if (PREFSMAN->m_verbose_log > 1)
-		Locator::getLogger()->trace("Opening device '{}'", m_sName.c_str());
+	Locator::getLogger()->info("Opening DIDevice '{}'", m_sName.c_str());
 	buffered = true;
 
 	LPDIRECTINPUTDEVICE8 tmpdevice;
@@ -48,13 +47,15 @@ DIDevice::Open()
 	HRESULT hr =
 	  g_dinput->CreateDevice(JoystickInst.guidInstance, &tmpdevice, nullptr);
 	if (hr != DI_OK) {
-		Locator::getLogger()->info(hr_ssprintf(hr, "OpenDevice: IDirectInput_CreateDevice"));
+		Locator::getLogger()->info(
+		  "{}", hr_ssprintf(hr, "OpenDevice: IDirectInput_CreateDevice"));
 		return false;
 	}
 	hr = tmpdevice->QueryInterface(IID_IDirectInputDevice8, (LPVOID*)&Device);
 	tmpdevice->Release();
 	if (hr != DI_OK) {
 		Locator::getLogger()->info(
+		  "{}",
 		  hr_ssprintf(hr,
 					  "OpenDevice(%s): IDirectInputDevice::QueryInterface",
 					  m_sName.c_str())
@@ -68,7 +69,10 @@ DIDevice::Open()
 
 	hr = Device->SetCooperativeLevel(GraphicsWindow::GetHwnd(), coop);
 	if (hr != DI_OK) {
-		Locator::getLogger()->info(hr_ssprintf(hr, "OpenDevice(%s): IDirectInputDevice2::SetCooperativeLevel", m_sName.c_str()));
+		Locator::getLogger()->info("{}", hr_ssprintf(
+		  hr,
+		  "OpenDevice(%s): IDirectInputDevice2::SetCooperativeLevel",
+		  m_sName.c_str()));
 		return false;
 	}
 
@@ -85,6 +89,7 @@ DIDevice::Open()
 	}
 	if (hr != DI_OK) {
 		Locator::getLogger()->info(
+		  "{}",
 		  hr_ssprintf(hr,
 					  "OpenDevice(%s): IDirectInputDevice2::SetDataFormat",
 					  m_sName.c_str())
@@ -132,6 +137,7 @@ DIDevice::Open()
 			buffered = false;
 		} else if (hr != DI_OK) {
 			Locator::getLogger()->info(
+			  "{}",
 			  hr_ssprintf(hr,
 						  "OpenDevice(%s): IDirectInputDevice2::SetProperty",
 						  m_sName.c_str())
