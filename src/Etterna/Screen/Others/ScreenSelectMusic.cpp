@@ -474,6 +474,12 @@ ScreenSelectMusic::Input(const InputEventPlus& input)
 				   m_MusicWheel.IsSettled() && input.type == IET_FIRST_PRESS) {
 			if (ReloadCurrentPack())
 				return true;
+		} else if (holding_shift && bHoldingCtrl && c == 'O' &&
+				   m_MusicWheel.IsSettled()) {
+			SONGMAN->GenerateCachefilesForGroup(
+			  GetMusicWheel()->GetSelectedSection());
+			AfterMusicChange();
+			return true;
 		} else if (bHoldingCtrl && c == 'F' && m_MusicWheel.IsSettled() &&
 				   input.type == IET_FIRST_PRESS) {
 			if (ToggleCurrentFavorite())

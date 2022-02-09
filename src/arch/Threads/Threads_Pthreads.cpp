@@ -355,7 +355,7 @@ EventImpl_Pthreads::Wait(float timeout)
 		// The RageTimer clock is different than the wait clock; convert it.
 		timeval tv;
 		gettimeofday(&tv, NULL);
-		
+
 		RageTimer timeofday(tv.tv_sec, tv.tv_usec);
 		float fSecondsInFuture = timeout;
 		timeofday += fSecondsInFuture;
