@@ -404,9 +404,9 @@ namespace Core::Platform {
 		 * is less likely to have a false match, and will match the gameplay
 		 * window. If that fails, try the window name, which should match the
 		 * loading window. */
-		HWND hWnd = FindWindow(Core::AppInfo::APP_TITLE, nullptr);
+		HWND hWnd = FindWindow(nowide::widen(Core::AppInfo::APP_TITLE).c_str(), nullptr);
 		if (hWnd == nullptr)
-			hWnd = FindWindow(nullptr, Core::AppInfo::APP_TITLE);
+			hWnd = FindWindow(nullptr, nowide::widen(Core::AppInfo::APP_TITLE).c_str());
 
 		// If after two find window attempts, the pointer is still null,
 		// then no other game instance was found.

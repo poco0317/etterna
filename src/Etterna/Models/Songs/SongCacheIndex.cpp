@@ -815,7 +815,7 @@ SongCacheIndex::LoadCache(
 	  [&data, fivePercent, &abort](
 		int limit,
 		int offset,
-		std::vector<pair<pair<std::string, unsigned int>, Song*>*>* cachePart,
+		std::vector<std::pair<std::pair<std::string, unsigned int>, Song*>*>* cachePart,
 		int index) {
 		  auto counter = 0;
 		  auto lastUpdate = 0;
@@ -867,7 +867,7 @@ SongCacheIndex::LoadCache(
 	threadpool.reserve(threads);
 	for (unsigned int i = 0; i < threads; i++)
 		threadpool.emplace_back(
-		  thread(threadCallback, limit, i * limit, &(cacheParts[i]), i));
+		  std::thread(threadCallback, limit, i * limit, &(cacheParts[i]), i));
 	Locator::getLogger()->info("LoadCache Started {} Threads", threads);
 	while (data._threadsFinished < static_cast<int>(threads)) {
 		data.waitForUpdate();

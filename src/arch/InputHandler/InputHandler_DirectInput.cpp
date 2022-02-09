@@ -33,9 +33,12 @@ EnumDevicesCallback(const DIDEVICEINSTANCE* pdidInstance, void* pContext)
 {
 	DIDevice device;
 
-	Locator::getLogger()->info("DInput: Enumerating device - Type: {0:#x} Instance Name: \"{1}\" "
-		"Product Name: \"{2}\"",
-		pdidInstance->dwDevType, pdidInstance->tszInstanceName, pdidInstance->tszProductName);
+	Locator::getLogger()->info(
+	  "DInput: Enumerating device - Type: {0:#x} Instance Name: \"{1}\" "
+	  "Product Name: \"{2}\"",
+	  pdidInstance->dwDevType,
+	  nowide::narrow(pdidInstance->tszInstanceName),
+	  nowide::narrow(pdidInstance->tszProductName));
 
 	switch (GET_DIDEVICE_TYPE(pdidInstance->dwDevType)) {
 		case DI8DEVTYPE_JOYSTICK:

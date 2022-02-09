@@ -29,14 +29,16 @@
 #include "Etterna/MinaCalc/MinaCalc.h"
 #include "Etterna/FileTypes/XmlFileUtil.h"
 
+#include <fstream>
+#include "Etterna/Globals/zip_file.hpp"
+#include <Etterna/Models/NoteWriters/NotesWriterSSC.h>
+
 #include <numeric>
 #include <algorithm>
 #include <mutex>
 #include <utility>
 
 typedef std::string SongDir;
-#include <fstream>
-#include "Etterna/Globals/zip_file.hpp"
 struct Group
 {
 	std::string name;
@@ -1134,8 +1136,7 @@ SongManager::ForceReloadSongGroup(const std::string& sGroupName) const
 }
 
 void
-SongManager::GetFavoriteSongs(std::vector<Song*>& songs) const
-SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
+SongManager::GenerateCachefilesForGroup(const std::string& sGroupName) const
 {
 	SCREENMAN->SystemMessage(ssprintf("Generating cache files for %s", sGroupName.c_str()));
 	auto songs = GetSongs(sGroupName);
@@ -1146,8 +1147,8 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 
 		// Save ssc/sm5 cache file
 		{
-			RString tmpOutPutPath = "Cache/tmp.ssc";
-			RString sscCacheFilePath = sdir + "songdata.cache";
+			std::string tmpOutPutPath = "Cache/tmp.ssc";
+			std::string sscCacheFilePath = sdir + "songdata.cache";
 
 			NotesWriterSSC::Write(tmpOutPutPath, *s, s->GetAllSteps(), true);
 
@@ -1157,7 +1158,7 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 									 tmpOutPutPath.c_str(),
 									 f.GetError().c_str());
 			}
-			string p = f.GetPath();
+			std::string p = f.GetPath();
 			f.Close();
 			std::ofstream dst(sscCacheFilePath, std::ios::binary);
 			std::ifstream src(p, std::ios::binary);
@@ -1173,21 +1174,21 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 			TimingData* td = steps->GetTimingData();
 			NoteData nd;
 			steps->GetNoteData(nd);
-			LOG->Trace("Writing cache file for chart %s (%s)",
-					   s->GetDisplayMainTitle().c_str(),
-					   steps->GetChartKey().c_str());
+			Locator::getLogger()->info("Writing cache file for chart {} ({})",
+									   s->GetDisplayMainTitle(),
+									   steps->GetChartKey());
 
 			nd.LogNonEmptyRows(td);
 			auto& nerv = nd.GetNonEmptyRowVector();
 			auto& etaner = td->BuildAndGetEtaner(nerv);
 			auto& serializednd = nd.SerializeNoteData(etaner);
 
-			string path = sdir + steps->GetChartKey() + ".cache";
-			ofstream FILE(path, ios::binary);
+			std::string path = sdir + steps->GetChartKey() + ".cache";
+			std::ofstream FILE(path, std::ios::binary);
 			if (!FILE) {
-				LOG->Warn("Failed to cache song %s (%s)",
-						  s->GetDisplayMainTitle().c_str(),
-						  steps->GetChartKey().c_str());
+				Locator::getLogger()->warn("Failed to cache song {} ({})",
+										   s->GetDisplayMainTitle(),
+										   steps->GetChartKey());
 				continue;
 			}
 
@@ -1202,11 +1203,11 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 			steps->Compress();
 		}
 	}
-	LOG->Trace("Finished generating cache files for %s", sGroupName.c_str());
+	Locator::getLogger()->info("Finished generating cache files for %s", sGroupName.c_str());
 
 	SCREENMAN->SystemMessage("Zipping song directory...");
 	miniz_cpp::zip_file fi;
-	std::vector<RString> flist;
+	std::vector<std::string> flist;
 	FILEMAN->FlushDirCache("Songs/" + sGroupName + "/");
 	GetDirListingRecursive("Songs/" + sGroupName + "/", "*", flist);
 	for (auto thing : flist) {
@@ -1214,7 +1215,8 @@ SongManager::GenerateCachefilesForGroup(const RString& sGroupName) const
 		fi.write(thing);
 	}
 	fi.save("Cache/" + sGroupName + ".zip");
-	LOG->Trace("Finished zipping to Cache.");
+
+	SCREENMAN->SystemMessage(ssprintf("Finished generating and zipping cache files for %s", sGroupName.c_str()));
 
 	// DLMAN->UploadPackForRanking(sGroupName);
 }
