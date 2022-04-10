@@ -29,6 +29,7 @@
 
 #include <unordered_set>
 #include <algorithm>
+#include <iomanip>
 
 #include "Poco/Net/SSLManager.h"
 #include "Poco/Net/ConsoleCertificateHandler.h"
@@ -78,6 +79,7 @@ static const std::string API_RANKED_CHARTKEYS = "/charts/ranked";
 static const std::string API_UPLOAD_SCORE = "/scores";
 static const std::string API_UPLOAD_SCORE_BULK = "/scores/bulk";
 static const std::string API_FAVORITES = "/favorites";
+static const std::string API_GOALS = "/goals";
 
 bool
 DownloadManager::InstallSmzip(const std::string& sZipFile)
@@ -150,6 +152,15 @@ EmptyTempDLFileDir()
 		if (FILEMAN->IsAFile(file))
 			FILEMAN->Remove(file);
 	}
+}
+
+inline Poco::DateTime
+EttDateTimeToPocoDate(DateTime dt)
+{
+	// have to add 1990 here because DateTime doesnt track properly
+	// also have to add 1 because for some reason a DateTime month is [0,11]
+	// but a DateTime day is [1,31]
+	return Poco::DateTime(1900 + dt.tm_year, dt.tm_mon + 1, dt.tm_mday);
 }
 
 int
@@ -537,11 +548,7 @@ DownloadManager::OnLogin()
 				lastCheckDT.tm_mon = 0;
 				lastCheckDT.tm_mday = 1;
 			}
-			// have to add 1990 here because DateTime doesnt track properly
-			// also have to add 1 because for some reason a DateTime month is [0,11]
-			// but a DateTime day is [1,31]
-			Poco::DateTime pocoDT = Poco::DateTime(
-			  1900 + lastCheckDT.tm_year, lastCheckDT.tm_mon + 1, lastCheckDT.tm_mday);
+			Poco::DateTime pocoDT = EttDateTimeToPocoDate(lastCheckDT);
 
 			// pass only 1 date, which sets the start of the range
 			// so it searches [start, inf]
@@ -1302,7 +1309,7 @@ DownloadManager::RemoveFavoriteRequest(const std::string& chartKey)
 			}
 		} else {
 			Locator::getLogger()->warn(
-			  "AddFavorite FAILED - Unexpected status: {}", status);
+			  "RemoveFavorite FAILED - Unexpected status: {}", status);
 		}
 
 		// do things if successful
@@ -1312,6 +1319,261 @@ DownloadManager::RemoveFavoriteRequest(const std::string& chartKey)
 	};
 
 	auto path = API_ROOT + API_FAVORITES + "/" + chartKey;
+	GenerateRequest(path,
+					callback,
+					nullptr,
+					nullptr,
+					HTTPRequest::HTTP_DELETE,
+					apiShouldUseHttps);
+}
+
+void
+DownloadManager::AddGoalRequest(ScoreGoal* goal)
+{
+	Locator::getLogger()->info("Generating Add Goal request ({} {} {})",
+							   goal->chartkey,
+							   goal->rate,
+							   goal->percent);
+
+	Poco::DateTime dt = EttDateTimeToPocoDate(goal->timeassigned);
+	std::string dtStr = fmt::format("{}-{}-{} {}:{}:{}",
+									dt.year(),
+									dt.month(),
+									dt.day(),
+									goal->timeassigned.tm_hour,
+									goal->timeassigned.tm_min,
+									goal->timeassigned.tm_sec);
+
+	/*
+	{
+		"key" : chartKey
+		"rate" : music rate
+		"wife" : percent [0,1]
+		"set_date" : date of set
+	}
+	*/
+	Poco::JSON::Object* json = new Poco::JSON::Object;
+	json->set("key", goal->chartkey);
+	json->set("rate", goal->rate);
+	json->set("wife", goal->percent);
+	json->set("set_date", dtStr);
+
+	RequestCallback callback = [this, goal](std::istream& in,
+												HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		bool success = false;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			Locator::getLogger()->info("AddGoal Success (({} {} {}))",
+									   goal->chartkey,
+									   goal->rate,
+									   goal->percent);
+
+			success = true;
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("AddGoal FAILED (401) - {}", reason);
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reasonstr = ExtractHTTP422Reasons(ret);
+				Locator::getLogger()->warn("AddGoal FAILED (422) - {}",
+										   reasonstr);
+			} catch (const Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "AddGoal FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "AddGoal FAILED - Unexpected status: {}", status);
+		}
+
+		// do things if successful
+		if (success) {
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_GOALS,
+					callback,
+					json,
+					HTTPRequest::HTTP_POST,
+					apiShouldUseHttps);
+}
+
+void
+DownloadManager::UpdateGoalRequest(ScoreGoal* goal)
+{
+	Locator::getLogger()->info("Generating Update Goal request ({} {} {} {})",
+							   goal->chartkey,
+							   goal->rate,
+							   goal->percent,
+							   goal->achieved);
+
+	Poco::DateTime dt = EttDateTimeToPocoDate(goal->timeassigned);
+	std::string dtStr = fmt::format("{}-{}-{} {}:{}:{}",
+									dt.year(),
+									dt.month(),
+									dt.day(),
+									goal->timeassigned.tm_hour,
+									goal->timeassigned.tm_min,
+									goal->timeassigned.tm_sec);
+
+	std::string achieveStr = "";
+	if (goal->achieved) {
+		Poco::DateTime achieved = EttDateTimeToPocoDate(goal->timeachieved);
+		std::string achieveStr = fmt::format("{}-{}-{} {}:{}:{}",
+											 achieved.year(),
+											 achieved.month(),
+											 achieved.day(),
+											 goal->timeachieved.tm_hour,
+											 goal->timeachieved.tm_min,
+											 goal->timeachieved.tm_sec);
+	}
+
+	/*
+	{
+		"key" : chartKey
+		"rate" : music rate
+		"wife" : percent [0,1]
+		"set_date" : date of set
+		"achieved" : 0/1
+		"achieved_date" : achieved date if achieved = 1
+	}
+	*/
+	Poco::JSON::Object* json = new Poco::JSON::Object;
+	json->set("key", goal->chartkey);
+	json->set("rate", goal->rate);
+	json->set("wife", goal->percent);
+	json->set("set_date", dtStr);
+	json->set("achieved", goal->achieved ? "1" : "0");
+	if (goal->achieved) {
+		json->set("achieved_date", achieveStr);
+	}
+
+	RequestCallback callback = [this, goal](std::istream& in,
+											HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		bool success = false;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			Locator::getLogger()->info("UpdateGoal Success (({} {} {}))",
+									   goal->chartkey,
+									   goal->rate,
+									   goal->percent);
+
+			success = true;
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("UpdateGoal FAILED (401) - {}", reason);
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_NOT_FOUND) {
+			Locator::getLogger()->warn("UpdateGoal FAILED (404) - Goal to "
+									   "update not found ({} {} {} {})",
+									   goal->chartkey,
+									   goal->rate,
+									   goal->percent,
+									   goal->achieved);
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reasonstr = ExtractHTTP422Reasons(ret);
+				Locator::getLogger()->warn("UpdateGoal FAILED (422) - {}",
+										   reasonstr);
+			} catch (const Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "UpdateGoal FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn("UpdateGoal FAILED - Unexpected status: {}",
+									   status);
+		}
+
+		// do things if successful
+		if (success) {
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_GOALS,
+					callback,
+					json,
+					HTTPRequest::HTTP_PATCH,
+					apiShouldUseHttps);
+}
+
+void
+DownloadManager::RemoveGoalRequest(ScoreGoal* goal)
+{
+	Locator::getLogger()->info("Generating Remove Goal request ({} {} {})",
+							   goal->chartkey,
+							   goal->rate,
+							   goal->percent);
+
+	RequestCallback callback = [this, goal](std::istream& in,
+												HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		bool success = false;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			Locator::getLogger()->info("RemoveGoal Success (({} {} {}))",
+									   goal->chartkey,
+									   goal->rate,
+									   goal->percent);
+			success = true;
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("RemoveGoal FAILED (401) - {}",
+									   reason);
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reasonstr = ExtractHTTP422Reasons(ret);
+				Locator::getLogger()->warn("RemoveGoal FAILED (422) - {}",
+										   reasonstr);
+			} catch (const Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "RemoveGoal FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "RemoveGoal FAILED - Unexpected status: {}", status);
+		}
+
+		// do things if successful
+		if (success) {
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	std::stringstream pathstrm;
+	pathstrm << API_ROOT << API_FAVORITES << "/" << goal->chartkey << "/"
+			 << std::fixed << std::setprecision(2) << goal->rate << "/"
+			 << goal->percent;
+	auto path = pathstrm.str();
 	GenerateRequest(path,
 					callback,
 					nullptr,

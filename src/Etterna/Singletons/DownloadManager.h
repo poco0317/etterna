@@ -26,6 +26,8 @@ using Poco::Net::HTMLForm;
 
 typedef std::function<void(std::istream&, HTTPResponse&)> RequestCallback;
 
+class ScoreGoal;
+
 struct RequestData
 {
 	Poco::URI uri;
@@ -227,6 +229,18 @@ class DownloadManager
 	{
 		RemoveFavoriteRequest(chartKey);
 	}
+	void AddGoal(ScoreGoal* goal)
+	{
+		AddGoalRequest(goal);
+	}
+	void UpdateGoal(ScoreGoal* goal)
+	{
+		UpdateGoalRequest(goal);
+	}
+	void RemoveGoal(ScoreGoal* goal)
+	{
+		RemoveGoalRequest(goal);
+	}
 
 	// The Score Upload Function
 	void UploadScore(HighScore* hs);
@@ -290,6 +304,9 @@ class DownloadManager
 	void UploadBulkScoresRequestInternal(const std::vector<HighScore*> hsList);
 	void AddFavoriteRequest(const std::string& chartKey);
 	void RemoveFavoriteRequest(const std::string& chartKey);
+	void AddGoalRequest(ScoreGoal* goal);
+	void UpdateGoalRequest(ScoreGoal* goal);
+	void RemoveGoalRequest(ScoreGoal* goal);
 
 	/// Active HTTP requests
 	std::vector<RequestData*> apiHttpsRequests{};
