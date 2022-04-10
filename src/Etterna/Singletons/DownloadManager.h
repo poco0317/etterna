@@ -219,6 +219,14 @@ class DownloadManager
 	{
 		GetRankedChartkeysRequest(uploadAfterResponse, start, end);
 	}
+	void AddFavorite(const std::string& chartKey)
+	{
+		AddFavoriteRequest(chartKey);
+	}
+	void RemoveFavorite(const std::string& chartKey)
+	{
+		RemoveFavoriteRequest(chartKey);
+	}
 
 	// The Score Upload Function
 	void UploadScore(HighScore* hs);
@@ -280,6 +288,8 @@ class DownloadManager
 	void UploadSingleScoreRequest(HighScore* hs);
 	void UploadBulkScoresRequest(std::vector<HighScore*>& hsList);
 	void UploadBulkScoresRequestInternal(const std::vector<HighScore*> hsList);
+	void AddFavoriteRequest(const std::string& chartKey);
+	void RemoveFavoriteRequest(const std::string& chartKey);
 
 	/// Active HTTP requests
 	std::vector<RequestData*> apiHttpsRequests{};

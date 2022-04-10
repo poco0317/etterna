@@ -77,6 +77,7 @@ static const std::string API_LOGIN = "/login";
 static const std::string API_RANKED_CHARTKEYS = "/charts/ranked";
 static const std::string API_UPLOAD_SCORE = "/scores";
 static const std::string API_UPLOAD_SCORE_BULK = "/scores/bulk";
+static const std::string API_FAVORITES = "/favorites";
 
 bool
 DownloadManager::InstallSmzip(const std::string& sZipFile)
@@ -1199,6 +1200,124 @@ DownloadManager::UploadPBsForPack(const std::string& pack, bool forceReupload)
 	} else {
 		Locator::getLogger()->info("ForceUploadPBsForPack: no scores to upload");
 	}
+}
+
+void
+DownloadManager::AddFavoriteRequest(const std::string& chartKey)
+{
+	Locator::getLogger()->info("Generating Add Favorite request ({})",
+							   chartKey);
+
+	/*
+	{ "key" : chartKey }
+	*/
+	Poco::JSON::Object* json = new Poco::JSON::Object;
+	json->set("key", chartKey);
+
+	RequestCallback callback = [this, chartKey](std::istream& in,
+										  HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		bool success = false;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			Locator::getLogger()->info(
+				"AddFavorite Success ({})", chartKey);
+
+			success = true;
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("AddFavorite FAILED (401) - {}",
+									   reason);
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reasonstr = ExtractHTTP422Reasons(ret);
+				Locator::getLogger()->warn(
+				  "AddFavorite FAILED (422) - {}", reasonstr);
+			} catch (const Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "AddFavorite FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "AddFavorite FAILED - Unexpected status: {}", status);
+		}
+
+		// do things if successful
+		if (success) {
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	GenerateRequest(API_ROOT + API_FAVORITES,
+					callback,
+					json,
+					HTTPRequest::HTTP_POST,
+					apiShouldUseHttps);
+}
+
+void
+DownloadManager::RemoveFavoriteRequest(const std::string& chartKey)
+{
+	Locator::getLogger()->info("Generating Remove Favorite request ({})",
+							   chartKey);
+
+	RequestCallback callback = [this, chartKey](std::istream& in,
+												HTTPResponse& response) {
+		Poco::JSON::Parser parser;
+		bool success = false;
+
+		auto status = response.getStatus();
+		if (status == HTTPResponse::HTTPStatus::HTTP_OK) {
+			Locator::getLogger()->info("RemoveFavorite Success ({})", chartKey);
+
+			success = true;
+		} else if (status == HTTPResponse::HTTPStatus::HTTP_UNAUTHORIZED) {
+			auto reason = OnAuthFailure(in);
+			Locator::getLogger()->warn("RemoveFavorite FAILED (401) - {}", reason);
+		} else if (status ==
+				   HTTPResponse::HTTPStatus::HTTP_UNPROCESSABLE_ENTITY) {
+			try {
+				// parsed result turned into object
+				Poco::Dynamic::Var res = parser.parse(in);
+				Poco::JSON::Object::Ptr ret =
+				  res.extract<Poco::JSON::Object::Ptr>();
+
+				auto reasonstr = ExtractHTTP422Reasons(ret);
+				Locator::getLogger()->warn("RemoveFavorite FAILED (422) - {}",
+										   reasonstr);
+			} catch (const Poco::Exception& e) {
+				Locator::getLogger()->error(
+				  "RemoveFavorite FAILED (422 + Parse Error) - {} {}",
+				  e.name(),
+				  e.message());
+			}
+		} else {
+			Locator::getLogger()->warn(
+			  "AddFavorite FAILED - Unexpected status: {}", status);
+		}
+
+		// do things if successful
+		if (success) {
+			const std::lock_guard<std::mutex> lock(g_dlmutex);
+		}
+	};
+
+	auto path = API_ROOT + API_FAVORITES + "/" + chartKey;
+	GenerateRequest(path,
+					callback,
+					nullptr,
+					nullptr,
+					HTTPRequest::HTTP_DELETE,
+					apiShouldUseHttps);
 }
 
 OnlineTopScore
