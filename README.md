@@ -18,7 +18,7 @@
 Etterna is a cross-platform rhythm game similar to [Dance Dance Revolution](https://en.wikipedia.org/wiki/Dance_Dance_Revolution). It started as a fork of [StepMania 5](https://github.com/stepmania/stepmania) (v5.0.12), with a focus on keyboard players. Over time, Etterna evolved into its own game, with in-game multiplayer, the online scoreboard [Etterna Online](https://etternaonline.com/), and a community of over 4,000 players.
 
 ## Table of Contents
-
+ 
 - [Installing](#Installing)
   - [Windows and macOS](#Windows-and-macOS)
   - [Linux](#Linux)
