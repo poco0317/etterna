@@ -141,7 +141,7 @@ namespace Core::Platform {
 
     Dimensions getScreenDimensions(){
         // Using X11 since it's currently a dependency, but is this the most portable?
-        auto display = XOpenDisplay(nullptr);
+        auto display = X11Helper::Dpy != nullptr ? X11Helper::Dpy : XOpenDisplay(nullptr);
         auto screen = XDefaultScreen(display);
         unsigned width = XDisplayWidth(display, screen);
         unsigned height = XDisplayHeight(display, screen);
@@ -196,7 +196,7 @@ namespace Core::Platform {
         std::string res;
 
         // Get reference to display then clipboard
-        Display *display = XOpenDisplay(nullptr);
+        Display *display = X11Helper::Dpy;
         if(display == nullptr){
             Locator::getLogger()->warn("Couldn't access clipboard. Can't open X Display.");
             return "";
@@ -280,9 +280,9 @@ namespace Core::Platform {
             XEvent realevent;
             Atom targets_atom, text_atom, UTF8, XA_ATOM = 4, XA_STRING = 31;
             while (scuffed_semaphor == 2) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 XPeekEvent(display, &event);
                 if (event.type != SelectionRequest && event.type != SelectionClear) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
                     continue;
                 }
                 Locator::getLogger()->warn("event ...");
@@ -315,6 +315,7 @@ namespace Core::Platform {
                     }
                     default: break;
                 }
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             Locator::getLogger()->warn("killed thread for the thing");
             scuffed_semaphor = 2;
