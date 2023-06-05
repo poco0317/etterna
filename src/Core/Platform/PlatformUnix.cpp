@@ -315,6 +315,7 @@ namespace Core::Platform {
                 }
             }
             Locator::getLogger()->warn("killed thread for the thing");
+            scuffed_semaphor = 2;
         }).detach();
 
         return true;
