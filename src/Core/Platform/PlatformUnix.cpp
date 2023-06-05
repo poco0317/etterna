@@ -9,6 +9,7 @@
 #include <fstream>
 #include <atomic>
 #include <thread>
+#include <chrono>
 
 #include <X11/Xlib.h>
 #include <sys/utsname.h>
@@ -274,13 +275,19 @@ namespace Core::Platform {
             }
         }
 
-        std::thread([&display, &clipboard, &text]() {
+        std::thread([display, &clipboard, &text]() {
             scuffed_semaphor = 2;
             Locator::getLogger()->warn("made new thread for the thing");
             XEvent event;
             Atom targets_atom, text_atom, UTF8, XA_ATOM = 4, XA_STRING = 31;
             while (scuffed_semaphor == 2) {
-                XNextEvent(display, &event);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                XPeekEvent(display, &event);
+                if (event.type != SelectionRequest && event.type != SelectionClear) {
+                    continue;
+                }
+
+                //XNextEvent(display, &event);
                 switch (event.type) {
                     case SelectionRequest: {
                         if (event.xselectionrequest.selection != clipboard) break;
