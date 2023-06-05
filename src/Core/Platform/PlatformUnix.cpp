@@ -279,6 +279,7 @@ namespace Core::Platform {
             scuffed_semaphor = 2;
             Locator::getLogger()->warn("made new thread for the thing");
             XEvent event;
+            XEvent realevent;
             Atom targets_atom, text_atom, UTF8, XA_ATOM = 4, XA_STRING = 31;
             while (scuffed_semaphor == 2) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -288,12 +289,12 @@ namespace Core::Platform {
                 }
                 Locator::getLogger()->warn("event ...");
 
-                //XNextEvent(display, &event);
                 switch (event.type) {
                     case SelectionRequest: {
-                        Locator::getLogger()->warn("got selectionrequest");
                         if (event.xselectionrequest.selection != clipboard) break;
-                        XSelectionRequestEvent* xsr = &event.xselectionrequest;
+                        Locator::getLogger()->warn("got selectionrequest");
+                        XNextEvent(display, &realevent);
+                        XSelectionRequestEvent* xsr = &realevent.xselectionrequest;
                         XSelectionEvent ev = {0};
                         int R = 0;
                         ev.type = SelectionNotify, ev.display = xsr->display, ev.requestor = xsr->requestor,
