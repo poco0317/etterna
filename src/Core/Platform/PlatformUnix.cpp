@@ -206,39 +206,34 @@ namespace Core::Platform {
         Window owner = XGetSelectionOwner(display, clipboard); // Get refernece to clipboard selection owner
         if (owner == None) return ""; // If there is no owner, there is no clipboard. (None is X11 null constant)
 
-        Atom target_property = XInternAtom(display, "ETT_CLIPBOARD", 0);
+        //Atom target_property = XInternAtom(display, "ETT_CLIPBOARD", 0);
 
         // Tell the owner we want a UTF8 string
         Atom utf8 = XInternAtom(display, "UTF8_STRING", 0);
-        XConvertSelection(display, clipboard, utf8, target_property, X11Helper::Win, CurrentTime);
+        XConvertSelection(display, clipboard, utf8, clipboard, X11Helper::Win, CurrentTime);
 
         // Event loop to want and check to see if the other application has convereted the
         // stirng as requested. We get notified on the SelectionNotify event. If it is successful,
         // we run the function that calls gets the X11 property. If it is not, we return an empty
         // string.
         XEvent ev;
-        XEvent event;
         XSelectionEvent *sev;
         while(true) {
             Locator::getLogger()->warn("looking for SelectionNotify");
-            XPeekEvent(display, &event);
-            if (event.type == SelectionNotify) {
-                Locator::getLogger()->warn("got it");
-                XNextEvent(display, &ev);
-                switch (ev.type) {
-                    case SelectionNotify: {
-                        sev = (XSelectionEvent*)&ev.xselection;
-                        if (sev->property != None) {
-                            res = getX11UTF8String(display, X11Helper::Win, target_property);
-                            goto main; // Jump down to the outside of the infinite while loop.
-                        } else {
-                            return "";
-                        }
-                        break;
+            XNextEvent(display, &ev);
+            switch (ev.type) {
+                case SelectionNotify: {
+                    sev = (XSelectionEvent*)&ev.xselection;
+                    if (sev->property != None) {
+                        res = getX11UTF8String(display, X11Helper::Win, clipboard);
+                        goto main; // Jump down to the outside of the infinite while loop.
+                    } else {
+                        return "";
                     }
-                    default: {
-                        Locator::getLogger()->warn("our event was stolen out from under us???");
-                    }
+                    break;
+                }
+                default: {
+                    Locator::getLogger()->warn("our event was stolen out from under us???");
                 }
             }
         }
@@ -294,9 +289,9 @@ namespace Core::Platform {
 
                 switch (event.type) {
                     case SelectionRequest: {
+                        XNextEvent(display, &realevent);
                         if (event.xselectionrequest.selection != clipboard) break;
                         Locator::getLogger()->warn("got selectionrequest");
-                        XNextEvent(display, &realevent);
                         XSelectionRequestEvent* xsr = &realevent.xselectionrequest;
                         XSelectionEvent ev = {0};
                         int R = 0;
