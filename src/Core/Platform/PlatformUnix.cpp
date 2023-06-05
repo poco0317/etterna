@@ -290,7 +290,12 @@ namespace Core::Platform {
                 switch (event.type) {
                     case SelectionRequest: {
                         XNextEvent(display, &realevent);
-                        if (event.xselectionrequest.selection != clipboard) break;
+                        if (event.xselectionrequest.selection != clipboard) {
+                            std::string xxx;
+                            xxx = XGetAtomName(display, event.xselectionrequest.selection);
+                            Locator::getLogger()->warn("selection wasnt clpboard but ...{}", xxx);
+                            break;
+                        }
                         Locator::getLogger()->warn("got selectionrequest");
                         XSelectionRequestEvent* xsr = &realevent.xselectionrequest;
                         XSelectionEvent ev = {0};
