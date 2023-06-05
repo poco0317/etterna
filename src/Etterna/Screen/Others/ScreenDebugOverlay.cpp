@@ -1602,8 +1602,10 @@ class DebugLineChartkey : public IDebugLine
 	std::string GetDisplayValue() override
 	{
 		auto c = GAMESTATE->m_pCurSteps;
-		if (c != nullptr)
+		if (c != nullptr) {
+			Core::Platform::setClipboardText(c->GetChartKey());
 			return c->GetChartKey();
+		}
 		return std::string("None");
 	}
 	std::string GetPageName() const override { return "Misc"; }

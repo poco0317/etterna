@@ -7,6 +7,8 @@
 
 #include <string>
 #include <fstream>
+#include <atomic>
+#include <thread>
 
 #include <X11/Xlib.h>
 #include <sys/utsname.h>
@@ -245,8 +247,67 @@ namespace Core::Platform {
     }
 
     bool setClipboardText(std::string text){
-        Locator::getLogger()->warn("Core::Platform::setClipboardText not implemented");
-        return false;
+        // Get reference to display then clipboard
+        Display *display = XOpenDisplay(nullptr);
+        if(display == nullptr){
+            Locator::getLogger()->warn("Couldn't access clipboard. Can't open X Display.");
+            return "";
+        }
+
+        Atom clipboard = XInternAtom(display, "CLIPBOARD", 0);
+
+        Window root = RootWindow(display, DefaultScreen(display));
+        Window target_window = XCreateSimpleWindow(display, root, -10, -10, 1, 1, 0, 0, 0);
+        Atom target_property = XInternAtom(display, "ETT_CLIPBOARD", 0);
+        XSetSelectionOwner(display, clipboard, target_window, 0);
+        if (XGetSelectionOwner (display, clipboard) != target_window) {
+            Locator::getLogger()->warn("Couldn't access clipboard. Failed to find target_window");
+            return false;
+        }
+
+        static std::atomic_int scuffed_semaphor = 0;
+
+        if (scuffed_semaphor == 2) {
+            scuffed_semaphor = 1;
+            while (scuffed_semaphor == 1) {
+                std::yield();
+            }
+        }
+
+        std::thread([&scuffed_semaphor, &display, &clipboard, &text]() {
+            scuffed_semaphor = 2;
+            Locator::getLogger()->warn("made new thread for the thing");
+            XEvent event;
+            Atom targets_atom, text_atom, UTF8, XA_ATOM = 4, XA_STRING = 31;
+            while (scuffed_semaphor == 2) {
+                XNextEvent(display, &event);
+                switch (event.type) {
+                    case SelectionRequest:
+                        if (event.xselectionrequest.selection != clipboard) break;
+                        XSelectionRequestEvent* xsr = &event.xselectionrequest;
+                        XSelectionEvent ev = {0};
+                        int R = 0;
+                        ev.type = SelectionNotify, ev.display = xsr->display, ev.requestor = xsr->requestor,
+                        ev.selection = xsr->selection, ev.time = xsr->time, ev.target = xsr->target, ev.property = xsr->property;
+                        if (ev.target == targets_atom)
+                            R = XChangeProperty(ev.display, ev.requestor, ev.property, XA_ATOM, 32, PropModeReplace, (unsigned char*)&UTF8, 1);
+                        else if (ev.target == XA_STRING || ev.target == text_atom)
+                            R = XChangeProperty(ev.display, ev.requestor, ev.property, XA_STRING, 8, PropModeReplace, text.c_str(), text.length());
+                        else if (ev.target == UTF8)
+                            R = XChangeProperty(ev.display, ev.requestor, ev.property, UTF8, 8, PropModeReplace, text.c_str(), text.length());
+                        else
+                            ev.property = None;
+                        if ((R & 2) == 0)
+                            XSendEvent(display, ev.requestor, 0, 0, (XEvent*)&ev);
+                        break;
+                    case SelectionClear:
+                        return;
+                }
+            }
+            Locator::getLogger()->warn("killed thread for the thing");
+        }).detach();
+
+        return true;
     }
 
     void setCursorVisible(bool value){
