@@ -292,9 +292,9 @@ namespace Core::Platform {
                         if (ev.target == targets_atom)
                             R = XChangeProperty(ev.display, ev.requestor, ev.property, XA_ATOM, 32, PropModeReplace, (unsigned char*)&UTF8, 1);
                         else if (ev.target == XA_STRING || ev.target == text_atom)
-                            R = XChangeProperty(ev.display, ev.requestor, ev.property, XA_STRING, 8, PropModeReplace, text.c_str(), text.length());
+                            R = XChangeProperty(ev.display, ev.requestor, ev.property, XA_STRING, 8, PropModeReplace, reinterpret_cast<const unsigned char*>(text.c_str()), text.length());
                         else if (ev.target == UTF8)
-                            R = XChangeProperty(ev.display, ev.requestor, ev.property, UTF8, 8, PropModeReplace, text.c_str(), text.length());
+                            R = XChangeProperty(ev.display, ev.requestor, ev.property, UTF8, 8, PropModeReplace, reinterpret_cast<const unsigned char*>(text.c_str()), text.length());
                         else
                             ev.property = None;
                         if ((R & 2) == 0)
