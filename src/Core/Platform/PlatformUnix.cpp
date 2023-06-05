@@ -270,11 +270,11 @@ namespace Core::Platform {
         if (scuffed_semaphor == 2) {
             scuffed_semaphor = 1;
             while (scuffed_semaphor == 1) {
-                std::yield();
+                std::this_thread::yield();
             }
         }
 
-        std::thread([&scuffed_semaphor, &display, &clipboard, &text]() {
+        std::thread([&display, &clipboard, &text]() {
             scuffed_semaphor = 2;
             Locator::getLogger()->warn("made new thread for the thing");
             XEvent event;
@@ -282,7 +282,7 @@ namespace Core::Platform {
             while (scuffed_semaphor == 2) {
                 XNextEvent(display, &event);
                 switch (event.type) {
-                    case SelectionRequest:
+                    case SelectionRequest: {
                         if (event.xselectionrequest.selection != clipboard) break;
                         XSelectionRequestEvent* xsr = &event.xselectionrequest;
                         XSelectionEvent ev = {0};
@@ -300,8 +300,11 @@ namespace Core::Platform {
                         if ((R & 2) == 0)
                             XSendEvent(display, ev.requestor, 0, 0, (XEvent*)&ev);
                         break;
-                    case SelectionClear:
+                    }
+                    case SelectionClear: {
                         return;
+                    }
+                    default: break;
                 }
             }
             Locator::getLogger()->warn("killed thread for the thing");
