@@ -219,16 +219,19 @@ namespace Core::Platform {
         XEvent ev;
         XSelectionEvent *sev;
         while(true) {
-            XNextEvent(display, &ev);
-            switch (ev.type) {
-                case SelectionNotify:
-                    sev = (XSelectionEvent*)&ev.xselection;
-                    if (sev->property != None) {
-                        res = getX11UTF8String(display, X11Helper::Win, target_property);
-                        goto main; // Jump down to the outside of the infinite while loop.
-                    } else {
-                        return "";
-                    }
+            XPeekEvent(display, &event);
+            if (event.type == SelectionNotify) {
+                XNextEvent(display, &ev);
+                switch (ev.type) {
+                    case SelectionNotify:
+                        sev = (XSelectionEvent*)&ev.xselection;
+                        if (sev->property != None) {
+                            res = getX11UTF8String(display, X11Helper::Win, target_property);
+                            goto main; // Jump down to the outside of the infinite while loop.
+                        } else {
+                            return "";
+                        }
+                }
             }
         }
         main: // Label to leave loop
@@ -238,7 +241,7 @@ namespace Core::Platform {
         // Remove newline characters
         res.erase(std::remove(res.begin(), res.end(), '\n'), res.end()); // Remove newlines
 		res.erase(std::remove(res.begin(), res.end(), '\r'), res.end()); // Remove carriage returns
-        
+
         return res;
     }
 
