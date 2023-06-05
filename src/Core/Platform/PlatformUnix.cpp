@@ -206,14 +206,11 @@ namespace Core::Platform {
         Window owner = XGetSelectionOwner(display, clipboard); // Get refernece to clipboard selection owner
         if (owner == None) return ""; // If there is no owner, there is no clipboard. (None is X11 null constant)
 
-        // Create a small window to paste clipboard into
-        Window root = RootWindow(display, DefaultScreen(display));
-        Window target_window = XCreateSimpleWindow(display, root, -10, -10, 1, 1, 0, 0, 0);
         Atom target_property = XInternAtom(display, "ETT_CLIPBOARD", 0);
 
         // Tell the owner we want a UTF8 string
         Atom utf8 = XInternAtom(display, "UTF8_STRING", 0);
-        XConvertSelection(display, clipboard, utf8, target_property, target_window, CurrentTime);
+        XConvertSelection(display, clipboard, utf8, target_property, X11Helper::Win, CurrentTime);
 
         // Event loop to want and check to see if the other application has convereted the
         // stirng as requested. We get notified on the SelectionNotify event. If it is successful,
@@ -227,7 +224,7 @@ namespace Core::Platform {
                 case SelectionNotify:
                     sev = (XSelectionEvent*)&ev.xselection;
                     if (sev->property != None) {
-                        res = getX11UTF8String(display, target_window, target_property);
+                        res = getX11UTF8String(display, X11Helper::Win, target_property);
                         goto main; // Jump down to the outside of the infinite while loop.
                     } else {
                         return "";
@@ -241,10 +238,7 @@ namespace Core::Platform {
         // Remove newline characters
         res.erase(std::remove(res.begin(), res.end(), '\n'), res.end()); // Remove newlines
 		res.erase(std::remove(res.begin(), res.end(), '\r'), res.end()); // Remove carriage returns
-
-        // Cleanup
-        XDestroyWindow(display, target_window);
-        XCloseDisplay(display);
+        
         return res;
     }
 
