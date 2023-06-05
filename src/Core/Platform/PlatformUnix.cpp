@@ -2,6 +2,7 @@
 #include "Core/Services/Locator.hpp"
 #include "Etterna/Singletons/PrefsManager.h"
 #include "Etterna/Globals/global.h"
+#include "archutils/Unix/X11Helper.h"
 
 #include <fmt/format.h>
 
@@ -249,19 +250,16 @@ namespace Core::Platform {
 
     bool setClipboardText(std::string text){
         // Get reference to display then clipboard
-        Display *display = XOpenDisplay(nullptr);
+        Display *display = X11Helper::Dpy;
         if(display == nullptr){
-            Locator::getLogger()->warn("Couldn't access clipboard. Can't open X Display.");
+            Locator::getLogger()->warn("Couldn't access clipboard. Can't get X Display.");
             return "";
         }
 
         Atom clipboard = XInternAtom(display, "CLIPBOARD", 0);
 
-        Window root = RootWindow(display, DefaultScreen(display));
-        Window target_window = XCreateSimpleWindow(display, root, -10, -10, 1, 1, 0, 0, 0);
-        Atom target_property = XInternAtom(display, "ETT_CLIPBOARD", 0);
-        XSetSelectionOwner(display, clipboard, target_window, 0);
-        if (XGetSelectionOwner (display, clipboard) != target_window) {
+        XSetSelectionOwner(display, clipboard, X11Helper::Win, 0);
+        if (XGetSelectionOwner(display, clipboard) != X11Helper::Win) {
             Locator::getLogger()->warn("Couldn't access clipboard. Failed to find target_window");
             return false;
         }
