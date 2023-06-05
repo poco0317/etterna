@@ -217,13 +217,16 @@ namespace Core::Platform {
         // we run the function that calls gets the X11 property. If it is not, we return an empty
         // string.
         XEvent ev;
+        XEvent event;
         XSelectionEvent *sev;
         while(true) {
+            Locator::getLogger()->warn("looking for SelectionNotify");
             XPeekEvent(display, &event);
             if (event.type == SelectionNotify) {
+                Locator::getLogger()->warn("got it");
                 XNextEvent(display, &ev);
                 switch (ev.type) {
-                    case SelectionNotify:
+                    case SelectionNotify: {
                         sev = (XSelectionEvent*)&ev.xselection;
                         if (sev->property != None) {
                             res = getX11UTF8String(display, X11Helper::Win, target_property);
@@ -231,6 +234,11 @@ namespace Core::Platform {
                         } else {
                             return "";
                         }
+                        break;
+                    }
+                    default: {
+                        Locator::getLogger()->warn("our event was stolen out from under us???");
+                    }
                 }
             }
         }
