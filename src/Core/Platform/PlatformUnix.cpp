@@ -286,10 +286,12 @@ namespace Core::Platform {
                 if (event.type != SelectionRequest && event.type != SelectionClear) {
                     continue;
                 }
+                Locator::getLogger()->warn("event ...");
 
                 //XNextEvent(display, &event);
                 switch (event.type) {
                     case SelectionRequest: {
+                        Locator::getLogger()->warn("got selectionrequest");
                         if (event.xselectionrequest.selection != clipboard) break;
                         XSelectionRequestEvent* xsr = &event.xselectionrequest;
                         XSelectionEvent ev = {0};
@@ -309,6 +311,7 @@ namespace Core::Platform {
                         break;
                     }
                     case SelectionClear: {
+                        Locator::getLogger()->warn("got selectionclear");
                         return;
                     }
                     default: break;
