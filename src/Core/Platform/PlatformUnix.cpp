@@ -293,7 +293,9 @@ namespace Core::Platform {
                         if (event.xselectionrequest.selection != clipboard) {
                             std::string xxx;
                             xxx = XGetAtomName(display, event.xselectionrequest.selection);
-                            Locator::getLogger()->warn("selection wasnt clpboard but ...{}", xxx);
+                            std::string zzz;
+                            zzz = XGetAtomName(display, clipboard);
+                            Locator::getLogger()->warn("selection wasnt {} but ... was {}", zzz, xxx);
                             break;
                         }
                         Locator::getLogger()->warn("got selectionrequest");
