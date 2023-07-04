@@ -119,7 +119,7 @@ jobs:
       - name: Checkout CrashpadTools
         uses: actions/checkout@v3
         with:
-          repository: etternagame/CrashpadTools
+          repository: poco0317/CrashpadTools
           path: tools
 
       - name: Install homebrew packages
