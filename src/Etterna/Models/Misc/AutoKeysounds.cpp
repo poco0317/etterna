@@ -101,10 +101,12 @@ AutoKeysounds::LoadAutoplaySoundsInto(RageSoundReader_Chain* pChain)
 void
 AutoKeysounds::LoadTracks(const Song* pSong,
 						  RageSoundReader*& pShared,
-						  RageSoundReader*& pPlayer1)
+						  RageSoundReader*& pPlayer1,
+						  RageSoundReader*& pPlayer2)
 {
 	pPlayer1 = nullptr;
 	pShared = nullptr;
+	pPlayer2 = nullptr;
 
 	std::vector<std::string> vsMusicFile;
 	const auto sMusicPath = GAMESTATE->m_pCurSteps->GetMusicPath();
@@ -155,7 +157,7 @@ AutoKeysounds::FinishLoading()
 	Song* pSong = GAMESTATE->m_pCurSong;
 
 	std::vector<RageSoundReader*> apSounds;
-	LoadTracks(pSong, m_pSharedSound, m_pPlayerSounds);
+	LoadTracks(pSong, m_pSharedSound, m_pPlayerSounds[0], m_pPlayerSounds[1]);
 
 	// Load autoplay sounds, if any.
 	{
@@ -183,11 +185,21 @@ AutoKeysounds::FinishLoading()
 	m_pSharedSound = new RageSoundReader_Pan(m_pSharedSound);
 	apSounds.push_back(m_pSharedSound);
 
-	if (m_pPlayerSounds != nullptr) {
-		m_pPlayerSounds = new RageSoundReader_PitchChange(m_pPlayerSounds);
-		m_pPlayerSounds = new RageSoundReader_PostBuffering(m_pPlayerSounds);
-		m_pPlayerSounds = new RageSoundReader_Pan(m_pPlayerSounds);
-		apSounds.push_back(m_pPlayerSounds);
+	if (m_pPlayerSounds[0] != nullptr) {
+		m_pPlayerSounds[0] = new RageSoundReader_PitchChange(m_pPlayerSounds[0]);
+		m_pPlayerSounds[0] =
+		  new RageSoundReader_PostBuffering(m_pPlayerSounds[0]);
+		m_pPlayerSounds[0] = new RageSoundReader_Pan(m_pPlayerSounds[0]);
+		apSounds.push_back(m_pPlayerSounds[0]);
+	}
+
+	if (m_pPlayerSounds[1] != nullptr) {
+		m_pPlayerSounds[1] =
+		  new RageSoundReader_PitchChange(m_pPlayerSounds[1]);
+		m_pPlayerSounds[1] =
+		  new RageSoundReader_PostBuffering(m_pPlayerSounds[1]);
+		m_pPlayerSounds[1] = new RageSoundReader_Pan(m_pPlayerSounds[1]);
+		apSounds.push_back(m_pPlayerSounds[1]);
 	}
 
 	if (apSounds.size() > 1) {

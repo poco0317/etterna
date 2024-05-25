@@ -23,20 +23,21 @@ class AutoKeysounds
 	{
 		if (pn == PLAYER_INVALID)
 			return nullptr;
-		return m_pPlayerSounds;
+		return m_pPlayerSounds[pn];
 	}
 
   protected:
 	void LoadAutoplaySoundsInto(RageSoundReader_Chain* pChain);
 	static void LoadTracks(const Song* pSong,
 						   RageSoundReader*& pGlobal,
-						   RageSoundReader*& pPlayer1);
+						   RageSoundReader*& pPlayer1,
+						   RageSoundReader*& pPlayer2);
 
 	NoteData m_ndAutoKeysoundsOnly;
 	std::vector<RageSound> m_vKeysounds;
 	RageSound m_sSound;
 	RageSoundReader* m_pChain;		  // owned by m_sSound
-	RageSoundReader* m_pPlayerSounds; // owned by m_sSound
+	RageSoundReader* m_pPlayerSounds[1]; // owned by m_sSound
 	RageSoundReader* m_pSharedSound;  // owned by m_sSound
 };
 
