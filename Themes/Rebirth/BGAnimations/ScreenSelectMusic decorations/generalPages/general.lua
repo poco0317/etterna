@@ -158,8 +158,6 @@ local msdNames = {
     ms.SkillSetsTranslatedByName["Jumpstream"],
     ms.SkillSetsTranslatedByName["Handstream"],
     ms.SkillSetsTranslatedByName["Stamina"],
-    ms.SkillSetsTranslatedByName["JackSpeed"],
-    ms.SkillSetsTranslatedByName["Chordjack"],
     ms.SkillSetsTranslatedByName["Technical"],
 }
 
@@ -244,6 +242,7 @@ local function createTopSkillsetLines()
                 SetCommand = function(self, params)
                     if params.steps then
                         local ss = params.steps:GetRelevantSkillsetsByMSDRank(getCurRateValue(), i)
+                        if ss:find("Jack") ~= nil then ss = "" end
                         self:settext(ss)
                     else
                         self:settext("")
@@ -337,7 +336,11 @@ local function createMSDLines()
                     else
                         if params.song then
                             if params.steps then
-                                local val = params.steps:GetMSD(getCurRateValue(), i)
+                                local zi = i
+                                if zi == 6 then
+                                    zi = 8
+                                end
+                                local val = params.steps:GetMSD(getCurRateValue(), zi)
                                 self:targetnumber(val)
                                 self:diffuse(colorByMSD(val))
                             else

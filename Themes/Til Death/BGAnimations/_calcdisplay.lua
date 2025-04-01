@@ -786,8 +786,10 @@ local function getDebugModsForIndex(modgroup, modgroupname, extramodgroup, index
         local mod = shortenEnum(modgroupname, mod)
         for h = 1, 2 do
             local hand = h == 2 and "R" or "L"
-            modsToValues[#modsToValues + 1] = graphVecs[mod][h]
-            modNames[#modNames + 1] = mod..hand
+            if graphVecs[mod] ~= nil then
+                modsToValues[#modsToValues + 1] = graphVecs[mod][h]
+                modNames[#modNames + 1] = mod..hand
+            end
         end
     end
 
@@ -796,8 +798,10 @@ local function getDebugModsForIndex(modgroup, modgroupname, extramodgroup, index
         local mod = shortenEnum("CalcDebugMisc", mod)
         for h = 1,2 do
             local hand = h == 2 and "R" or "L"
-            modsToValues[#modsToValues + 1] = graphVecs[mod][h]
-            modNames[#modNames + 1] = mod..hand
+            if graphVecs[mod] ~= nil then
+                modsToValues[#modsToValues + 1] = graphVecs[mod][h]
+                modNames[#modNames + 1] = mod..hand
+            end
         end
     end
     

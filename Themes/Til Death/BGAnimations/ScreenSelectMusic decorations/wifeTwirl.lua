@@ -444,7 +444,7 @@ t[#t + 1] = Def.ActorFrame {
 			if song and GAMESTATE:GetCurrentStyle():ColumnsPerPlayer() == 4 then
 				local ss = steps:GetRelevantSkillsetsByMSDRank(getCurRateValue(), 1)
 				local out = ss == "" and "" or ms.SkillSetsTranslatedByName[ss]
-
+				if out == nil then out = "" end
 				self:settext(out)
 			else
 				self:settext("")
@@ -465,6 +465,7 @@ t[#t + 1] = Def.ActorFrame {
 			if song and GAMESTATE:GetCurrentStyle():ColumnsPerPlayer() == 4 then
 				local ss = steps:GetRelevantSkillsetsByMSDRank(getCurRateValue(), 2)
 				local out = ss == "" and "" or ms.SkillSetsTranslatedByName[ss]
+				if out == nil then out = "" end
 				self:settext(out)
 			else
 				self:settext("")
@@ -485,6 +486,7 @@ t[#t + 1] = Def.ActorFrame {
 			if song and GAMESTATE:GetCurrentStyle():ColumnsPerPlayer() == 4 then
 				local ss = steps:GetRelevantSkillsetsByMSDRank(getCurRateValue(), 3)
 				local out = ss == "" and "" or ms.SkillSetsTranslatedByName[ss]
+				if out == nil then out = "" end
 				self:settext(out)
 			else
 				self:settext("")

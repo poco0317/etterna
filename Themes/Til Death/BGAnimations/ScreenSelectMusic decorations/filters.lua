@@ -71,7 +71,11 @@ local function FilterInput(event)
 			else
 				num = tonumber(SSQuery[activebound][ActiveSS])
 			end
-			FILTERMAN:SetSSFilter(num, ActiveSS, activebound)
+			local realss = ActiveSS
+			if realss >= 6 then
+				realss = realss + 2
+			end
+			FILTERMAN:SetSSFilter(num, realss, activebound)
 			whee:SongSearch("") -- stupid workaround?
 			MESSAGEMAN:Broadcast("UpdateFilter")
 		end

@@ -632,7 +632,15 @@ local function createList()
         local function sortPlaysBySkillset()
             local t = {}
             for i,v in ipairs(playsbyskillset) do
-                t[i] = {v, ms.SkillSets[i]}
+                if i == 8 then
+                    t[6] = {v, ms.SkillSets[6]}
+                else
+                    if i > #ms.SkillSets then
+                        --
+                    else
+                        t[i] = {v, ms.SkillSets[i]}
+                    end
+                end
             end
 
             table.sort(

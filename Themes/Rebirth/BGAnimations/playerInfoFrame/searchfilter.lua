@@ -38,8 +38,6 @@ local translations = {
     JumpstreamFilter = THEME:GetString("SearchFilter", "JumpstreamFilter"),
     HandstreamFilter = THEME:GetString("SearchFilter", "HandstreamFilter"),
     StaminaFilter = THEME:GetString("SearchFilter", "StaminaFilter"),
-    JackSpeedFilter = THEME:GetString("SearchFilter", "JackSpeedFilter"),
-    ChordjacksFilter = THEME:GetString("SearchFilter", "ChordjacksFilter"),
     TechnicalFilter = THEME:GetString("SearchFilter", "TechnicalFilter"),
     LengthFilter = THEME:GetString("SearchFilter", "LengthFilter"),
     ClearPercentFilter = THEME:GetString("SearchFilter", "ClearPercentFilter"),
@@ -540,8 +538,6 @@ local function lowerSection()
         translations["JumpstreamFilter"],
         translations["HandstreamFilter"],
         translations["StaminaFilter"],
-        translations["JackSpeedFilter"],
-        translations["ChordjacksFilter"],
         translations["TechnicalFilter"],
         translations["LengthFilter"],
         translations["ClearPercentFilter"],
@@ -558,8 +554,6 @@ local function lowerSection()
         { 0, 40 },  -- Jumpstream
         { 0, 40 },  -- Handstream
         { 0, 40 },  -- Stamina
-        { 0, 40 },  -- JackSpeed
-        { 0, 40 },  -- Chordjacks
         { 0, 40 },  -- Technical
         { 0, 600 },  -- Length (in seconds)
         { 85, 100 }, -- Percent
@@ -604,14 +598,6 @@ local function lowerSection()
         function(lb, ub, limits)
             setSSFilter(5, lb, ub)
         end,
-        -- Jackspeed range
-        function(lb, ub, limits)
-            setSSFilter(6, lb, ub)
-        end,
-        -- Chordjacks range
-        function(lb, ub, limits)
-            setSSFilter(7, lb, ub)
-        end,
         -- Tech range
         function(lb, ub, limits)
             setSSFilter(8, lb, ub)
@@ -654,14 +640,6 @@ local function lowerSection()
         -- Stamina range
         function()
             return getSSFilter(5)
-        end,
-        -- Jackspeed range
-        function()
-            return getSSFilter(6)
-        end,
-        -- Chordjacks range
-        function()
-            return getSSFilter(7)
         end,
         -- Tech range
         function()

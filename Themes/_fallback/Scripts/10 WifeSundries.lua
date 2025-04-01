@@ -62,8 +62,6 @@ ms.SkillSets = {
 	"Jumpstream",
 	"Handstream",
 	"Stamina",
-	"JackSpeed",
-	"Chordjack",
 	"Technical"
 }
 
@@ -73,8 +71,6 @@ ms.SkillSetsTranslatedByName = {
 	Jumpstream = THEME:GetString("Skillsets", "Jumpstream"),
 	Handstream = THEME:GetString("Skillsets", "Handstream"),
 	Stamina = THEME:GetString("Skillsets", "Stamina"),
-	JackSpeed = THEME:GetString("Skillsets", "JackSpeed"),
-	Chordjack = THEME:GetString("Skillsets", "Chordjack"),
 	Technical = THEME:GetString("Skillsets", "Technical"),
 }
 
@@ -84,8 +80,6 @@ ms.SkillSetsTranslated = {
 	THEME:GetString("Skillsets", "Jumpstream"),
 	THEME:GetString("Skillsets", "Handstream"),
 	THEME:GetString("Skillsets", "Stamina"),
-	THEME:GetString("Skillsets", "JackSpeed"),
-	THEME:GetString("Skillsets", "Chordjack"),
 	THEME:GetString("Skillsets", "Technical"),
 }
 
@@ -95,8 +89,6 @@ ms.SkillSetsShortTranslated = {
 	THEME:GetString("Skillsets", "JumpstreamShort"),
 	THEME:GetString("Skillsets", "HandstreamShort"),
 	THEME:GetString("Skillsets", "StaminaShort"),
-	THEME:GetString("Skillsets", "JackSpeedShort"),
-	THEME:GetString("Skillsets", "ChordjackShort"),
 	THEME:GetString("Skillsets", "TechnicalShort"),
 }
 

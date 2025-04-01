@@ -585,8 +585,6 @@ local sortmodes = {
     "Jumpstream MSD", -- group by highest jumpstream MSD
     "Handstream MSD", -- group by highest handstream MSD
     "Stamina MSD", -- group by highest stamina MSD
-    "Jackspeed MSD", -- group by highest jack MSD
-    "Chordjack MSD", -- group by highest chordjack MSD
     "Technical MSD", -- group by highest tech MSD
     "Length", -- group by length range
     "Date Added", -- group by date of song load (until cache reset)
@@ -1384,78 +1382,6 @@ local sortmodeImplementations = {
         end,
     },
 
-    {   -- Jackspeed MSD sort -- pack folders sorted internally by jacks
-        function()
-            WHEELDATA:ResetSorts()
-            local songs = WHEELDATA:GetAllSongsPassingFilter()
-
-            -- go through AllSongs and construct it as we go, then sort
-            for _, song in ipairs(songs) do
-                local fname = song:GetGroupName()
-                if WHEELDATA.AllSongsByFolder[fname] ~= nil then
-                    WHEELDATA.AllSongsByFolder[fname][#WHEELDATA.AllSongsByFolder[fname] + 1] = song
-                else
-                    WHEELDATA.AllSongsByFolder[fname] = {song}
-                    WHEELDATA.AllFolders[#WHEELDATA.AllFolders + 1] = fname
-                end
-                WHEELDATA.AllFilteredSongs[#WHEELDATA.AllFilteredSongs + 1] = song
-            end
-
-            -- sort folders and songs
-            table.sort(WHEELDATA.AllFolders, function(a,b) return a:lower() < b:lower() end)
-            for _, songlist in pairs(WHEELDATA.AllSongsByFolder) do
-                table.sort(
-                    songlist,
-                    function(a,b)
-                        return getHighestDiffForSongBySkillset(a, 6) < getHighestDiffForSongBySkillset(b, 6)
-                    end
-                )
-            end
-        end,
-        function(song)
-            return song:GetGroupName()
-        end,
-        function(packName)
-            return SONGMAN:GetSongGroupBannerPath(packName)
-        end,
-    },
-
-    {   -- Chordjack MSD sort -- pack folders sorted internally by chordjacks
-        function()
-            WHEELDATA:ResetSorts()
-            local songs = WHEELDATA:GetAllSongsPassingFilter()
-
-            -- go through AllSongs and construct it as we go, then sort
-            for _, song in ipairs(songs) do
-                local fname = song:GetGroupName()
-                if WHEELDATA.AllSongsByFolder[fname] ~= nil then
-                    WHEELDATA.AllSongsByFolder[fname][#WHEELDATA.AllSongsByFolder[fname] + 1] = song
-                else
-                    WHEELDATA.AllSongsByFolder[fname] = {song}
-                    WHEELDATA.AllFolders[#WHEELDATA.AllFolders + 1] = fname
-                end
-                WHEELDATA.AllFilteredSongs[#WHEELDATA.AllFilteredSongs + 1] = song
-            end
-
-            -- sort folders and songs
-            table.sort(WHEELDATA.AllFolders, function(a,b) return a:lower() < b:lower() end)
-            for _, songlist in pairs(WHEELDATA.AllSongsByFolder) do
-                table.sort(
-                    songlist,
-                    function(a,b)
-                        return getHighestDiffForSongBySkillset(a, 7) < getHighestDiffForSongBySkillset(b, 7)
-                    end
-                )
-            end
-        end,
-        function(song)
-            return song:GetGroupName()
-        end,
-        function(packName)
-            return SONGMAN:GetSongGroupBannerPath(packName)
-        end,
-    },
-
     {   -- Technical MSD sort -- pack folders sorted internally by technical
         function()
             WHEELDATA:ResetSorts()
@@ -2026,7 +1952,11 @@ local function getAverageDifficultyOfGroup(group)
             if countableStepsTypeForDiff(chart:GetStepsType()) then
                 chartcount = chartcount + 1
                 for i, ___ in ipairs(ms.SkillSets) do
-                    out[i] = out[i] + chart:GetMSD(1, i)
+                    local zi = i
+                    if zi == 6 then
+                        zi = 8
+                    end
+                    out[i] = out[i] + chart:GetMSD(1, zi)
                 end
             end
         end

@@ -56,7 +56,9 @@ local t = Def.ActorFrame {
 			greatest = 0
 			if song and steps then
 				for i = 1, #ms.SkillSets do
-					meter[i + 1] = steps:GetMSD(getCurRateValue(), i)
+					local zi = i
+					if zi == 6 then zi = 8 end
+					meter[i + 1] = steps:GetMSD(getCurRateValue(), zi)
 					if meter[i + 1] > meter[greatest + 1] then
 						greatest = i
 					end

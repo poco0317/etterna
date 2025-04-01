@@ -45,7 +45,9 @@ t[#t+1] = Def.ActorFrame {
         if steps then
             meter = {}
             for i = 1, #ms.SkillSets do
-                local m = steps:GetMSD(getCurRateValue(), i)
+                local zi = i
+                if zi == 6 then zi = 8 end
+                local m = steps:GetMSD(getCurRateValue(), zi)
                 meter[i] = m
             end
         end

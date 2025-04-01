@@ -123,14 +123,6 @@ local function helpMenu()
                 Image = THEME:GetPathG("", "Patterns/gluts"),
             },
             {
-                Name = "Chordjack",
-                Image = THEME:GetPathG("", "Patterns/chordjacks"),
-            },
-            {
-                Name = "DenseChordjack",
-                Image = THEME:GetPathG("", "Patterns/dense chordjack"),
-            },
-            {
                 Name = "Stream",
                 Image = THEME:GetPathG("", "Patterns/streams"),
             },
@@ -161,14 +153,6 @@ local function helpMenu()
             {
                 Name = "SplitJumptrillTrainTrack",
                 Image = THEME:GetPathG("", "Patterns/14 split jt"),
-            },
-            {
-                Name = "Minijacks",
-                Image = THEME:GetPathG("", "Patterns/minijacks"),
-            },
-            {
-                Name = "Longjack",
-                Image = THEME:GetPathG("", "Patterns/longjack"),
             },
             {
                 Name = "Anchor",

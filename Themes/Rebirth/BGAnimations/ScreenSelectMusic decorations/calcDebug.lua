@@ -867,8 +867,10 @@ local function getDebugModsForIndex(modgroup, modgroupname, extramodgroup, index
         local mod = shortenEnum(modgroupname, mod)
         for h = 1, 2 do
             local hand = h == 2 and "R" or "L"
-            modsToValues[#modsToValues + 1] = graphVecs[mod][h]
-            modNames[#modNames + 1] = mod..hand
+            if graphVecs[mod] ~= nil then
+                modsToValues[#modsToValues + 1] = graphVecs[mod][h]
+                modNames[#modNames + 1] = mod..hand
+            end
         end
     end
 
@@ -877,8 +879,10 @@ local function getDebugModsForIndex(modgroup, modgroupname, extramodgroup, index
         local mod = shortenEnum("CalcDebugMisc", mod)
         for h = 1,2 do
             local hand = h == 2 and "R" or "L"
-            modsToValues[#modsToValues + 1] = graphVecs[mod][h]
-            modNames[#modNames + 1] = mod..hand
+            if graphVecs[mod] ~= nil then
+                modsToValues[#modsToValues + 1] = graphVecs[mod][h]
+                modNames[#modNames + 1] = mod..hand
+            end
         end
     end
     
@@ -1514,7 +1518,9 @@ local function msditem(i)
             SetCommand = function(self, params)
                 if focused then
                     if params.steps == nil then return end
-                    local meter = params.steps:GetMSD(getCurRateValue(), i)
+                    local zi = i
+                    if zi == 6 then zi = 8 end
+                    local meter = params.steps:GetMSD(getCurRateValue(), zi)
                     self:diffuse(colorByMSD(meter))
                     self:settextf("%5.2f", meter)
                 end
@@ -1859,8 +1865,6 @@ t[#t+1] = Def.ActorFrame {
                         ssrs[3][ssrindex], -- jumpstream
                         ssrs[4][ssrindex], -- handstream
                         ssrs[5][ssrindex], -- stamina
-                        ssrs[6][ssrindex], -- jackspeed
-                        ssrs[7][ssrindex], -- chordjack
                         ssrs[8][ssrindex], -- technical
                     }
                     local ssrtext = string.format("Percent: %5.4f\n", (ssrLowerBoundWife + (ssrUpperBoundWife-ssrLowerBoundWife)*perc)*100)
